@@ -391,3 +391,9 @@ This error is thrown for any queries that were pending when the timeout to [`sql
 ## NOTICE using `onnotice`
 
 nb. You can use [`onnotice`](#onnotice) to listen to any Postgres `NOTICE` sent on connections. But note that this will be called for every singlee connection to the database.
+
+
+## Thank you
+
+A really big thank you to @JAForbes who introduced me to Postgres and still holds my hand navigating all the great opportunities we have.
+
