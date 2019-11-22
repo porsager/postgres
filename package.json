@@ -1,0 +1,28 @@
+{
+  "name": "postgres",
+  "version": "0.0.2",
+  "description": "Fastest full featured PostgreSQL client for Node.js",
+  "main": "lib/index.js",
+  "type": "module",
+  "scripts": {
+    "prepublishOnly": "npm run build",
+    "build": "node cjs/transpile.js"
+  },
+  "files": [
+    "/lib",
+    "/cjs"
+  ],
+  "author": "Rasmus Porsager <rasmus@porsager.com",
+  "license": "WTFPL",
+  "repository": "porsager/postgres",
+  "keywords": [
+    "postgresql",
+    "postgres",
+    "postgre",
+    "client",
+    "sql",
+    "db",
+    "pg",
+    "database"
+  ]
+}
