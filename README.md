@@ -41,7 +41,7 @@ const postgres = require('postgres/cjs')
 
 const sql = postgres('postgres://user:pass@host:port/database', {
   ssl         : false,      // True, or an object with options to tls.connect
-  connections : 10,         // Max number of connections
+  max         : 10,         // Max number of connections
   timeout     : 0,          // Idle connection timeout in seconds
   types       : [],         // Custom types, see section below
   onconnect   : null,       // Runs before any queries on each connect
