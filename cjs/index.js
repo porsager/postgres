@@ -289,16 +289,16 @@ module.exports = function Postgres(url, options) {
     let c
     let destroy
 
+    if (timeout === 0)
+      return ended = Promise.all(all.map(c => c.destroy()))
+
     return ended = Promise.race([
-      Promise.all(timeout === 0
-        ? all.map(c => c.destroy())
-        : all.map(c => c.end())
-      )
-      .concat(timeout > 0
-        ? Promise.resolve(r => destroy = setTimeout(() => all.map(c => c.destroy()), timeout * 1000))
+      all.map(c => c.end())
+    ].concat(
+      timeout > 0
+        ? new Promise(r => destroy = setTimeout(() => (all.map(c => c.destroy()), r()), timeout * 1000))
         : []
-      )
-    ])
+    ))
     .then(() => clearTimeout(destroy))
   }
 

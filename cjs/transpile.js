@@ -16,6 +16,6 @@ fs.readdirSync(path.join('lib')).forEach(name =>
 fs.writeFileSync(
   path.join('cjs', 'package.json'),
   fs.readFileSync('package.json', 'utf8')
-    .replace('"type": "module",', '')
+    .replace('"type": "module"', '"type": "commonjs"')
     .replace('"main": "lib/index.js"', '"main": "index.js"')
 )

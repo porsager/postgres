@@ -1,9 +1,9 @@
 {
-  "name": "postgres",
-  "version": "0.0.2",
+  "name": "peegee",
+  "version": "0.0.3",
   "description": "Fastest full featured PostgreSQL client for Node.js",
   "main": "index.js",
-  
+  "type": "commonjs",
   "scripts": {
     "prepublishOnly": "npm run build",
     "build": "node cjs/transpile.js"
@@ -24,5 +24,8 @@
     "db",
     "pg",
     "database"
-  ]
+  ],
+  "dependencies": {
+    "wtfnode": "0.8.0"
+  }
 }
