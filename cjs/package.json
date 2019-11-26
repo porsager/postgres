@@ -5,6 +5,7 @@
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
+    "test": "node tests/index.js",
     "prepublishOnly": "npm run build",
     "build": "node cjs/transpile.js"
   },
@@ -16,6 +17,7 @@
   "license": "WTFPL",
   "repository": "porsager/postgres",
   "keywords": [
+    "driver",
     "postgresql",
     "postgres",
     "postgre",
@@ -24,8 +26,5 @@
     "db",
     "pg",
     "database"
-  ],
-  "dependencies": {
-    "wtfnode": "0.8.0"
-  }
+  ]
 }

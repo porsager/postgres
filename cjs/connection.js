@@ -7,8 +7,8 @@ const { errors } = require('./types.js')
 
 module.exports = function Connection(options = {}) {
   const {
-    database,
-    user,
+    onparameter,
+    transform,
     timeout,
     onnotify,
     onnotice,
@@ -34,6 +34,8 @@ module.exports = function Connection(options = {}) {
   })
 
   const backend = Backend({
+    onparameter,
+    transform,
     parsers,
     resolve,
     reject,
@@ -84,31 +86,34 @@ module.exports = function Connection(options = {}) {
       q.reject(err)
   }
 
-  function send(query, { str, args = [] }) {
+  function send(query, { sig, str, args = [] }) {
+    query.result = []
+    query.result.count = null
     timeout && clearTimeout(timer)
     !connection.ready || backend.query
       ? queries.push(query)
       : (backend.query = query)
 
-    const buffer = statements.has(str)
-      ? prepared(statements.get(str), str, args)
-      : prepare(str, args)
+    const buffer = statements.has(sig)
+      ? prepared(statements.get(sig), args, query)
+      : prepare(sig, str, args, query)
 
     connection.ready
       ? socket.write(buffer)
       : (messages.push(buffer), socket.connect())
   }
 
-  function prepared(name, str, args) {
-    return frontend.Bind(name, args)
+  function prepared(statement, args, query) {
+    query.statement = statement
+    return frontend.Bind(statement.name, args)
   }
 
-  function prepare(str, args) {
-    const name = 'p' + id++
-    statements.set(str, name)
+  function prepare(sig, str, args, query) {
+    query.statement = { name: sig ? 'p' + id++ : '' }
+    sig && statements.set(sig, query.statement)
     return Buffer.concat([
-      frontend.Parse(name, str, args),
-      frontend.Bind(name, args)
+      frontend.Parse(query.statement.name, str, args),
+      frontend.Bind(query.statement.name, args)
     ])
   }
 
@@ -141,13 +146,13 @@ module.exports = function Connection(options = {}) {
       if (length >= buffer.length)
         break
 
-      (backend[buffer[0]] || unknown)(buffer)
+      (backend[buffer[0]] || unknown)(buffer.slice(0, length + 1))
       buffer = buffer.slice(length + 1)
     }
   }
 
   function ready() {
-    socket.write(frontend.connect({ user, database }))
+    socket.write(frontend.connect(options))
   }
 
   function close() {

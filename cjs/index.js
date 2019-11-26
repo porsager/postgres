@@ -8,9 +8,18 @@ const {
   arraySerializer,
   arrayParser,
   inferType,
+  toPascal,
+  toCamel,
+  toKebab,
   errors,
   types
 } = require('./types.js')
+
+Object.assign(Postgres, {
+  toPascal,
+  toCamel,
+  toKebab
+})
 
 module.exports = function Postgres(url, options) {
   options = parseOptions(url, options)
@@ -18,7 +27,7 @@ module.exports = function Postgres(url, options) {
   let ready = false
     , ended = null
     , arrayTypesPromise
-    , max = Math.max(1, options.connections || options.max)
+    , max = Math.max(1, options.max)
     , listener
 
   const connections = Queue()
@@ -28,16 +37,25 @@ module.exports = function Postgres(url, options) {
       , typeArrayMap = {}
 
   function postgres(xs, ...args) {
-    return query(getConnection(), xs, args)
+    return query(false, getConnection(), xs, args)
   }
 
   Object.assign(postgres, {
+    parameters: {},
     listen,
     begin,
     end
   })
 
   addTypes(postgres)
+
+  const onparameter = options.onparameter
+  options.onparameter = (k, v) => {
+    if (postgres.parameters[k] !== v) {
+      postgres.parameters[k] = v
+      onparameter && onparameter(k, v)
+    }
+  }
 
   return postgres
 
@@ -65,7 +83,7 @@ module.exports = function Postgres(url, options) {
     savepoint = ''
   }, connection) {
     begin && (connection.savepoints = 0)
-    addTypes(scoped)
+    addTypes(scoped, connection)
     scoped.savepoint = (name, fn) => new Promise((resolve, reject) => {
       transaction({
         savepoint: 'savepoint s' + connection.savepoints++ + '_' + (fn ? name : ''),
@@ -75,25 +93,24 @@ module.exports = function Postgres(url, options) {
       }, connection)
     })
 
-    query(connection, raw(begin || savepoint))
+    query(true, connection, begin || savepoint)
       .then(() => {
         const result = fn(scoped)
-        return (Array.isArray(result)
+        return Array.isArray(result)
           ? Promise.all(result)
           : result
-        )
       })
       .then((x) =>
         begin
-          ? scoped`commit`
+          ? scoped`commit`.then(() => resolve(x))
           : resolve(x)
       )
       .catch((err) => {
-        query(connection, raw(
+        query(true, connection,
           begin
             ? 'rollback'
             : 'rollback to ' + savepoint
-        ))
+        )
         .then(() => reject(err))
       })
       .then(() => {
@@ -102,10 +119,7 @@ module.exports = function Postgres(url, options) {
       })
 
     function scoped(xs, ...args) {
-      return query(connection, xs, args).catch(err => {
-        reject(err)
-        throw err
-      })
+      return query(false, connection, xs, args).catch(reject)
     }
   }
 
@@ -119,15 +133,15 @@ module.exports = function Postgres(url, options) {
     while ((x = queries.shift()) && (c = getConnection(x.fn))) {
       x.fn
         ? transaction(x, c)
-        : c.send(x.query, parse(x.xs, x.args))
+        : send(c, x.query, x.xs, x.args)
     }
   }
 
-  function query(connection, xs, args) {
-    if (!Array.isArray(xs) || !Array.isArray(xs.raw))
+  function query(raw, connection, xs, args) {
+    if (!raw && (!Array.isArray(xs) || !Array.isArray(xs.raw)))
       throw errors.generic({ message: 'Query not called as a tagged template literal', code: 'NOT_TAGGED_CALL' })
 
-    const query = {}
+    const query = { raw }
 
     const promise = new Promise((resolve, reject) => {
       query.resolve = resolve
@@ -147,14 +161,14 @@ module.exports = function Postgres(url, options) {
 
   function send(connection, query, xs, args) {
     connection
-      ? connection.send(query, parse(xs, args))
+      ? connection.send(query, query.raw ? parseRaw(xs, args) : parse(xs, args))
       : queries.push({ query, xs, args })
   }
 
   function getConnection(reserve) {
-    const connection = connections.shift() || (--max && createConnection(options))
+    const connection = --max >= 0 ? createConnection(options) : connections.shift()
     !options.fifo && !reserve && connection && connections.push(connection)
-    connection.active = !(options.onconnect && !connection.ready)
+    connection && (connection.active = !(options.onconnect && !connection.ready))
     return options.onconnect && !connection.ready
       ? instance({ fn: options.onconnect }, connection)
       : connection
@@ -170,11 +184,11 @@ module.exports = function Postgres(url, options) {
 
   function instance({ fn }, connection) {
     let queries = 0
-    addTypes(scoped)
+    addTypes(scoped, connection)
     const container = fn(scoped)
     function scoped(xs, ...args) {
       queries++
-      const promise = query(connection, xs, args)
+      const promise = query(false, connection, xs, args)
       promise.then(finished, finished)
       return promise
     }
@@ -221,11 +235,11 @@ module.exports = function Postgres(url, options) {
   function fetchArrayTypes(connection) {
     return arrayTypesPromise || (arrayTypesPromise =
       new Promise((resolve, reject) => {
-        send(connection, { resolve, reject }, raw(`
+        send(connection, { resolve, reject, raw: true }, `
           select oid, typelem
           from pg_catalog.pg_type
           where typcategory = 'A'
-        `))
+        `)
       }).then(types => {
         types.forEach(({ oid, typelem }) => addArrayType(oid, typelem))
         ready = true
@@ -242,9 +256,10 @@ module.exports = function Postgres(url, options) {
     options.serializers[oid] = (xs) => arraySerializer(xs, serializer)
   }
 
-  function addTypes(instance) {
+  function addTypes(instance, connection) {
     Object.assign(instance, {
       notify: (channel, payload) => instance`select pg_notify(${ channel }, ${ String(payload) })`,
+      unsafe: (xs, args) => query(true, connection || getConnection(), xs, args),
       array,
       rows,
       row,
@@ -267,7 +282,7 @@ module.exports = function Postgres(url, options) {
       ? listeners[x].push(fn)
       : (listeners[x] = [fn])
 
-    return query(getListener(), raw('listen "' + x + '"')).then(() => x)
+    return query(true, getListener(), 'listen "' + x + '"').then(() => x)
   }
 
   function getListener() {
@@ -302,45 +317,70 @@ module.exports = function Postgres(url, options) {
     .then(() => clearTimeout(destroy))
   }
 
-  function parse(xs, args) {
+  function parseRaw(str, args = []) {
+    const types = []
+        , xargs = args.map(x => {
+          const type = getType(x)
+          types.push(type.type)
+          return type
+        })
+
+    return {
+      sig: types + str,
+      str,
+      args: xargs
+    }
+  }
+
+  function parse(xs, args = []) {
     const xargs = []
+        , types = []
+
     let str = xs[0]
     let arg
 
     for (let i = 1; i < xs.length; i++) {
       arg = args[i - 1]
       str += (arg.rows
-        ? parseRows(arg.rows, xargs)
+        ? parseRows(arg.rows, xargs, types)
         : arg.row
-          ? parseRow(arg.row, xargs)
-          : parseValue(arg, xargs)
+          ? parseRow(arg.row, xargs, types)
+          : parseValue(arg, xargs, types)
       ) + xs[i]
     }
 
     return {
+      sig: !xargs.dynamic && types + str,
       str: str.trim(),
       args: xargs
     }
   }
 
-  function parseRows(rows, xargs) {
-    return rows.map(row => parseRow(row, xargs)).join(',')
+  function parseRows(rows, xargs, types) {
+    xargs.dynamic = true
+    return rows.map(row => parseRow(row, xargs, types)).join(',')
   }
 
-  function parseRow(row, xargs) {
-    return '(' + row.map(x => parseValue(x, xargs)).join(',') + ')'
+  function parseRow(row, xargs, types) {
+    return '(' + row.map(x => parseValue(x, xargs, types)).join(',') + ')'
   }
 
-  function parseValue(x, xargs) {
+  function parseValue(x, xargs, types) {
+    const type = getType(x)
+    types.push(type.type)
+    return '$' + xargs.push(type)
+  }
+
+  function getType(x) {
     const value = x.value ? x.value : x
         , type = x.type || (Array.isArray(value) ? typeArrayMap[inferType(value)] : inferType(value))
 
-    return '$' + xargs.push({
+    return {
       type,
       value: type
         ? (options.serializers[type] || types.string.serialize)(value)
         : value
-    })
+    }
   }
 }
 
@@ -348,13 +388,15 @@ function parseOptions(url, options = {}) {
   const env = process.env // eslint-disable-line
 
   options = Object.assign({
+    connection: {},
     host      : env.PGHOST || 'localhost',
     port      : env.PGPORT || 5432,
     database  : env.PGDATABASE || 'postgres',
     username  : env.PGUSERNAME || os.userInfo().username,
     password  : env.PGPASSWORD || '',
     max       : Math.max(1, os.cpus().length - 1),
-    fifo      : false
+    fifo      : false,
+    transform : x => x
   },
     typeof url === 'string' ? parseUrl(url) : url,
     options,
@@ -367,7 +409,11 @@ function parseOptions(url, options = {}) {
   options.user = String(options.username || options.user)
   options.pass = String(options.password || options.pass)
   options.host = String(options.hostname || options.host)
+  options.database = options.db || options.database
   options.port = parseInt(options.port)
+
+  if ('application_name' in options.connection === false)
+    options.connection.application_name = 'postgres.js'
 
   if (!options.path && options.host.indexOf('/') > -1)
     options.path = options.host + '/.s.PGSQL.' + options.port

@@ -145,6 +145,22 @@ function arrayParserLoop(s, x, parser) {
   return xs
 }
 
+const toCamel = module.exports.toCamel = x => {
+  let str = x[0]
+  for (let i = 1; i < x.length; i++)
+    str += x[i] === '_' ? x[++i].toUpperCase() : x[i]
+  return str
+}
+
+const toPascal = module.exports.toPascal = x => {
+  let str = x[0].toUpperCase()
+  for (let i = 1; i < x.length; i++)
+    str += x[i] === '_' ? x[++i].toUpperCase() : x[i]
+  return str
+}
+
+const toKebab = module.exports.toKebab = x => x.replace(/_/g, '-')
+
 const errors = module.exports.errors = {
   connection: (x, options) => Object.assign(
     new Error('write CONNECTION_' + x + ' ' + options.path || (options.host + ':' + options.port)),

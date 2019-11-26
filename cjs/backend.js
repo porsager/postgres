@@ -6,16 +6,16 @@ const char = (acc, [k, v]) => (acc[k.charCodeAt(0)] = v, acc)
 module.exports = Backend
 
 function Backend({
+  onparameter,
   parsers,
   onauth,
   onready,
   resolve,
   reject,
+  transform,
   onnotice,
   onnotify
 }) {
-  let result = null
-  let columns = null
   let rows = 0
 
   const backend = Object.entries({
@@ -47,24 +47,15 @@ function Backend({
 
   const state = backend.state = {
     status    : 'I',
-    settings  : {},
     pid       : null,
     secret    : null
   }
 
   return backend
 
-  function ParseComplete() {
-    // No handling needed
-  }
-
-  function BindComplete() {
-    // No handling needed
-  }
-
-  function CloseComplete() {
-    // No handling needed
-  }
+  function ParseComplete() { /* No handling needed */ }
+  function BindComplete() { /* No handling needed */ }
+  function CloseComplete() { /* No handling needed */ }
 
   function NotificationResponse(x) {
     if (!onnotify)
@@ -79,18 +70,25 @@ function Backend({
   }
 
   function CommandComplete(x) {
-    backend.query && resolve(backend.query.stream
-      ? rows + 1
-      : result
+    if (!backend.query)
+      return
+
+    for (let i = x.length - 1; i > 0; i--) {
+      if (x[i] === 32 && x[i + 1] < 58 && backend.query.result.count === null)
+        backend.query.result.count = +x.utf8Slice(i + 1, x.length - 1) // eslint-disable-line
+      if (x[i - 1] >= 65) {
+        backend.query.result.command = x.utf8Slice(5, i)
+        break
+      }
+    }
+
+    resolve(backend.query.stream
+      ? backend.query.result.count
+      : backend.query.result
     )
-    result = null
-    columns = null
-    rows = 0
   }
 
-  function CopyDone(x) {
-    // No handling needed
-  }
+  function CopyDone(x) { /* No handling needed */ }
 
   function DataRow(x) {
     let index = 7
@@ -98,8 +96,8 @@ function Backend({
     let column
 
     const row = {}
-    for (let i = 0; i < columns.length; i++) {
-      column = columns[i]
+    for (let i = 0; i < backend.query.statement.columns.length; i++) {
+      column = backend.query.statement.columns[i]
       length = x.readInt32BE(index)
       index += 4
 
@@ -114,12 +112,10 @@ function Backend({
 
     backend.query.stream
       ? backend.query.stream(row, rows++)
-      : result.push(row)
+      : backend.query.result.push(row)
   }
 
-  function CopyData(x) {
-    // No handling needed until implemented
-  }
+  function CopyData(x) { /* No handling needed until implemented */ }
 
   function ErrorResponse(x) {
     reject(errors.generic(error(x)))
@@ -133,9 +129,7 @@ function Backend({
     reject(errors.notSupported('CopyOutResponse'))
   }
 
-  function EmptyQueryResponse() {
-    // No handling needed
-  }
+  function EmptyQueryResponse() { /* No handling needed */ }
 
   function BackendKeyData(x) {
     state.pid = x.readInt32BE(5)
@@ -143,12 +137,12 @@ function Backend({
   }
 
   function NoticeResponse(x) {
-    onnotice(error(x))
+    onnotice
+      ? onnotice(error(x))
+      : console.log(error(x))
   }
 
-  function NoData(x) {
-    // No handling needed
-  }
+  function NoData(x) { /* No handling needed */ }
 
   function Authentication(x) {
     const type = x.readInt32BE(5)
@@ -157,7 +151,7 @@ function Backend({
 
   function ParameterStatus(x) {
     const [k, v] = x.utf8Slice(5, x.length - 1).split(N)
-    state.settings[k] = v
+    onparameter(k, v)
   }
 
   function PortalSuspended(x) {
@@ -169,19 +163,22 @@ function Backend({
   }
 
   function RowDescription(x) {
+    rows = 0
+
+    if (backend.query.statement.columns)
+      return
+
     const length = x.readInt16BE(5)
     let index = 7
     let start
 
-    columns = Array(length)
-    result = []
-    rows = 0
+    backend.query.statement.columns = Array(length)
 
     for (let i = 0; i < length; ++i) {
       start = index
       while (x[index++] !== 0);
-      columns[i] = {
-        n: x.utf8Slice(start, index - 1),
+      backend.query.statement.columns[i] = {
+        n: transform(x.utf8Slice(start, index - 1)),
         p: parsers[x.readInt32BE(index + 6)]
       }
       index += 18
