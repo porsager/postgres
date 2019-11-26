@@ -74,12 +74,17 @@ module.exports = {
 
 */
 
-function connect({ user, database }) {
+function connect({ user, database, connection }) {
   return bytes
     .inc(4)
     .i16(3)
     .z(2)
-    .str(['user', user, 'database', database, 'client_encoding', '\'utf-8\''].join(N))
+    .str(Object.entries({
+      user,
+      database,
+      client_encoding: '\'utf-8\'',
+      ...connection
+    }).filter(([k, v]) => v).map(([k, v]) => k + N + v).join(N))
     .z(2)
     .end(0)
 }
