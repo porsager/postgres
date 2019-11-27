@@ -6,6 +6,7 @@ const char = (acc, [k, v]) => (acc[k.charCodeAt(0)] = v, acc)
 module.exports = Backend
 
 function Backend({
+  onparse,
   onparameter,
   parsers,
   onauth,
@@ -53,7 +54,10 @@ function Backend({
 
   return backend
 
-  function ParseComplete() { /* No handling needed */ }
+  function ParseComplete() {
+    onparse()
+  }
+
   function BindComplete() { /* No handling needed */ }
   function CloseComplete() { /* No handling needed */ }
 
@@ -75,7 +79,7 @@ function Backend({
 
     for (let i = x.length - 1; i > 0; i--) {
       if (x[i] === 32 && x[i + 1] < 58 && backend.query.result.count === null)
-        backend.query.result.count = +x.utf8Slice(i + 1, x.length - 1) // eslint-disable-line
+        backend.query.result.count = +x.utf8Slice(i + 1, x.length - 1)
       if (x[i - 1] >= 65) {
         backend.query.result.command = x.utf8Slice(5, i)
         break
@@ -88,7 +92,7 @@ function Backend({
     )
   }
 
-  function CopyDone(x) { /* No handling needed */ }
+  function CopyDone() { /* No handling needed */ }
 
   function DataRow(x) {
     let index = 7
@@ -115,20 +119,24 @@ function Backend({
       : backend.query.result.push(row)
   }
 
-  function CopyData(x) { /* No handling needed until implemented */ }
+  /* c8 ignore next */
+  function CopyData() { /* No handling needed until implemented */ }
 
   function ErrorResponse(x) {
     reject(errors.generic(error(x)))
   }
 
+  /* c8 ignore next */
   function CopyInResponse() {
     reject(errors.notSupported('CopyInResponse'))
   }
 
+  /* c8 ignore next */
   function CopyOutResponse() {
     reject(errors.notSupported('CopyOutResponse'))
   }
 
+  /* c8 ignore next */
   function EmptyQueryResponse() { /* No handling needed */ }
 
   function BackendKeyData(x) {
@@ -139,14 +147,18 @@ function Backend({
   function NoticeResponse(x) {
     onnotice
       ? onnotice(error(x))
-      : console.log(error(x))
+      : console.log(error(x)) // eslint-disable-line
   }
 
-  function NoData(x) { /* No handling needed */ }
+  function NoData() { /* No handling needed */ }
 
   function Authentication(x) {
     const type = x.readInt32BE(5)
-    type !== 0 && onauth(type, x)
+    try {
+      type !== 0 && onauth(type, x)
+    } catch (err) {
+      reject(err)
+    }
   }
 
   function ParameterStatus(x) {
@@ -154,11 +166,13 @@ function Backend({
     onparameter(k, v)
   }
 
-  function PortalSuspended(x) {
+  /* c8 ignore next */
+  function PortalSuspended() {
     reject(errors.notSupported('PortalSuspended'))
   }
 
-  function ParameterDescription(x) {
+  /* c8 ignore next */
+  function ParameterDescription() {
     reject(errors.notSupported('ParameterDescription'))
   }
 
@@ -185,22 +199,24 @@ function Backend({
     }
   }
 
-  function FunctionCallResponse(x) {
+  /* c8 ignore next */
+  function FunctionCallResponse() {
     reject(errors.notSupported('FunctionCallResponse'))
   }
 
-  function NegotiateProtocolVersion(x) {
+  /* c8 ignore next */
+  function NegotiateProtocolVersion() {
     reject(errors.notSupported('NegotiateProtocolVersion'))
   }
 
-  function CopyBothResponse(x) {
+  /* c8 ignore next */
+  function CopyBothResponse() {
     reject(errors.notSupported('CopyBothResponse'))
   }
 
-  function ReadyForQuery(x) {
+  function ReadyForQuery() {
     onready()
   }
-
 }
 
 function error(x) {

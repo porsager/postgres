@@ -5,7 +5,8 @@
   "main": "lib/index.js",
   "type": "module",
   "scripts": {
-    "prepublishOnly": "npm run build",
+    "test": "node tests/index.js",
+    "prepublishOnly": "eslint lib && npm run build",
     "build": "node cjs/transpile.js"
   },
   "files": [
@@ -16,6 +17,7 @@
   "license": "WTFPL",
   "repository": "porsager/postgres",
   "keywords": [
+    "driver",
     "postgresql",
     "postgres",
     "postgre",

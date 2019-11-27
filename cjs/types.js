@@ -5,19 +5,19 @@ const types = module.exports.types = {
   string: {
     to: 25,
     from: null,             // defaults to string
-    serialize: x => '' + x  // eslint-disable-line
+    serialize: x => '' + x
   },
   number: {
     to: 1700,
     from: [20, 21, 23, 26, 700, 701, 790, 1700],
-    serialize: x => '' + x, // eslint-disable-line
-    parse: x => +x          // eslint-disable-line
+    serialize: x => '' + x,
+    parse: x => +x
   },
   json: {
     to: 3802,
     from: [114, 3802],
     serialize: x => JSON.stringify(x),
-    parse: x => JSON.parse(JSON.parse(x))
+    parse: x => JSON.parse(x)
   },
   boolean: {
     to: 16,
@@ -28,7 +28,7 @@ const types = module.exports.types = {
   date: {
     to: 1184,
     from: [1082, 1083, 1114, 1184],
-    serialize: x => x.toJSON(),
+    serialize: x => x.toISOString(),
     parse: x => new Date(x)
   },
   bytea: {
@@ -53,7 +53,7 @@ module.exports.mergeUserTypes = function mergeUserTypes(types) {
 }
 
 function typeHandlers(types) {
-  return Object.entries(types).reduce((acc, [name, type]) => {
+  return Object.entries(types).reduce((acc, [, type]) => {
     type.from && type.from.forEach(x => acc.parsers[x] = type.parse)
     acc.serializers[type.to] = type.serialize
     return acc
@@ -67,13 +67,13 @@ const type = {
 }
 
 module.exports.inferType = function inferType(x) {
-  return x instanceof Date
+  return x.type || (x instanceof Date
     ? 1184
     : Array.isArray(x)
       ? inferType(x[0])
       : x instanceof Buffer
         ? 17
-        : type[typeof x] || 25
+        : type[typeof x] || 25)
 }
 
 const escapeBackslash = /\\/g
@@ -91,10 +91,12 @@ module.exports.arraySerializer = function arraySerializer(xs, serializer) {
 
   const first = xs[0]
 
-  if (Array.isArray(first))
+  if (Array.isArray(first) && !first.type)
     return '{' + xs.map(x => arraySerializer(x, serializer)).join(',') + '}'
 
-  return '{' + xs.map(x => '"' + arrayEscape(serializer(x)) + '"').join(',') + '}'
+  return '{' + xs.map(x =>
+    '"' + arrayEscape(serializer ? serializer(x.type ? x.value : x) : '' + x) + '"'
+  ).join(',') + '}'
 }
 
 const arrayParserState = {

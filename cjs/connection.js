@@ -101,7 +101,7 @@ module.exports = function Connection(options = {}) {
       : (backend.query = query)
 
     const buffer = query.simple
-      ? frontend.Query(str)
+      ? simple(str, query)
       : statements.has(sig)
         ? prepared(statements.get(sig), args, query)
         : prepare(sig, str, args, query)
@@ -109,6 +109,11 @@ module.exports = function Connection(options = {}) {
     connection.ready
       ? socket.write(buffer)
       : (messages.push(buffer), socket.connect())
+  }
+
+  function simple(str, query) {
+    query.statement = {}
+    return frontend.Query(str)
   }
 
   function prepared(statement, args, query) {
