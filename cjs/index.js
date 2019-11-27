@@ -1,6 +1,6 @@
 const os = require('os')
 const crypto = require('crypto')
-const url = require('url')
+const Url = require('url')
 const Connection = require('./connection.js')
 const Queue = require('./queue.js')
 const {
@@ -37,7 +37,7 @@ module.exports = function Postgres(url, options) {
       , typeArrayMap = {}
 
   function postgres(xs, ...args) {
-    return query(false, getConnection(), xs, args)
+    return query({}, getConnection(), xs, args)
   }
 
   Object.assign(postgres, {
@@ -93,7 +93,7 @@ module.exports = function Postgres(url, options) {
       }, connection)
     })
 
-    query(true, connection, begin || savepoint)
+    query({ raw: true }, connection, begin || savepoint)
       .then(() => {
         const result = fn(scoped)
         return Array.isArray(result)
@@ -106,7 +106,7 @@ module.exports = function Postgres(url, options) {
           : resolve(x)
       )
       .catch((err) => {
-        query(true, connection,
+        query({ raw: true }, connection,
           begin
             ? 'rollback'
             : 'rollback to ' + savepoint
@@ -119,12 +119,8 @@ module.exports = function Postgres(url, options) {
       })
 
     function scoped(xs, ...args) {
-      return query(false, connection, xs, args).catch(reject)
+      return query({}, connection, xs, args).catch(reject)
     }
-  }
-
-  function raw(x) {
-    return Object.assign([x], { raw: [] })
   }
 
   function next() {
@@ -137,11 +133,11 @@ module.exports = function Postgres(url, options) {
     }
   }
 
-  function query(raw, connection, xs, args) {
+  function query({ raw, simple }, connection, xs, args) {
     if (!raw && (!Array.isArray(xs) || !Array.isArray(xs.raw)))
       throw errors.generic({ message: 'Query not called as a tagged template literal', code: 'NOT_TAGGED_CALL' })
 
-    const query = { raw }
+    const query = { raw, simple }
 
     const promise = new Promise((resolve, reject) => {
       query.resolve = resolve
@@ -151,7 +147,7 @@ module.exports = function Postgres(url, options) {
         ? reject(errors.connection('ENDED', options))
         : ready
           ? send(connection, query, xs, args)
-          : fetchArrayTypes().then(() => send(connection, query, xs, args)).catch(reject)
+          : fetchArrayTypes(connection).then(() => send(connection, query, xs, args)).catch(reject)
     })
 
     promise.stream = (fn) => (query.stream = fn, promise)
@@ -170,7 +166,7 @@ module.exports = function Postgres(url, options) {
     !options.fifo && !reserve && connection && connections.push(connection)
     connection && (connection.active = !(options.onconnect && !connection.ready))
     return options.onconnect && !connection.ready
-      ? instance({ fn: options.onconnect }, connection)
+      ? instance(options.onconnect, connection)
       : connection
   }
 
@@ -182,15 +178,23 @@ module.exports = function Postgres(url, options) {
     return connection
   }
 
-  function instance({ fn }, connection) {
+  function instance(fn, connection) {
     let queries = 0
+      , container
+
     addTypes(scoped, connection)
-    const container = fn(scoped)
+    connection.onconnect = onconnect
+
     function scoped(xs, ...args) {
       queries++
-      const promise = query(false, connection, xs, args)
+      const promise = query({}, connection, xs, args)
       promise.then(finished, finished)
       return promise
+    }
+
+    function onconnect() {
+      container = fn(scoped)
+      queries === 0 && finished(queries++)
     }
 
     function finished() {
@@ -206,7 +210,7 @@ module.exports = function Postgres(url, options) {
     return {
       rows: typeof args[0] === 'string'
         ? rows.map(x => Array.isArray(x) ? x : args.map(a => x[a])) // pluck
-        : args[0] === 'function'
+        : typeof args[0] === 'function'
           ? rows.map(x => args[0](x)) // map
           : rows
     }
@@ -218,9 +222,10 @@ module.exports = function Postgres(url, options) {
     }
   }
 
-  function array(value, type) {
+  function array(value) {
     return {
-      type,
+      type: inferType(value),
+      array: true,
       value
     }
   }
@@ -228,7 +233,7 @@ module.exports = function Postgres(url, options) {
   function json(value) {
     return {
       type: types.json.to,
-      value: types.json.serialize(value)
+      value
     }
   }
 
@@ -249,28 +254,40 @@ module.exports = function Postgres(url, options) {
 
   function addArrayType(oid, typelem) {
     const parser = options.parsers[typelem]
-        , serializer = options.serializers[typelem]
+
     typeArrayMap[typelem] = oid
     options.parsers[oid] = (xs) => arrayParser(xs, parser)
     options.parsers[oid].array = true
-    options.serializers[oid] = (xs) => arraySerializer(xs, serializer)
+    options.serializers[oid] = (xs) => arraySerializer(xs, options.serializers[typelem])
   }
 
-  function addTypes(instance, connection) {
-    Object.assign(instance, {
-      notify: (channel, payload) => instance`select pg_notify(${ channel }, ${ String(payload) })`,
-      unsafe: (xs, args) => query(true, connection || getConnection(), xs, args),
+  function addTypes(sql, connection) {
+    Object.assign(sql, {
+      notify,
+      unsafe,
       array,
       rows,
       row,
       json
     })
 
+    function notify(channel, payload) {
+      return sql`select pg_notify(${ channel }, ${ '' + payload })`
+    }
+
+    function unsafe(xs, args, options = {}) {
+      if (!Array.isArray(args)) {
+        options = args || []
+        args = []
+      }
+      return query({ raw: true, simple: options.simple }, connection || getConnection(), xs, args)
+    }
+
     options.types && Object.entries(options.types).forEach(([name, type]) => {
-      if (name in instance)
+      if (name in sql)
         throw errors.generic({ message: name + ' is a reserved method name', code: 'RESERVED_METHOD_NAME' })
 
-      instance[name] = (x) => ({ type: type.to, value: type.serializer(x) })
+      sql[name] = (x) => ({ type: type.to, value: x })
     })
   }
 
@@ -282,7 +299,7 @@ module.exports = function Postgres(url, options) {
       ? listeners[x].push(fn)
       : (listeners[x] = [fn])
 
-    return query(true, getListener(), 'listen "' + x + '"').then(() => x)
+    return query({ raw: true }, getListener(), 'listen "' + x + '"').then(() => x)
   }
 
   function getListener() {
@@ -301,7 +318,6 @@ module.exports = function Postgres(url, options) {
     if (ended)
       return ended
 
-    let c
     let destroy
 
     if (timeout === 0)
@@ -372,65 +388,44 @@ module.exports = function Postgres(url, options) {
   }
 
   function getType(x) {
-    const value = x.value ? x.value : x
-        , type = x.type || (Array.isArray(value) ? typeArrayMap[inferType(value)] : inferType(value))
+    const value = x.type ? x.value : x
+        , type = x && x.array ? typeArrayMap[x.type || inferType(value)] : (x.type || inferType(value))
 
     return {
       type,
-      value: type
-        ? (options.serializers[type] || types.string.serialize)(value)
-        : value
+      value: (options.serializers[type] || types.string.serialize)(value)
     }
   }
 }
 
-function parseOptions(url, options = {}) {
-  const env = process.env // eslint-disable-line
+function parseOptions(uri, options) {
+  const o = options || uri
+      , env = process.env // eslint-disable-line
+      , url = options ? Url.parse(uri, true) : { query: {}, pathname: '' }
+      , host = o.hostname || o.host || url.hostname || env.PGHOST || 'localhost'
+      , port = o.port || url.port || env.PGPORT || 5432
 
-  options = Object.assign({
-    connection: {},
-    host      : env.PGHOST || 'localhost',
-    port      : env.PGPORT || 5432,
-    database  : env.PGDATABASE || 'postgres',
-    username  : env.PGUSERNAME || os.userInfo().username,
-    password  : env.PGPASSWORD || '',
-    max       : Math.max(1, os.cpus().length - 1),
-    fifo      : false,
-    transform : x => x
-  },
-    typeof url === 'string' ? parseUrl(url) : url,
-    options,
-    {
-      ...mergeUserTypes(options.types),
-      nonce: crypto.randomBytes(18).toString('base64')
-    }
-  )
-
-  options.user = String(options.username || options.user)
-  options.pass = String(options.password || options.pass)
-  options.host = String(options.hostname || options.host)
-  options.database = options.db || options.database
-  options.port = parseInt(options.port)
-
-  if ('application_name' in options.connection === false)
-    options.connection.application_name = 'postgres.js'
-
-  if (!options.path && options.host.indexOf('/') > -1)
-    options.path = options.host + '/.s.PGSQL.' + options.port
-
-  return options
-}
-
-function parseUrl(x) {
-  x = url.parse(x)
-
-  const config = {}
-
-  x.host && (config.host = x.hostname)
-  x.port && (config.port = x.port)
-  x.path && (config.database = x.path.slice(1))
-  x.auth && (config.username = x.auth.split(':')[0])
-  x.auth && (config.password = x.auth.split(':')[1])
-
-  return config
+  return {
+    host,
+    port,
+    path        : o.path || host.indexOf('/') > -1 && host + '/.s.PGSQL.' + port,
+    database    : o.database || o.db || url.pathname.slice(1) || env.PGDATABASE || 'postgres',
+    user        : o.user || o.username || url.user || env.PGUSERNAME || os.userInfo().username,
+    pass        : o.pass || o.password || url.pass || env.PGPASSWORD || '',
+    max         : o.max || url.query.max || Math.max(1, os.cpus().length),
+    fifo        : o.fifo || url.query.fifo || false,
+    transform   : o.transform || (x => x),
+    types       : o.types || {},
+    ssl         : o.ssl || url.ssl || false,
+    timeout     : o.timeout,
+    onconnect   : o.onconnect,
+    onnotice    : o.onnotice,
+    onparameter : o.onparameter,
+    none        : crypto.randomBytes(18).toString('base64'),
+    connection  : {
+      application_name: 'postgres.js',
+      ...o.connection
+    },
+    ...mergeUserTypes(o.types)
+  }
 }

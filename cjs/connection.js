@@ -34,6 +34,7 @@ module.exports = function Connection(options = {}) {
   })
 
   const backend = Backend({
+    onparse,
     onparameter,
     transform,
     parsers,
@@ -46,6 +47,11 @@ module.exports = function Connection(options = {}) {
   })
 
   return connection
+
+  function onparse() {
+    if (backend.query && backend.query.statement.name)
+      statements[backend.query.statement.sig] = backend.query.statement.name
+  }
 
   function onauth(type, x) {
     socket.write(frontend.auth(type, x, options))
@@ -94,9 +100,11 @@ module.exports = function Connection(options = {}) {
       ? queries.push(query)
       : (backend.query = query)
 
-    const buffer = statements.has(sig)
-      ? prepared(statements.get(sig), args, query)
-      : prepare(sig, str, args, query)
+    const buffer = query.simple
+      ? frontend.Query(str)
+      : statements.has(sig)
+        ? prepared(statements.get(sig), args, query)
+        : prepare(sig, str, args, query)
 
     connection.ready
       ? socket.write(buffer)
@@ -109,8 +117,7 @@ module.exports = function Connection(options = {}) {
   }
 
   function prepare(sig, str, args, query) {
-    query.statement = { name: sig ? 'p' + id++ : '' }
-    sig && statements.set(sig, query.statement)
+    query.statement = { name: sig ? 'p' + id++ : '', sig }
     return Buffer.concat([
       frontend.Parse(query.statement.name, str, args),
       frontend.Bind(query.statement.name, args)
@@ -133,6 +140,7 @@ module.exports = function Connection(options = {}) {
       messages.forEach(socket.write)
       messages = []
       connection.ready = true
+      connection.onconnect && connection.onconnect()
     }
   }
 
@@ -161,8 +169,8 @@ module.exports = function Connection(options = {}) {
     connection.ready = connection.active = false
   }
 
-  function unknown(buffer) {
-    // console.log('Unknown Message', buffer[0])
+  function unknown() {
+    // console.log('Unknown Message', x[0])
   }
 }
 
@@ -174,18 +182,15 @@ function postgresSocket(options, {
 }) {
   let socket
   let closed = true
-  let ended = false
 
   return {
     ready: false,
     write: x => socket.write(x),
     destroy: () => {
-      ended = true
       socket.destroy()
       return Promise.resolve()
     },
     end: () => {
-      ended = true
       return new Promise(r => socket.end(r))
     },
     connect

@@ -25,32 +25,13 @@ const authNames = {
 }
 
 const auths = {
-  2 : authNotImplemented,
-  3 : authNotImplemented,
+  3 : AuthenticationCleartextPassword,
   5 : AuthenticationMD5Password,
-  6 : authNotImplemented,
-  7 : authNotImplemented,
-  8 : authNotImplemented,
-  9 : authNotImplemented,
   10: SASL,
   11: SASLContinue,
   12: SASLFinal
 }
 
-const messages = {
-  B : 'Bind',
-  C : 'Close',
-  D : 'Describe',
-  E : 'Execute',
-  F : 'FunctionCall',
-  f : 'CopyFail',
-  H : 'Flush',
-  P : 'Parse',
-  p : 'PasswordMessage',
-  S : 'Sync',
-  Q : 'Query',
-  X : 'Terminate'
-}
 
 module.exports = {
   connect,
@@ -59,20 +40,6 @@ module.exports = {
   Parse,
   Query
 }
-
-/* Other messages
-
-  Close (C)
-  Describe (D)
-  Execute (F)
-  FunctionCall (F)
-  CopyFail (f)
-  Flush (H)
-  PasswordMessage (p)
-  Sync (S)
-  Terminate (X)
-
-*/
 
 function connect({ user, database, connection }) {
   return bytes
@@ -84,19 +51,27 @@ function connect({ user, database, connection }) {
       database,
       client_encoding: '\'utf-8\'',
       ...connection
-    }).filter(([k, v]) => v).map(([k, v]) => k + N + v).join(N))
+    }).filter(([, v]) => v).map(([k, v]) => k + N + v).join(N))
     .z(2)
     .end(0)
 }
 
 function auth(type, x, options) {
-  return auths[type](type, x, options) || ''
+  return (auths[type] || authNotImplemented)(type, x, options) || ''
 }
 
-function AuthenticationMD5Password(type, x, { user, password }) {
+function AuthenticationCleartextPassword(type, x, { pass }) {
   return bytes
     .p()
-    .str('md5' + md5(Buffer.concat([Buffer.from(md5(password + user)), x.slice(9)])))
+    .str(pass)
+    .z(1)
+    .end()
+}
+
+function AuthenticationMD5Password(type, x, { user, pass }) {
+  return bytes
+    .p()
+    .str('md5' + md5(Buffer.concat([Buffer.from(md5(pass + user)), x.slice(9)])))
     .z(1)
     .end()
 }
@@ -119,7 +94,7 @@ function SASLContinue(type, x, options) {
   const res = x.utf8Slice(9).split(',').reduce((acc, x) => (acc[x[0]] = x.slice(2), acc), {})
 
   const saltedPassword = crypto.pbkdf2Sync(
-    options.password,
+    options.pass,
     Buffer.from(res.s, 'base64'),
     parseInt(res.i), 32,
     'sha256'
@@ -139,7 +114,7 @@ function SASLContinue(type, x, options) {
 }
 
 function SASLFinal(type, x, options) {
-  if (x.utf8Slice(9).split(N, 1)[0].slice(2, -1) !== options.serverSignature) {
+  if (x.utf8Slice(9).split(N, 1)[0].slice(2) !== options.serverSignature) {
     throw errors.generic({
       message: 'The server did not return the correct signature',
       code: 'SASL_SIGNATURE_MISMATCH'
@@ -172,7 +147,7 @@ function Bind(name, args) {
     .i16(0)
     .i16(args.length)
 
-  args.forEach((x, i) => {
+  args.forEach(x => {
     if (x.value == null)
       return bytes.i32(0xFFFFFFFF)
 

@@ -37,9 +37,17 @@ const postgres = require('postgres/cjs')
 
 ## Connection options
 
+You can use either a postgres:// url connection string or the options to define your database connection properties.
+
 ```js
 
 const sql = postgres('postgres://user:pass@host:port/database', {
+  host        :             // or hostname
+  port        :             // Postgres server port
+  path        :             // unix socket path (usually /tmp)
+  database    :             // Database to connect to
+  username    :             // or username
+  password    :             // or password
   ssl         : false,      // True, or an object with options to tls.connect
   max         : 10,         // Max number of connections
   timeout     : 0,          // Idle connection timeout in seconds
@@ -130,7 +138,7 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 Due to the nature of sql and Postgres types various helpers are available to simplify queries.
 
 #### Object to row `row(Object, ...columns)`
-Sometimes the number of columns can be quite large, so typing out 
+Sometimes the number of columns can be quite large, so this is shorter.
 
 ```js
 
@@ -350,7 +358,7 @@ There are also the following errors specifically for this library.
 ##### MESSAGE_NOT_SUPPORTED
 > X (X) is not supported
 
-Whenever a mesage is received which is not supported by this library. Feel free to file an issue if you think something is missing.
+Whenever a message is received from Postgres which is not supported by this library. Feel free to file an issue if you think something is missing.
 
 ##### SASL_SIGNATURE_MISMATCH
 > Message type X not supported
