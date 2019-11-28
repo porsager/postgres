@@ -238,6 +238,14 @@ t('sql file', async() =>
   [1, (await sql.file('./select.sql'))[0].x]
 )
 
+t('sql file can stream', async() => {
+  let result
+  await sql.file('./select.sql')
+    .stream(({ x }) => result = x)
+
+  return [1, result]
+})
+
 t('sql file throws', async() =>
   ['ENOENT', (await sql.file('./selectomondo.sql').catch(x => x.code))]
 )

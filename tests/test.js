@@ -25,7 +25,6 @@ async function test(o, name, fn, after) {
       process.stdout.write('✅')
     })
     .catch(err => {
-      p('errorrrr')
       tests[line].failed = true
       tests[line].error = err instanceof Error ? err : new Error(util.inspect(err))
     })
