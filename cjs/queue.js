@@ -1,4 +1,4 @@
-module.exports = function Queue() {
+module.exports = Queue;function Queue() {
   let xs = []
   let index = 0
 

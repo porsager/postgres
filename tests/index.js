@@ -156,7 +156,7 @@ t('Throw syntax error', async() =>
 
 t('Connect using uri', async() =>
   [true, await new Promise((resolve, reject) => {
-    const sql = postgres('postgres://' + login.user + ':' + login.pass + '@localhost:5432/' + options.db, {
+    const sql = postgres('postgres://' + login.user + ':' + (login.pass || '') + '@localhost:5432/' + options.db, {
       timeout: 0.1
     })
     sql`select 1`.then(() => resolve(true), reject)
@@ -233,6 +233,14 @@ t('Point type array', async() => {
   await sql`insert into test (x) values (${ sql.array([sql.point([10, 20]), sql.point([20, 30])]) })`
   return [30, (await sql`select x from test`)[0].x[1][1]]
 }, () => sql`drop table test`)
+
+t('sql file', async() =>
+  [1, (await sql.file('./select.sql'))[0].x]
+)
+
+t('sql file throws', async() =>
+  ['ENOENT', (await sql.file('./selectomondo.sql').catch(x => x.code))]
+)
 
 t('Connection ended error', async() => {
   const sql = postgres(options)
@@ -349,6 +357,15 @@ t('responds with server parameters (application_name)', async() =>
     onparameter: (k, v) => k === 'application_name' && resolve(v)
   })`select 1`.catch(reject))]
 )
+
+t('onconnect', async() => {
+  const sql = postgres({
+    ...options,
+    onconnect: () => 'something'
+  })
+
+  return [1, (await sql`select 1 as x`)[0].x]
+})
 
 t('onconnect runs first', async() => {
   const results = []

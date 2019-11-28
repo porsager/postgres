@@ -25,6 +25,7 @@ async function test(o, name, fn, after) {
       process.stdout.write('✅')
     })
     .catch(err => {
+      p('errorrrr')
       tests[line].failed = true
       tests[line].error = err instanceof Error ? err : new Error(util.inspect(err))
     })
@@ -50,7 +51,7 @@ function exit() {
   })
 
   ignored && console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's', '\n'))
-  success && !ignored
+  !only && success && !ignored
     ? console.log('All good')
     : process.exit(1)
 }

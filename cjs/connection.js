@@ -5,7 +5,7 @@ const Backend = require('./backend.js')
 const Queue = require('./queue.js')
 const { errors } = require('./types.js')
 
-module.exports = function Connection(options = {}) {
+module.exports = Connection;function Connection(options = {}) {
   const {
     onparameter,
     transform,

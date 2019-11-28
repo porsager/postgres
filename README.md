@@ -1,7 +1,7 @@
 # Postgres.js
 
 - 🚀 Fastest full featured PostgreSQL client for Node.js
-- 🚯 1200 LOC - 0 dependencies
+- 🚯 1300 LOC - 0 dependencies
 - 🏷 ES6 Tagged Template Strings at the core
 - 🏄‍♀️ Simple surface API
 - 🧪 No tests! 0% coverage = infinite coverage!
@@ -405,3 +405,4 @@ nb. You can use [`onnotice`](#onnotice) to listen to any Postgres `NOTICE` sent 
 
 A really big thank you to @JAForbes who introduced me to Postgres and still holds my hand navigating all the great opportunities we have.
 
+Thanks to @ACXGit for initial tests.

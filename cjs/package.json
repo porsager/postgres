@@ -1,18 +1,14 @@
 {
   "name": "peegee",
-  "version": "0.0.4",
+  "version": "0.0.7",
   "description": "Fastest full featured PostgreSQL client for Node.js",
-  "main": "index.js",
+  "main": "lib/index.js",
   "type": "commonjs",
   "scripts": {
     "test": "node tests/index.js",
     "prepublishOnly": "eslint lib && npm run build",
     "build": "node cjs/transpile.js"
   },
-  "files": [
-    "/lib",
-    "/cjs"
-  ],
   "author": "Rasmus Porsager <rasmus@porsager.com",
   "license": "WTFPL",
   "repository": "porsager/postgres",

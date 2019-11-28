@@ -1,4 +1,5 @@
 const os = require('os')
+const fs = require('fs')
 const crypto = require('crypto')
 const Url = require('url')
 const Connection = require('./connection.js')
@@ -21,7 +22,7 @@ Object.assign(Postgres, {
   toKebab
 })
 
-module.exports = function Postgres(url, options) {
+module.exports = Postgres;function Postgres(url, options) {
   options = parseOptions(url, options)
 
   let ready = false
@@ -35,6 +36,7 @@ module.exports = function Postgres(url, options) {
       , queries = Queue()
       , listeners = {}
       , typeArrayMap = {}
+      , files = {}
 
   function postgres(xs, ...args) {
     return query({}, getConnection(), xs, args)
@@ -142,7 +144,6 @@ module.exports = function Postgres(url, options) {
     const promise = new Promise((resolve, reject) => {
       query.resolve = resolve
       query.reject = reject
-
       ended !== null
         ? reject(errors.connection('ENDED', options))
         : ready
@@ -193,7 +194,7 @@ module.exports = function Postgres(url, options) {
     }
 
     function onconnect() {
-      container = fn(scoped)
+      container = fetchArrayTypes().then(() => fn(scoped))
       queries === 0 && finished(queries++)
     }
 
@@ -266,9 +267,10 @@ module.exports = function Postgres(url, options) {
       notify,
       unsafe,
       array,
+      file,
+      json,
       rows,
-      row,
-      json
+      row
     })
 
     function notify(channel, payload) {
@@ -281,6 +283,25 @@ module.exports = function Postgres(url, options) {
         args = []
       }
       return query({ raw: true, simple: options.simple }, connection || getConnection(), xs, args)
+    }
+
+    function file(path) {
+      const file = files[path]
+
+      if (typeof file === 'string')
+        return query({ raw: true, simple: true }, connection || getConnection(), files[path])
+
+      const promise = (file || new Promise((resolve, reject) => fs.readFile(path, 'utf8', (err, str) => {
+        if (err)
+          return reject(err)
+
+        files[path] = str
+        const q = query({ raw: true, simple: true }, connection || getConnection(), files[path])
+        promise.stream = q.stream
+        resolve(q)
+      })))
+
+      return promise
     }
 
     options.types && Object.entries(options.types).forEach(([name, type]) => {
@@ -398,10 +419,11 @@ module.exports = function Postgres(url, options) {
   }
 }
 
-function parseOptions(uri, options) {
+function parseOptions(uri = {}, options) {
   const o = options || uri
       , env = process.env // eslint-disable-line
       , url = options ? Url.parse(uri, true) : { query: {}, pathname: '' }
+      , auth = (url.auth || '').split(':')
       , host = o.hostname || o.host || url.hostname || env.PGHOST || 'localhost'
       , port = o.port || url.port || env.PGPORT || 5432
 
@@ -410,8 +432,8 @@ function parseOptions(uri, options) {
     port,
     path        : o.path || host.indexOf('/') > -1 && host + '/.s.PGSQL.' + port,
     database    : o.database || o.db || url.pathname.slice(1) || env.PGDATABASE || 'postgres',
-    user        : o.user || o.username || url.user || env.PGUSERNAME || os.userInfo().username,
-    pass        : o.pass || o.password || url.pass || env.PGPASSWORD || '',
+    user        : o.user || o.username || auth[0] || env.PGUSERNAME || os.userInfo().username,
+    pass        : o.pass || o.password || auth[1] || env.PGPASSWORD || '',
     max         : o.max || url.query.max || Math.max(1, os.cpus().length),
     fifo        : o.fifo || url.query.fifo || false,
     transform   : o.transform || (x => x),
