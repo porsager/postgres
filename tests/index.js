@@ -112,6 +112,11 @@ t('Escape in arrays', async() =>
   ['Hello "you",c:\\windows', (await sql`select ${ sql.array(['Hello "you"', 'c:\\windows']) } as x`)[0].x.join(',')]
 )
 
+t('null for int', async() => {
+  await sql`create table test (x int)`
+  return [1, (await sql`insert into test values(${ null })`).count]
+}, () => sql`drop table test`)
+
 t('Transaction throws', async() => {
   await sql`create table test (a int)`
   return ['22P02', await sql.begin(async sql => {
@@ -243,7 +248,7 @@ t('Point type array', async() => {
 }, () => sql`drop table test`)
 
 t('sql file', async() =>
-  [1, (await sql.file('./select.sql'))[0].x]
+  [1, (await sql.file('./tests/select.sql'))[0].x]
 )
 /*
 t('select column vars', async() => {
@@ -254,7 +259,7 @@ t('select column vars', async() => {
 */
 t('sql file can stream', async() => {
   let result
-  await sql.file('./select.sql')
+  await sql.file('./tests/select.sql')
     .stream(({ x }) => result = x)
 
   return [1, result]
