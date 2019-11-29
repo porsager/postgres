@@ -57,6 +57,14 @@ t('Drop table', async() =>
   ['DROP TABLE', (await sql`drop table test`).command]
 )
 
+t('null', async() =>
+  [null, (await sql`select ${ null } as x`)[0].x]
+)
+
+t('undefined to null', async() =>
+  [null, (await sql`select ${ undefined } as x`)[0].x]
+)
+
 t('Integer', async() =>
   [1, (await sql`select ${ 1 } as x`)[0].x]
 )
@@ -237,7 +245,13 @@ t('Point type array', async() => {
 t('sql file', async() =>
   [1, (await sql.file('./select.sql'))[0].x]
 )
-
+/*
+t('select column vars', async() => {
+  await sql`create table test (x int)`
+  await sql`insert into test values (1)`
+  return [1, (await sql`select ${ 'x' } from test`)[0].x]
+})
+*/
 t('sql file can stream', async() => {
   let result
   await sql.file('./select.sql')
