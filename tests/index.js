@@ -1,7 +1,11 @@
+import { fileURLToPath } from 'url'
 import { t, ot, not } from './test.js'
 import cp from 'child_process'
+import path from 'path'
 
 import postgres from '../lib/index.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const login = {
   user: 'postgres_js_test'
@@ -248,18 +252,12 @@ t('Point type array', async() => {
 }, () => sql`drop table test`)
 
 t('sql file', async() =>
-  [1, (await sql.file('./tests/select.sql'))[0].x]
+  [1, (await sql.file(path.join(__dirname, 'select.sql')))[0].x]
 )
-/*
-t('select column vars', async() => {
-  await sql`create table test (x int)`
-  await sql`insert into test values (1)`
-  return [1, (await sql`select ${ 'x' } from test`)[0].x]
-})
-*/
+
 t('sql file can stream', async() => {
   let result
-  await sql.file('./tests/select.sql')
+  await sql.file(path.join(__dirname, 'select.sql'))
     .stream(({ x }) => result = x)
 
   return [1, result]
@@ -424,3 +422,27 @@ t('big query body', async() => {
   }`).count]
 }, () => sql`drop table test`)
 
+
+/*
+
+
+t('select column vars', async() => {
+  await sql`create table test (x int)`
+  await sql`insert into test values (1)`
+  return [1, (await sql`select ${ 'x' } from test`)[0].x]
+})
+
+t('select column vars', async() => {
+  await sql`create table test (x int)`
+  await sql`insert into test values (1)`
+  return [1, (await sql`select ${ 'x' } from test`)[0].x]
+})
+
+t('select column vars', async() => {
+  await sql`create table test (x int)`
+  await sql`insert into test values (1)`
+  return [1, (await sql`select ${ 'x' } from test`)[0].x]
+})
+
+
+*/
