@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "node tests/index.js",
-    "prepublishOnly": "eslint lib && npm run build",
+    "lint": "eslint lib",
+    "prepublishOnly": "npm run lint && npm test && npm run build",
     "build": "node cjs/transpile.js"
   },
   "files": [
