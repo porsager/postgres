@@ -98,6 +98,7 @@ function Backend({
     let index = 7
     let length
     let column
+    let value
 
     const row = {}
     for (let i = 0; i < backend.query.statement.columns.length; i++) {
@@ -105,18 +106,20 @@ function Backend({
       length = x.readInt32BE(index)
       index += 4
 
-      row[column.n] = length === -1
+      value = length === -1
         ? null
         : column.p === undefined
           ? x.utf8Slice(index, index += length)
           : column.p.array === true
             ? column.p(x.utf8Slice(index + 1, index += length))
             : column.p(x.utf8Slice(index, index += length))
+
+      row[column.n] = transform.value ? transform.value(value) : value
     }
 
     backend.query.stream
-      ? backend.query.stream(row, rows++)
-      : backend.query.result.push(row)
+      ? backend.query.stream(transform.row ? transform.row(row) : row, rows++)
+      : backend.query.result.push(transform.row ? transform.row(row) : row)
   }
 
   /* c8 ignore next */
@@ -192,7 +195,9 @@ function Backend({
       start = index
       while (x[index++] !== 0);
       backend.query.statement.columns[i] = {
-        n: transform(x.utf8Slice(start, index - 1)),
+        n: transform.column
+          ? transform.column(x.utf8Slice(start, index - 1))
+          : x.utf8Slice(start, index - 1),
         p: parsers[x.readInt32BE(index + 6)]
       }
       index += 18

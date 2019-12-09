@@ -21,14 +21,15 @@ module.exports = Connection;function Connection(options = {}) {
   let timer
   let id = 1
   let ended
+  let ready = false
 
   const queries = Queue()
       , statements = new Map()
-      , connection = { send, end, destroy, ready: false, active: false }
+      , connection = { send, end, destroy }
 
   const socket = postgresSocket(options, {
+    ready: () => socket.write(frontend.connect(options)),
     data,
-    ready,
     error,
     close
   })
@@ -60,13 +61,13 @@ module.exports = Connection;function Connection(options = {}) {
   function resolve(x) {
     backend.query.resolve(x)
     backend.query = null
-    timeout && connection.active && queries.length === 0 && idle()
+    timeout && queries.length === 0 && idle()
   }
 
   function reject(err) {
     backend.query ? backend.query.reject(err) : error(err)
     backend.query = null
-    timeout && connection.active && queries.length === 0 && idle()
+    timeout && queries.length === 0 && idle()
   }
 
   function end() {
@@ -96,9 +97,6 @@ module.exports = Connection;function Connection(options = {}) {
     query.result = []
     query.result.count = null
     timeout && clearTimeout(timer)
-    !connection.ready || backend.query
-      ? queries.push(query)
-      : (backend.query = query)
 
     const buffer = query.simple
       ? simple(str, query)
@@ -106,9 +104,14 @@ module.exports = Connection;function Connection(options = {}) {
         ? prepared(statements.get(sig), args, query)
         : prepare(sig, str, args, query)
 
-    connection.ready
-      ? socket.write(buffer)
-      : (messages.push(buffer), socket.connect())
+    if (ready && !backend.query) {
+      backend.query = query
+      socket.write(buffer)
+    } else {
+      queries.push(query)
+      messages.push(buffer)
+      !ready && socket.connect()
+    }
   }
 
   function simple(str, query) {
@@ -135,18 +138,17 @@ module.exports = Connection;function Connection(options = {}) {
   }
 
   function onready() {
-    if (!backend.query)
-      backend.query = queries.shift()
-
     if (!backend.query && queries.length === 0 && ended)
       return ended()
 
-    if (!connection.ready) {
+    if (!ready) {
       messages.forEach(socket.write)
       messages = []
-      connection.ready = true
-      connection.onconnect && connection.onconnect()
+      ready = true
     }
+
+    if (!backend.query)
+      backend.query = queries.shift()
   }
 
   function data(x) {
@@ -164,14 +166,10 @@ module.exports = Connection;function Connection(options = {}) {
     }
   }
 
-  function ready() {
-    socket.write(frontend.connect(options))
-  }
-
   function close() {
     error(errors.connection('CLOSED', options))
     statements.clear()
-    connection.ready = connection.active = false
+    ready = false
   }
 
   function unknown() {
@@ -196,7 +194,7 @@ function postgresSocket(options, {
       return Promise.resolve()
     },
     end: () => {
-      return new Promise(r => socket.end(r))
+      return new Promise(r => socket && socket.end(r))
     },
     connect
   }

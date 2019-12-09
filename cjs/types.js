@@ -62,8 +62,29 @@ function typeHandlers(types) {
 
 const type = {
   number: 1700,
-  string: 25,
   boolean: 16
+}
+
+module.exports.escape = function escape(str) {
+  let result = ''
+  let q = str[0] < 10 || str[0] === '$'
+  let last = 0
+  let char
+  let code
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i]
+    const code = char.charCodeAt(0)
+    if (str[i] === '"') {
+      q = true
+      result += str.slice(last, i) + '"'
+      last = i
+    } else if (code === 96 || (code !== 36 && code <= 47) || (code >= 58 && code <= 64) || (code >= 91 && code <= 94) || (code >= 123 && code <= 128)) {
+      q = true
+    }
+  }
+
+  return (q ? '"' : '') + (q ? result + str.slice(last, str.length) : str) + (q ? '"' : '')
 }
 
 module.exports.inferType = function inferType(x) {
@@ -73,7 +94,7 @@ module.exports.inferType = function inferType(x) {
       ? inferType(x[0])
       : x instanceof Buffer
         ? 17
-        : type[typeof x] || 25)
+        : type[typeof x] || 0)
 }
 
 const escapeBackslash = /\\/g

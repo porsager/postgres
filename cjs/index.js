@@ -13,8 +13,20 @@ const {
   toCamel,
   toKebab,
   errors,
+  escape,
   types
 } = require('./types.js')
+
+const notPromise = {
+  P: {},
+  finally: notTagged,
+  then: notTagged,
+  catch: notTagged
+}
+
+function notTagged() {
+  throw errors.generic({ message: 'Query not called as a tagged template literal', code: 'NOT_TAGGED_CALL' })
+}
 
 Object.assign(Postgres, {
   toPascal,
@@ -37,12 +49,15 @@ module.exports = Postgres;function Postgres(url, options) {
       , listeners = {}
       , typeArrayMap = {}
       , files = {}
+      , isInsert = /(^|\))\s*insert\s*into\s/i
+      , isSelect = /(^|\))\s*select\s/i
 
   function postgres(xs, ...args) {
     return query({}, getConnection(), xs, args)
   }
 
   Object.assign(postgres, {
+    options,
     parameters: {},
     listen,
     begin,
@@ -126,20 +141,17 @@ module.exports = Postgres;function Postgres(url, options) {
   }
 
   function next() {
-    let x
-    let c
-    while ((x = queries.shift()) && (c = getConnection(x.fn))) {
+    let c, x
+    while (queries.length && (c = getConnection(queries.peek().fn)) && (x = queries.shift())) {
       x.fn
         ? transaction(x, c)
         : send(c, x.query, x.xs, x.args)
     }
   }
 
-  function query({ raw, simple }, connection, xs, args) {
-    if (!raw && (!Array.isArray(xs) || !Array.isArray(xs.raw)))
-      throw errors.generic({ message: 'Query not called as a tagged template literal', code: 'NOT_TAGGED_CALL' })
-
-    const query = { raw, simple }
+  function query(query, connection, xs, args) {
+    if (!query.raw && (!Array.isArray(xs) || !Array.isArray(xs.raw)))
+      return nested(xs, args)
 
     const promise = new Promise((resolve, reject) => {
       query.resolve = resolve
@@ -156,6 +168,13 @@ module.exports = Postgres;function Postgres(url, options) {
     return promise
   }
 
+  function nested(first, rest) {
+    const o = Object.create(notPromise)
+    o.first = first
+    o.rest = rest
+    return o
+  }
+
   function send(connection, query, xs, args) {
     connection
       ? connection.send(query, query.raw ? parseRaw(xs, args) : parse(xs, args))
@@ -165,10 +184,7 @@ module.exports = Postgres;function Postgres(url, options) {
   function getConnection(reserve) {
     const connection = --max >= 0 ? createConnection(options) : connections.shift()
     !options.fifo && !reserve && connection && connections.push(connection)
-    connection && (connection.active = !(options.onconnect && !connection.ready))
-    return options.onconnect && !connection.ready
-      ? instance(options.onconnect, connection)
-      : connection
+    return connection
   }
 
   function createConnection(options) {
@@ -179,53 +195,9 @@ module.exports = Postgres;function Postgres(url, options) {
     return connection
   }
 
-  function instance(fn, connection) {
-    let queries = 0
-      , container
-
-    addTypes(scoped, connection)
-    connection.onconnect = onconnect
-
-    function scoped(xs, ...args) {
-      queries++
-      const promise = query({}, connection, xs, args)
-      promise.then(finished, finished)
-      return promise
-    }
-
-    function onconnect() {
-      container = fetchArrayTypes().then(() => fn(scoped))
-      queries === 0 && finished(queries++)
-    }
-
-    function finished() {
-      --queries === 0 && Promise.resolve(container).then(() => {
-        connections.push(connection)
-        connection.active = true
-        next()
-      })
-    }
-  }
-
-  function rows(rows, ...args) {
-    return {
-      rows: typeof args[0] === 'string'
-        ? rows.map(x => Array.isArray(x) ? x : args.map(a => x[a])) // pluck
-        : typeof args[0] === 'function'
-          ? rows.map(x => args[0](x)) // map
-          : rows
-    }
-  }
-
-  function row(row, ...args) {
-    return {
-      row: args.map(a => row[a])
-    }
-  }
-
   function array(value) {
     return {
-      type: inferType(value),
+      type: inferType(value) || 25,
       array: true,
       value
     }
@@ -264,13 +236,12 @@ module.exports = Postgres;function Postgres(url, options) {
 
   function addTypes(sql, connection) {
     Object.assign(sql, {
+      types: {},
       notify,
       unsafe,
       array,
       file,
-      json,
-      rows,
-      row
+      json
     })
 
     function notify(channel, payload) {
@@ -291,15 +262,18 @@ module.exports = Postgres;function Postgres(url, options) {
       if (typeof file === 'string')
         return query({ raw: true, simple: true }, connection || getConnection(), files[path])
 
-      const promise = (file || new Promise((resolve, reject) => fs.readFile(path, 'utf8', (err, str) => {
-        if (err)
-          return reject(err)
+      const q = { raw: true, simple: true }
+      const promise = (file || (files[path] = new Promise((resolve, reject) => {
+        fs.readFile(path, 'utf8', (err, str) => {
+          if (err)
+            return reject(err)
 
-        files[path] = str
-        const q = query({ raw: true, simple: true }, connection || getConnection(), files[path])
-        promise.stream = q.stream
-        resolve(q)
-      })))
+          files[path] = str
+          resolve(str)
+        })
+      }))).then((str) => query(q, connection || getConnection(), str))
+
+      promise.stream = fn => (q.stream = fn, promise)
 
       return promise
     }
@@ -308,7 +282,7 @@ module.exports = Postgres;function Postgres(url, options) {
       if (name in sql)
         throw errors.generic({ message: name + ' is a reserved method name', code: 'RESERVED_METHOD_NAME' })
 
-      sql[name] = (x) => ({ type: type.to, value: x })
+      sql.types[name] = (x) => ({ type: type.to, value: x })
     })
   }
 
@@ -378,11 +352,9 @@ module.exports = Postgres;function Postgres(url, options) {
 
     for (let i = 1; i < xs.length; i++) {
       arg = args[i - 1]
-      str += (arg.rows
-        ? parseRows(arg.rows, xargs, types)
-        : arg.row
-          ? parseRow(arg.row, xargs, types)
-          : parseValue(arg, xargs, types)
+      str += (arg && arg.P === notPromise.P
+        ? parseHelper(str, arg, xargs, types)
+        : parseValue(arg, xargs, types)
       ) + xs[i]
     }
 
@@ -393,24 +365,77 @@ module.exports = Postgres;function Postgres(url, options) {
     }
   }
 
-  function parseRows(rows, xargs, types) {
-    xargs.dynamic = true
-    return rows.map(row => parseRow(row, xargs, types)).join(',')
+  function parseHelper(str, { first, rest }, xargs, types) {
+    if (first !== null && typeof first === 'object' && typeof first[0] !== 'string') {
+      if (isInsert.test(str))
+        return insertHelper(first, rest, xargs, types)
+      else if(isSelect.test(str))
+        return selectHelper(first, rest, xargs, types)
+      else if(!Array.isArray(first))
+        return equalsHelper(first, rest, xargs, types)
+    }
+
+    return escapeHelper(Array.isArray(first) ? first : [first].concat(rest))
   }
 
-  function parseRow(row, xargs, types) {
-    return '(' + row.map(x => parseValue(x, xargs, types)).join(',') + ')'
+  function selectHelper(first, columns, xargs, types) {
+    return Object.entries(first).reduce((acc, [k, v]) =>
+      acc + (!columns.length || columns.indexOf(k) > -1
+        ? (acc ? ',' : '') + parseValue(v, xargs, types) + ' as ' + escape(k)
+        : ''
+      )
+    , '')
+  }
+
+  function insertHelper(first, columns, xargs, types) {
+    first = Array.isArray(first) ? first : [first]
+    return '(' + escapeHelper(Object.keys(first[0])) + ') values ' +
+      first.map(row =>
+        '(' + Object.entries(row).reduce((acc, [k, v]) =>
+          acc + (!columns.length || columns.indexOf(k) > -1
+            ? (acc ? ',' : '') + parseValue(v, xargs, types)
+            : ''
+          )
+        , '') + ')'
+      ).join(',')
+  }
+
+  function equalsHelper(first, columns, xargs, types) {
+    return Object.entries(first).reduce((acc, [k, v]) =>
+      acc + (!columns.length || columns.indexOf(k) > -1
+        ? (acc ? ',' : '') + escape(k) + ' = ' + parseValue(v, xargs, types)
+        : ''
+      )
+    , '')
+  }
+
+  function escapeHelper(xs) {
+    return xs.reduce((acc, x) => acc + (acc ? ',' : '') + escape(x), '')
   }
 
   function parseValue(x, xargs, types) {
+    return Array.isArray(x)
+      ? x.reduce((acc, x) => acc + (acc ? ',' : '') + addValue(x, xargs, types), '')
+      : addValue(x, xargs, types)
+  }
+
+  function addValue(x, xargs, types) {
     const type = getType(x)
-    types.push(type.type)
-    return '$' + xargs.push(type)
+        , i = types.push(type-type)
+
+    if (i > 65534)
+      throw errors.generic({ message: 'Max number of parameters exceeded', code: 'MAX_PARAMETERS_EXCEEDED' })
+
+    xargs.push(type)
+    return '$' + i
   }
 
   function getType(x) {
+    if (x == null)
+      return { type: 0, value: x }
+
     const value = x.type ? x.value : x
-        , type = x && x.array ? typeArrayMap[x.type || inferType(value)] : (x.type || inferType(value))
+        , type = x.array ? typeArrayMap[x.type || inferType(value)] : (x.type || inferType(value))
 
     return {
       type,
@@ -436,18 +461,14 @@ function parseOptions(uri = {}, options) {
     pass        : o.pass || o.password || auth[1] || env.PGPASSWORD || '',
     max         : o.max || url.query.max || Math.max(1, os.cpus().length),
     fifo        : o.fifo || url.query.fifo || false,
-    transform   : o.transform || (x => x),
     types       : o.types || {},
     ssl         : o.ssl || url.ssl || false,
     timeout     : o.timeout,
-    onconnect   : o.onconnect,
     onnotice    : o.onnotice,
     onparameter : o.onparameter,
-    none        : crypto.randomBytes(18).toString('base64'),
-    connection  : {
-      application_name: 'postgres.js',
-      ...o.connection
-    },
+    nonce       : crypto.randomBytes(18).toString('base64'),
+    transform   : { ...o.transform },
+    connection  : { application_name: 'postgres.js', ...o.connection },
     ...mergeUserTypes(o.types)
   }
 }

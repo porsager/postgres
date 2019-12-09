@@ -7,6 +7,7 @@ module.exports = Queue;function Queue() {
       return xs.length - index
     },
     push: (x) => xs.push(x),
+    peek: (x) => xs[index],
     shift: () => {
       if (index === xs.length) {
         index = -1

@@ -1,12 +1,13 @@
 {
   "name": "peegee",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Fastest full featured PostgreSQL client for Node.js",
   "main": "lib/index.js",
   "type": "commonjs",
   "scripts": {
     "test": "node tests/index.js",
-    "prepublishOnly": "eslint lib && npm test && npm run build",
+    "lint": "eslint lib",
+    "prepublishOnly": "npm run lint && npm test && npm run build",
     "build": "node cjs/transpile.js"
   },
   "author": "Rasmus Porsager <rasmus@porsager.com",
