@@ -438,6 +438,20 @@ t('dynamic insert', async () => {
   return ['the answer', (await sql`insert into test ${ sql(x) } returning *`)[0].b]
 }, () => sql`drop table test`)
 
+t('array insert', async () => {
+  await sql`create table test (a int, b int)`
+  return [2, (await sql`insert into test (a, b) values (${ [1,2] }) returning *`)[0].b]
+}, () => sql`drop table test`)
+
+t('parameters in()', async () => {
+  return [2, (await sql`
+    with rows as (
+      select * from (values (1), (2), (3), (4)) as x(a)
+    )
+    select * from rows where a in (${ [3, 4] })
+  `).count]
+})
+
 t('dynamic multi row insert', async () => {
   await sql`create table test (a int, b text)`
   const x = { a: 42, b: 'the answer' }
@@ -471,7 +485,7 @@ t('dynamic select args', async () => {
   return ['yay', (await sql`select ${ sql('a', 'b') } from test`)[0].b]
 }, () => sql`drop table test`)
 
-ot('connection parameters', async() => {
+t('connection parameters', async() => {
   const sql = postgres({
     ...options,
     connection: {
