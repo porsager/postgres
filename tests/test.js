@@ -37,6 +37,8 @@ async function test(o, name, fn, after) {
 
 process.on('exit', exit)
 
+process.on('SIGINT', exit)
+
 function exit() {
   console.log('')
   let success = true

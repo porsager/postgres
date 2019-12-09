@@ -41,8 +41,8 @@ cp.execSync('dropdb ' + options.db + ';createdb ' + options.db)
 
 const sql = postgres(options)
 
-t('Result is array',
-  async() => [true, Array.isArray(await sql`select 1`)]
+t('Result is array', async() =>
+  [true, Array.isArray(await sql`select 1`)]
 )
 
 t('Result has count', async() =>
@@ -55,11 +55,12 @@ t('Result has command', async() =>
 
 t('Create table', async() =>
   ['CREATE TABLE', (await sql`create table test(int int)`).command]
-)
+, () => sql`drop table test`)
 
-t('Drop table', async() =>
-  ['DROP TABLE', (await sql`drop table test`).command]
-)
+t('Drop table', async() => {
+  await sql`create table test(int int)`
+  return ['DROP TABLE', (await sql`drop table test`).command]
+})
 
 t('null', async() =>
   [null, (await sql`select ${ null } as x`)[0].x]
@@ -148,7 +149,6 @@ t('Transaction throws on uncaught savepoint', async() => {
       throw new Error('fail')
     })
 
-    /* c8 ignore next */
     await sql`insert into test values(3)`
   }).catch(() => 'fail'))]
 }, () => sql`drop table test`)
@@ -189,7 +189,6 @@ t('Fail with proper error on no host', async() =>
   })).code]
 )
 
-// If your local db doesn't support ssl this will be tested in CI
 t('Connect using SSL', async() =>
   [true, (await new Promise((resolve, reject) => {
     postgres({
@@ -285,10 +284,10 @@ t('Message not supported', async() => {
   return ['MESSAGE_NOT_SUPPORTED', await sql`copy test to stdout`.catch(x => x.code)]
 }, () => sql`drop table test`)
 
-t('transform', async() => {
+t('transform column', async() => {
   const sql = postgres({
     ...options,
-    transform: x => x.split('').reverse().join('')
+    transform: { column: x => x.split('').reverse().join('') }
   })
 
   await sql`create table test (hello_world int)`
@@ -296,10 +295,10 @@ t('transform', async() => {
   return ['dlrow_olleh', Object.keys((await sql`select * from test`)[0])[0]]
 }, () => sql`drop table test`)
 
-t('toPascal', async() => {
+t('column toPascal', async() => {
   const sql = postgres({
     ...options,
-    transform: postgres.toPascal
+    transform: { column: postgres.toPascal }
   })
 
   await sql`create table test (hello_world int)`
@@ -307,10 +306,10 @@ t('toPascal', async() => {
   return ['HelloWorld', Object.keys((await sql`select * from test`)[0])[0]]
 }, () => sql`drop table test`)
 
-t('toCamel', async() => {
+t('column toCamel', async() => {
   const sql = postgres({
     ...options,
-    transform: postgres.toCamel
+    transform: { column: postgres.toCamel }
   })
 
   await sql`create table test (hello_world int)`
@@ -318,40 +317,15 @@ t('toCamel', async() => {
   return ['helloWorld', Object.keys((await sql`select * from test`)[0])[0]]
 }, () => sql`drop table test`)
 
-t('toKebab', async() => {
+t('column toKebab', async() => {
   const sql = postgres({
     ...options,
-    transform: postgres.toKebab
+    transform: { column: postgres.toKebab }
   })
 
   await sql`create table test (hello_world int)`
   await sql`insert into test values (1)`
   return ['hello-world', Object.keys((await sql`select * from test`)[0])[0]]
-}, () => sql`drop table test`)
-
-t('row helper', async() => {
-  const obj = { a: 1, b: 'hello', c: false }
-  await sql`create table test (a int, b text, c bool)`
-  await sql`insert into test (a, b, c) values ${ sql.row(obj, 'a', 'b', 'c') }`
-
-  const [x] = await sql`select * from test`
-  return [true, x.a === 1 && x.b === 'hello' && x.c === false]
-}, () => sql`drop table test`)
-
-t('multi rows helper', async() => {
-  const obj = { a: 1, b: 'hello', c: false }
-  const arr = [obj, obj]
-
-  await sql`create table test (a int, b text, c bool)`
-  await sql`insert into test (a, b, c) values ${ sql.rows(arr, 'a', 'b', 'c') }`
-  await sql`insert into test (a, b, c) values ${ sql.rows(arr, x => [x.a, x.b, x.c]) }`
-  await sql`insert into test (a, b, c) values ${ sql.rows(arr.map(x => [x.a, x.b, x.c])) }`
-
-  const x = await sql`select * from test`
-  return [true, x[0].a === 1 && x[0].b === 'hello' && x[0].c === false &&
-    x[1].a === 1 && x[1].b === 'hello' && x[1].c === false &&
-    x.count === 6
-  ]
 }, () => sql`drop table test`)
 
 t('unsafe', async() => {
@@ -367,12 +341,10 @@ t('listen and notify', async() => {
   const sql = postgres(options)
 
   return ['world', await new Promise((resolve, reject) =>
-    sql.listen('hello', x => {
-      resolve(x)
-      sql.end()
-    })
+    sql.listen('hello', resolve)
     .then(() => sql.notify('hello', 'world'))
     .catch(reject)
+    .then(sql.end)
   )]
 })
 
@@ -386,7 +358,7 @@ t('responds with server parameters (application_name)', async() =>
 t('onconnect', async() => {
   const sql = postgres({
     ...options,
-    onconnect: () => 'something'
+    onconnect: () => 'connected'
   })
 
   return [1, (await sql`select 1 as x`)[0].x]
@@ -417,32 +389,112 @@ t('has server parameters', async() => {
 
 t('big query body', async() => {
   await sql`create table test (x int)`
-  return [1000, (await sql`insert into test values ${
-    sql.rows([...Array(1000).keys()].map(x => [x]))
+  return [1000, (await sql`insert into test ${
+    sql([...Array(1000).keys()].map(x => ({ x })))
   }`).count]
 }, () => sql`drop table test`)
 
-
-/*
-
-
-t('select column vars', async() => {
+t('Throws if more than 65534 parameters', async() => {
   await sql`create table test (x int)`
-  await sql`insert into test values (1)`
-  return [1, (await sql`select ${ 'x' } from test`)[0].x]
+  return ['MAX_PARAMETERS_EXCEEDED', (await sql`insert into test ${
+    sql([...Array(65535).keys()].map(x => ({ x })))
+  }`.catch(e => e.code))]
+}, () => sql`drop table test`)
+
+t('let postgres do implicit cast of unknown types', async() => {
+  await sql`create table test (x timestamp with time zone)`
+  const [{ x }] = await sql`insert into test values (${ new Date().toISOString() }) returning *`
+  return [true, x instanceof Date]
+}, () => sql`drop table test`)
+
+t('only allows one statement', async() =>
+  ['42601', await sql`select 1; select 2`.catch(e => e.code)]
+)
+
+t('await sql() throws not tagged error', async() => {
+  let error
+  try {
+    await sql('select 1')
+  } catch(e) {
+    error = e.code
+  }
+  return ['NOT_TAGGED_CALL', error]
 })
 
-t('select column vars', async() => {
-  await sql`create table test (x int)`
-  await sql`insert into test values (1)`
-  return [1, (await sql`select ${ 'x' } from test`)[0].x]
+t('sql().then throws not tagged error', async() => {
+  let error
+  try {
+    sql('select 1').then(() => {})
+  } catch(e) {
+    error = e.code
+  }
+  return ['NOT_TAGGED_CALL', error]
 })
 
-t('select column vars', async() => {
-  await sql`create table test (x int)`
-  await sql`insert into test values (1)`
-  return [1, (await sql`select ${ 'x' } from test`)[0].x]
+t('sql().catch throws not tagged error', async() => {
+  let error
+  try {
+    sql('select 1').catch(() => {})
+  } catch(e) {
+    error = e.code
+  }
+  return ['NOT_TAGGED_CALL', error]
 })
 
+t('sql().finally throws not tagged error', async() => {
+  let error
+  try {
+    sql('select 1').finally(() => {})
+  } catch(e) {
+    error = e.code
+  }
+  return ['NOT_TAGGED_CALL', error]
+})
 
-*/
+t('dynamic column name', async () => {
+  return ['!not_valid', Object.keys((await sql`select 1 as ${ sql('!not_valid') }`)[0])[0]]
+})
+
+t('dynamic select as', async () => {
+  return [2, (await sql`select ${ sql({ a: 1, b: 2 }) }`)[0].b]
+})
+
+t('dynamic insert', async () => {
+  await sql`create table test (a int, b text)`
+  const x = { a: 42, b: 'the answer' }
+
+  return ['the answer', (await sql`insert into test ${ sql(x) } returning *`)[0].b]
+}, () => sql`drop table test`)
+
+t('dynamic multi row insert', async () => {
+  await sql`create table test (a int, b text)`
+  const x = { a: 42, b: 'the answer' }
+
+  return ['the answer', (await sql`insert into test ${ sql([x, x]) } returning *`)[1].b]
+}, () => sql`drop table test`)
+
+t('dynamic update', async () => {
+  await sql`create table test (a int, b text)`
+  await sql`insert into test (a, b) values (17, 'wrong')`
+
+  return ['the answer', (await sql`update test set ${ sql({ a: 42, b: 'the answer' }) } returning *`)[0].b]
+}, () => sql`drop table test`)
+
+t('dynamic update pluck', async () => {
+  await sql`create table test (a int, b text)`
+  await sql`insert into test (a, b) values (17, 'wrong')`
+
+  return ['wrong', (await sql`update test set ${ sql({ a: 42, b: 'the answer' }, 'a') } returning *`)[0].b]
+}, () => sql`drop table test`)
+
+t('dynamic select array', async () => {
+  await sql`create table test (a int, b text)`
+  await sql`insert into test (a, b) values (42, 'yay')`
+  return ['yay', (await sql`select ${ sql(['a', 'b']) } from test`)[0].b]
+}, () => sql`drop table test`)
+
+t('dynamic select args', async () => {
+  await sql`create table test (a int, b text)`
+  await sql`insert into test (a, b) values (42, 'yay')`
+  return ['yay', (await sql`select ${ sql('a', 'b') } from test`)[0].b]
+}, () => sql`drop table test`)
