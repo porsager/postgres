@@ -1,17 +1,18 @@
-import util from 'util'
+const util = require('util')
 
+let all = 0
 let done = 0
 let only = false
 let ignored = 0
 let promise = Promise.resolve()
 const tests = {}
 
-export const not = () => ignored++
-export const t = (...rest) => test(false, ...rest)
-export const ot = (...rest) => (only = true, test(true, ...rest))
+module.exports.not = () => ignored++
+module.exports.t = (...rest) => test(false, ...rest)
+module.exports.ot = (...rest) => (only = true, test(true, ...rest))
 
 async function test(o, name, fn, after) {
-  const line = new Error().stack.split('\n')[3].split(':')[2]
+  const line = new Error().stack.split('\n')[3].split(':')[1]
   await 1
 
   if (only && !o)
@@ -37,7 +38,9 @@ async function test(o, name, fn, after) {
       tests[line].succeeded = false
       tests[line].cleanup = err
     })
-    .then(() => ++done === Object.keys(tests).length && exit())
+    .then(() => {
+      ++done === Object.keys(tests).length && exit()
+    })
 }
 
 process.on('exit', exit)

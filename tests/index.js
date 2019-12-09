@@ -1,11 +1,8 @@
-import { fileURLToPath } from 'url'
-import { t, ot, not } from './test.js'
-import cp from 'child_process'
-import path from 'path'
+const { t, not, ot } = require('./test.js')
+const cp = require('child_process')
+const path = require('path')
 
-import postgres from '../lib/index.js'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const postgres = require('../lib')
 
 const login = {
   user: 'postgres_js_test'

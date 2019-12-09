@@ -3,7 +3,7 @@
   "version": "0.0.2",
   "description": "Fastest full featured PostgreSQL client for Node.js",
   "main": "lib/index.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "test": "node tests/index.js",
     "lint": "eslint lib",
