@@ -355,36 +355,8 @@ t('responds with server parameters (application_name)', async() =>
   })`select 1`.catch(reject))]
 )
 
-t('onconnect', async() => {
-  const sql = postgres({
-    ...options,
-    onconnect: () => 'connected'
-  })
-
-  return [1, (await sql`select 1 as x`)[0].x]
-})
-
-t('onconnect runs first', async() => {
-  const results = []
-  const sql = postgres({
-    ...options,
-    onconnect: sql => sql`select 1`.then(() => results.push('onconnect'))
-  })
-
-  const x = await sql`select 1 as x`
-  results.push(x)
-
-  return ['onconnect', results[0]]
-})
-
 t('has server parameters', async() => {
-  return ['postgres.js', await new Promise((resolve, reject) => {
-    const sql = postgres({
-      ...options,
-      onconnect: () => resolve(sql.parameters.application_name)
-    })
-    sql`select 1`.catch(reject)
-  })]
+  return ['postgres.js', (await sql`select 1`.then(() => sql.parameters.application_name))]
 })
 
 t('big query body', async() => {
@@ -498,3 +470,14 @@ t('dynamic select args', async () => {
   await sql`insert into test (a, b) values (42, 'yay')`
   return ['yay', (await sql`select ${ sql('a', 'b') } from test`)[0].b]
 }, () => sql`drop table test`)
+
+ot('connection parameters', async() => {
+  const sql = postgres({
+    ...options,
+    connection: {
+      'some.var': 'yay'
+    }
+  })
+
+  return ['yay', (await sql`select current_setting('some.var') as x`)[0].x]
+})
