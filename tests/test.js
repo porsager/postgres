@@ -1,5 +1,6 @@
 import util from 'util'
 
+let done = 0
 let only = false
 let ignored = 0
 let promise = Promise.resolve()
@@ -17,7 +18,10 @@ async function test(o, name, fn, after) {
     return
 
   tests[line] = { fn, line, name }
-  promise = promise.then(() => fn())
+  promise = promise.then(() => Promise.race([
+    new Promise((resolve, reject) => fn.timer = setTimeout(() => reject('Timed out'), 1000)),
+    fn()
+  ]))
     .then(([expected, got]) => {
       if (expected !== got)
         throw new Error(util.inspect(got) + ' != ' + expected)
@@ -33,6 +37,7 @@ async function test(o, name, fn, after) {
       tests[line].succeeded = false
       tests[line].cleanup = err
     })
+    .then(() => ++done === Object.keys(tests).length && exit())
 }
 
 process.on('exit', exit)
@@ -40,6 +45,7 @@ process.on('exit', exit)
 process.on('SIGINT', exit)
 
 function exit() {
+  process.removeAllListeners('exit')
   console.log('')
   let success = true
   Object.values(tests).forEach((x) => {
