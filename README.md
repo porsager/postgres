@@ -42,17 +42,17 @@ You can use either a postgres:// url connection string or the options to define 
 ```js
 
 const sql = postgres('postgres://user:pass@host:port/database', {
-  host        :             // or hostname
-  port        :             // Postgres server port
-  path        :             // unix socket path (usually /tmp)
-  database    :             // Database to connect to
-  username    :             // or username
-  password    :             // or password
+  host        : '',         // or hostname
+  port        : 5432,       // Postgres server port
+  path        : '',         // unix socket path (usually /tmp)
+  database    : '',         // Database to connect to
+  username    : '',         // or username
+  password    : '',         // or password
   ssl         : false,      // True, or an object with options to tls.connect
   max         : 10,         // Max number of connections
   timeout     : 0,          // Idle connection timeout in seconds
   types       : [],         // Custom types, see section below
-  onconnect   : null,       // Runs before any queries on each connect
+  onconnect   : null,       // Runs on each single connection
   onnotice    : console.log // Any NOTICE the db sends will be posted here
 })
 
@@ -133,52 +133,51 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 
 ```
 
-## Query Helpers
+## Dynamic query helpers `sql()`
 
-Due to the nature of sql and Postgres types various helpers are available to simplify queries.
+Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic inserts, selects, updates and where queries.
 
-#### Object to row `row(Object, ...columns)`
-Sometimes the number of columns can be quite large, so this is shorter.
+#### Insert
+
 
 ```js
 
-const data = {
-  user: {
-    name: 'Murray'
-  }
+const user = {
+  name: 'Murray',
+  age: 68
 }
 
-const [user] = sql`
-  insert into users (
-    name, age
-  ) values ${
-    sql.row(data.user, 'name', 'age')
+sql`
+  insert into users ${
+    sql(data)
   }
 `
 
 ```
 
-#### Array of objects to rows `sql.rows(Array, ...columns)`
-If you need to insert multiple rows at the same time it's much faster to do it with a single `insert`. This is easily done using `sql.rows`
+Is translated into a safe query like this:
+
+```sql
+insert into users (name, age) values ($1, $2)
+```
+
+#### Multiple inserts in one query
+If you need to insert multiple rows at the same time it's also much faster to do it with a single `insert`. Simply pass an array of objects to `sql()`.
 ```js
 
-const data = {
-  users: [{
-    name: 'Murray',
-    age: 68
-  }, {
-    name: 'Walter',
-    age: 78
-  }]
-}
+const users = [{
+  name: 'Murray',
+  age: 68,
+  garbage: 'ignore'
+}, {
+  name: 'Walter',
+  age: 78
+}]
 
-const users = sql`
-  insert into users (
-    name, age
-  ) values ${
-    sql.rows(data.users, 'name', 'age')
+sql`
+  insert into users ${
+    sql(users, 'name', 'age')
   }
-  returning *
 `
 
 ```
@@ -224,6 +223,13 @@ const [{ json }] = await sql`
 
 // json = { hello: 'postgres' }
 ```
+
+## Unsafe
+
+
+
+## File
+
 
 
 ## Transactions
