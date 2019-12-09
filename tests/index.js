@@ -228,7 +228,7 @@ t('Point type', async() => {
   })
 
   await sql`create table test (x point)`
-  await sql`insert into test (x) values (${ sql.point([10, 20]) })`
+  await sql`insert into test (x) values (${ sql.types.point([10, 20]) })`
   return [20, (await sql`select x from test`)[0].x[1]]
 }, () => sql`drop table test`)
 
@@ -246,7 +246,7 @@ t('Point type array', async() => {
   })
 
   await sql`create table test (x point[])`
-  await sql`insert into test (x) values (${ sql.array([sql.point([10, 20]), sql.point([20, 30])]) })`
+  await sql`insert into test (x) values (${ sql.array([sql.types.point([10, 20]), sql.types.point([20, 30])]) })`
   return [30, (await sql`select x from test`)[0].x[1][1]]
 }, () => sql`drop table test`)
 
