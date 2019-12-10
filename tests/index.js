@@ -492,3 +492,14 @@ t('connection parameters', async() => {
 
   return ['yay', (await sql`select current_setting('some.var') as x`)[0].x]
 })
+
+t('Multiple queries', async() => {
+  const sql = postgres(options)
+
+  return [4, (await Promise.all([
+    sql`select 1`,
+    sql`select 2`,
+    sql`select 3`,
+    sql`select 4`
+  ])).length]
+})
