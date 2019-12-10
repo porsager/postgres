@@ -503,3 +503,19 @@ t('Multiple queries', async() => {
     sql`select 4`
   ])).length]
 })
+
+t('Multiple statements', async() =>
+  [2, await sql.unsafe(`
+    select 1 as x;
+    select 2 as x;
+  `, { simple: true }).then(([, x]) => x.x)]
+)
+
+t('throws correct error when authentication fails', async() => {
+  const sql = postgres({
+    ...options,
+    ...login_md5,
+    pass: 'wrong'
+  })
+  return ['28P01', await sql`select 1`.catch(e => e.code)]
+})
