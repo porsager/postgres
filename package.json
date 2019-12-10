@@ -7,8 +7,7 @@
   "scripts": {
     "test": "node tests/index.js",
     "lint": "eslint lib",
-    "prepublishOnly": "npm run lint && npm test && npm run build",
-    "build": "node cjs/transpile.js"
+    "prepublishOnly": "npm run lint && npm test"
   },
   "files": [
     "/lib"
