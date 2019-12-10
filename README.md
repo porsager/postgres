@@ -4,7 +4,6 @@
 - 🚯 1300 LOC - 0 dependencies
 - 🏷 ES6 Tagged Template Strings at the core
 - 🏄‍♀️ Simple surface API
-- 🧪 No tests! 0% coverage = infinite coverage!
 
 ## Getting started
 
@@ -44,16 +43,25 @@ You can use either a postgres:// url connection string or the options to define 
 const sql = postgres('postgres://user:pass@host:port/database', {
   host        : '',         // or hostname
   port        : 5432,       // Postgres server port
-  path        : '',         // unix socket path (usually /tmp)
+  path        : '',         // unix socket path (usually '/tmp')
   database    : '',         // Database to connect to
   username    : '',         // or username
   password    : '',         // or password
-  ssl         : false,      // True, or an object with options to tls.connect
+  ssl         : false,      // True, or options for tls.connect
   max         : 10,         // Max number of connections
   timeout     : 0,          // Idle connection timeout in seconds
-  types       : [],         // Custom types, see section below
-  onconnect   : null,       // Runs on each single connection
-  onnotice    : console.log // Any NOTICE the db sends will be posted here
+  types       : [],         // Custom types, see more below
+  onnotice    : fn          // Any NOTICE the db sends will be posted here
+  onparameter : fn          // Callback with key, value for server params
+  transform   : {
+    column            : fn, // Transforms incoming column names
+    value             : fn, // Transforms incoming row values
+    row               : fn  // Transforms entire rows
+  },
+  connection  : {
+    application_name  : 'postgres.js', // Default application_name
+    ...                                // Other connection parameters
+  }
 })
 
 ```
@@ -224,13 +232,9 @@ const [{ json }] = await sql`
 // json = { hello: 'postgres' }
 ```
 
-## Unsafe
+## File query
 
-
-
-## File
-
-
+Using a file to query 
 
 ## Transactions
 
@@ -355,6 +359,18 @@ prexit(async () => {
 
 ```
 
+
+## Unsafe
+
+If you know what you're doing, you can use `unsafe` to pass any string you'd like to postgres.
+
+```js
+
+sql
+
+```
+
+
 ## Errors
 
 Errors are all thrown to related queries and never globally. Errors comming from Postgres itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
@@ -365,6 +381,11 @@ There are also the following errors specifically for this library.
 > X (X) is not supported
 
 Whenever a message is received from Postgres which is not supported by this library. Feel free to file an issue if you think something is missing.
+
+##### MAX_PARAMETERS_EXCEEDED
+> Max number of parameters (65534) exceeded
+
+The postgres protocol doesn't allow more than 65534 (16bit) parameters. If you run into this issue there are various workarounds such as using `sql([...])` to escape values instead of passing them as parameters.
 
 ##### SASL_SIGNATURE_MISMATCH
 > Message type X not supported
