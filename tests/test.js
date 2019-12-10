@@ -20,12 +20,12 @@ async function test(o, name, fn, after) {
 
   tests[line] = { fn, line, name }
   promise = promise.then(() => Promise.race([
-    new Promise((resolve, reject) => fn.timer = setTimeout(() => reject('Timed out'), 1000)),
+    new Promise((resolve, reject) => fn.timer = setTimeout(() => reject('Timed out'), 100)),
     fn()
   ]))
     .then(([expected, got]) => {
       if (expected !== got)
-        throw new Error(util.inspect(got) + ' != ' + expected)
+        throw new Error(expected + ' != ' + util.inspect(got))
       tests[line].succeeded = true
       process.stdout.write('✅')
     })
