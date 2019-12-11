@@ -53,6 +53,7 @@ const sql = postgres('postgres://user:pass@host:port/database', {
   types       : [],         // Custom types, see more below
   onnotice    : fn          // Any NOTICE the db sends will be posted here
   onparameter : fn          // Callback with key, value for server params
+  debug       : fn          // Is called with (connection, query, parameters)
   transform   : {
     column            : fn, // Transforms incoming column names
     value             : fn, // Transforms incoming row values
