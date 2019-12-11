@@ -164,6 +164,12 @@ t('Transaction succeeds on uncaught savepoint', async() => {
   return [2, (await sql`select count(1) from test`)[0].count]
 }, () => sql`drop table test`)
 
+t('Helpers in Transaction', async() => {
+  return [1, (await sql.begin(async sql =>
+    await sql`select ${ sql({ x: 1 }) }`
+  ))[0].x]
+})
+
 t('Throw syntax error', async() =>
   ['42601', (await sql`wat 1`.catch(x => x)).code]
 )
