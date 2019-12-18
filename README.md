@@ -34,19 +34,19 @@ const something = await sql`
 
 ```
 
-## Connection options
+## Connection options `postgres([url], [options])`
 
-You can use either a postgres:// url connection string or the options to define your database connection properties.
+You can use either a `postgres://` url connection string or the options to define your database connection properties.
 
 ```js
 
-const sql = postgres('postgres://user:pass@host:port/database', {
-  host        : '',         // or hostname
+const sql = postgres('postgres://username:password@host:port/database', {
+  host        : '',         // Postgres ip address or domain name
   port        : 5432,       // Postgres server port
   path        : '',         // unix socket path (usually '/tmp')
-  database    : '',         // or db
-  username    : '',         // or user
-  password    : '',         // or pass
+  database    : '',         // Name of database to connect to
+  username    : '',         // Username of database user
+  password    : '',         // Password of database user
   ssl         : false,      // True, or options for tls.connect
   max         : 10,         // Max number of connections
   timeout     : 0,          // Idle connection timeout in seconds
@@ -67,7 +67,9 @@ const sql = postgres('postgres://user:pass@host:port/database', {
 
 ```
 
-## Query ```sql`...` -> Promise```
+More info for `ssl` can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options)
+
+## Query ```sql` ` -> Promise```
 
 A query will always return a `Promise` which resolves to either an array `[...]` or `null` depending on the type of query. Destructuring is great to immidiately access the first element.
 
@@ -107,7 +109,7 @@ const users = await sql`
 
 ```
 
-## Stream ```sql`...`.stream(fn) -> Promise```
+## Stream ```sql` `.stream(fn) -> Promise```
 
 If you want to handle rows returned by a query one by one you can use `.stream` which returns a promise that resolves once there are no more rows.
 ```js
@@ -142,7 +144,7 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 
 ```
 
-## Dynamic query helpers `sql()`
+## Dynamic query helpers `sql() inside tagged template`
 
 Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic inserts, selects, updates and where queries.
 
@@ -158,7 +160,7 @@ const user = {
 
 sql`
   insert into users ${
-    sql(data)
+    sql(user)
   }
 `
 
@@ -215,7 +217,7 @@ const types = sql`
 
 ```
 
-#### JSON `sql.json()`
+#### JSON `sql.json(object)`
 
 ```js
 
@@ -233,9 +235,18 @@ const [{ json }] = await sql`
 // json = { hello: 'postgres' }
 ```
 
-## File query
+## File query `sql.file(path, [args], [options]) -> Promise`
 
-Using a file to query 
+Using an `sql` file for a query. The contents will be cached in memory so that the file is only read once.
+
+```js
+
+sql.file(path.join(__dirname, 'query.sql'), [], {
+  simple: true, // Default true — allows multiple statements, but no arguments
+  cache: true // Default true - disable for single queries or memory reasons
+})
+
+```
 
 ## Transactions
 
@@ -361,13 +372,15 @@ prexit(async () => {
 ```
 
 
-## Unsafe
+## sql.unsafe(query, [args], [options]) -> promise
 
 If you know what you're doing, you can use `unsafe` to pass any string you'd like to postgres.
 
 ```js
 
-sql
+sql.unsafe(danger + `
+  select * from users where id = $1
+`, [user_id])
 
 ```
 
@@ -433,4 +446,4 @@ nb. You can use [`onnotice`](#onnotice) to listen to any Postgres `NOTICE` sent 
 
 A really big thank you to @JAForbes who introduced me to Postgres and still holds my hand navigating all the great opportunities we have.
 
-Thanks to @ACXGit for initial tests.
+Thanks to @ACXgit for initial tests.
