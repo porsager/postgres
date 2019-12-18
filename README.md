@@ -1,4 +1,7 @@
-# Postgres.js
+
+
+<img align="left" width="460" height="124" alt="Fastest full PostgreSQL nodejs client" src="postgresjs.svg" />
+
 
 - 🚀 Fastest full featured PostgreSQL client for Node.js
 - 🚯 1300 LOC - 0 dependencies
@@ -6,6 +9,10 @@
 - 🏄‍♀️ Simple surface API
 
 ## Getting started
+
+<br>
+<img height="220" alt="Good UX with Postgres.js" src="demo.gif" />
+<br>
 
 **Install**
 ```bash
@@ -15,7 +22,7 @@ $ npm install postgres
 **Use**
 ```js
 
-import postgres from 'postgres'
+const postgres = require('postgres')
 
 const sql = postgres({ ...options }) // will default to the same as psql
 
@@ -24,13 +31,6 @@ const something = await sql`
 `
 
 // something = [{ name: 'Murray', age: 68 }, { name: 'Walter', age 78 }]
-
-```
-
-**Node pre 13.1.0**
-```js
-
-const postgres = require('postgres/cjs')
 
 ```
 
@@ -44,9 +44,9 @@ const sql = postgres('postgres://user:pass@host:port/database', {
   host        : '',         // or hostname
   port        : 5432,       // Postgres server port
   path        : '',         // unix socket path (usually '/tmp')
-  database    : '',         // Database to connect to
-  username    : '',         // or username
-  password    : '',         // or password
+  database    : '',         // or db
+  username    : '',         // or user
+  password    : '',         // or pass
   ssl         : false,      // True, or options for tls.connect
   max         : 10,         // Max number of connections
   timeout     : 0,          // Idle connection timeout in seconds
