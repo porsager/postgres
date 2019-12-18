@@ -337,7 +337,7 @@ t('unsafe', async() => {
 }, () => sql`drop table test`)
 
 t('unsafe simple', async() => {
-  return [1, (await sql.unsafe('select 1 as x', { simple: true }))[0].x]
+  return [1, (await sql.unsafe('select 1 as x'))[0].x]
 })
 
 t('listen and notify', async() => {
@@ -521,7 +521,7 @@ t('Multiple statements', async() =>
   [2, await sql.unsafe(`
     select 1 as x;
     select 2 as x;
-  `, { simple: true }).then(([, x]) => x.x)]
+  `).then(([, x]) => x.x)]
 )
 
 t('throws correct error when authentication fails', async() => {
