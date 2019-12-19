@@ -1,6 +1,6 @@
 
 
-<img align="left" width="460" height="124" alt="Fastest full PostgreSQL nodejs client" src="postgresjs.svg" />
+<img align="left" width="460" height="124" alt="Fastest full PostgreSQL nodejs client" src="https://raw.githubusercontent.com/porsager/postgres/master/postgresjs.svg?sanitize=true" />
 
 
 - 🚀 Fastest full featured PostgreSQL client for Node.js
@@ -11,7 +11,7 @@
 ## Getting started
 
 <br>
-<img height="220" alt="Good UX with Postgres.js" src="demo.gif" />
+<img height="220" alt="Good UX with Postgres.js" src="https://raw.githubusercontent.com/porsager/postgres/master/demo.gif" />
 <br>
 
 **Install**
