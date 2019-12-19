@@ -242,8 +242,7 @@ Using an `sql` file for a query. The contents will be cached in memory so that t
 ```js
 
 sql.file(path.join(__dirname, 'query.sql'), [], {
-  simple: true, // Default true — allows multiple statements, but no arguments
-  cache: true // Default true - disable for single queries or memory reasons
+  cache: true // Default true - disable for single shot queries or memory reasons
 })
 
 ```
@@ -372,7 +371,7 @@ prexit(async () => {
 ```
 
 
-## sql.unsafe(query, [args], [options]) -> promise
+## Unsafe queries `sql.unsafe(query, [args], [options]) -> promise`
 
 If you know what you're doing, you can use `unsafe` to pass any string you'd like to postgres.
 
