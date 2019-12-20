@@ -404,11 +404,6 @@ The postgres protocol doesn't allow more than 65534 (16bit) parameters. If you r
 
 When using SASL authentication the server responds with a signature at the end of the authentication flow which needs to match the one on the client. This is to avoid [man in the middle attacks](https://en.wikipedia.org/wiki/Man-in-the-middle_attack). If you receive this error the connection was canceled because the server did not reply with the expected signature.
 
-##### RESERVED_METHOD_NAME
-> X is a reserved method name
-
-When implementing custom types, the name of the type is used for the method added to the `sql` object. There are a few reserved method names which can't be used. This is one of them.
-
 ##### NOT_TAGGED_CALL
 > Query not called as a tagged template literal
 
