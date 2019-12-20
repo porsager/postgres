@@ -168,6 +168,31 @@ t('Transaction succeeds on uncaught savepoint', async() => {
   return [2, (await sql`select count(1) from test`)[0].count]
 }, () => sql`drop table test`)
 
+t('Parallel transactions', async() => {
+  await sql`create table test (a int)`
+  return ['11', (await Promise.all([
+    sql.begin(sql => sql`select 1`),
+    sql.begin(sql => sql`select 1`),
+  ])).map(x => x.count).join('')]
+}, () => sql`drop table test`)
+
+t('Transaction waits', async() => {
+  await sql`create table test (a int)`
+  await sql.begin(async sql => {
+    await sql`insert into test values(1)`
+    await sql.savepoint(async sql => {
+      await sql`insert into test values(2)`
+      throw new Error('please rollback')
+    }).catch(() => { /* ignore */ })
+    await sql`insert into test values(3)`
+  })
+
+  return ['11', (await Promise.all([
+    sql.begin(sql => sql`select 1`),
+    sql.begin(sql => sql`select 1`),
+  ])).map(x => x.count).join('')]
+}, () => sql`drop table test`)
+
 t('Helpers in Transaction', async() => {
   return [1, (await sql.begin(async sql =>
     await sql`select ${ sql({ x: 1 }) }`
