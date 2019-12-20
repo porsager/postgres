@@ -568,3 +568,12 @@ t('notice hook works', async() => {
 
   return ['NOTICE', notice.severity]
 })
+
+t('bytea serializes and parses', async() => {
+  const buf = Buffer.from('wat')
+
+  await sql`create table test (x bytea)`
+  await sql`insert into test values (${ buf })`
+
+  return [0, Buffer.compare(buf, (await sql`select x from test`)[0].x)]
+})
