@@ -38,6 +38,15 @@ cp.execSync('dropdb ' + options.db + ';createdb ' + options.db)
 
 const sql = postgres(options)
 
+t('Connects with no options', async() => {
+  const sql = postgres()
+
+  const result = (await sql`select 1 as x`)[0].x
+  sql.end()
+
+  return [1, result]
+})
+
 t('Result is array', async() =>
   [true, Array.isArray(await sql`select 1`)]
 )
@@ -75,8 +84,12 @@ t('String', async() =>
   ['hello', (await sql`select ${ 'hello' } as x`)[0].x]
 )
 
-t('Boolean', async() =>
+t('Boolean false', async() =>
   [false, (await sql`select ${ false } as x`)[0].x]
+)
+
+t('Boolean true', async() =>
+  [true, (await sql`select ${ true } as x`)[0].x]
 )
 
 t('Date', async() => {
@@ -88,6 +101,10 @@ t('Json', async() => {
   const x = (await sql`select ${ sql.json({ a: 1, b: 'hello' }) } as x`)[0].x
   return [true, x.a === 1 && x.b === 'hello']
 })
+
+t('Empty array', async() =>
+  [0, (await sql`select ${ sql.array([]) } as x`)[0].x.length]
+)
 
 t('Array of Integer', async() =>
   [3, (await sql`select ${ sql.array([1, 2, 3]) } as x`)[0].x[2]]
@@ -149,12 +166,22 @@ t('Transaction throws on uncaught savepoint', async() => {
       await sql`insert into test values(2)`
       throw new Error('fail')
     })
-
-    await sql`insert into test values(3)`
   }).catch(() => 'fail'))]
 }, () => sql`drop table test`)
 
-t('Transaction succeeds on uncaught savepoint', async() => {
+t('Transaction throws on uncaught named savepoint', async() => {
+  await sql`create table test (a int)`
+
+  return ['fail', (await sql.begin(async sql => {
+    await sql`insert into test values(1)`
+    await sql.savepoint('watpoint', async sql => {
+      await sql`insert into test values(2)`
+      throw new Error('fail')
+    })
+  }).catch(() => 'fail'))]
+}, () => sql`drop table test`)
+
+t('Transaction succeeds on caught savepoint', async() => {
   await sql`create table test (a int)`
   await sql.begin(async sql => {
     await sql`insert into test values(1)`
@@ -168,11 +195,31 @@ t('Transaction succeeds on uncaught savepoint', async() => {
   return [2, (await sql`select count(1) from test`)[0].count]
 }, () => sql`drop table test`)
 
+t('Savepoint returns Result', async() => {
+  let result
+  await sql.begin(async sql => {
+    result = await sql.savepoint(sql =>
+      sql`select 1 as x`
+    )
+  })
+
+  return [1, result[0].x]
+})
+
 t('Parallel transactions', async() => {
   await sql`create table test (a int)`
   return ['11', (await Promise.all([
     sql.begin(sql => sql`select 1`),
     sql.begin(sql => sql`select 1`),
+  ])).map(x => x.count).join('')]
+}, () => sql`drop table test`)
+
+t('Transactions array', async() => {
+  await sql`create table test (a int)`
+
+  return ['11', (await sql.begin(sql => [
+    sql`select 1`.then(x => x),
+    sql`select 1`
   ])).map(x => x.count).join('')]
 }, () => sql`drop table test`)
 
@@ -288,7 +335,8 @@ t('sql file', async() =>
 
 t('sql file can stream', async() => {
   let result
-  await sql.file(path.join(__dirname, 'select.sql'))
+  await sql
+    .file(path.join(__dirname, 'select.sql'), { cache: false })
     .stream(({ x }) => result = x)
 
   return [1, result]
@@ -298,11 +346,46 @@ t('sql file throws', async() =>
   ['ENOENT', (await sql.file('./selectomondo.sql').catch(x => x.code))]
 )
 
+t('sql file cached', async() => {
+  await sql.file(path.join(__dirname, 'select.sql'))
+  await new Promise(r => setTimeout(r, 20))
+
+  return [1, (await sql.file(path.join(__dirname, 'select.sql')))[0].x]
+})
+
+t('Connection ended promise', async() => {
+  const sql = postgres(options)
+
+  await sql.end()
+
+  return [undefined, await sql.end()]
+})
+
+t('Connection ended timeout', async() => {
+  const sql = postgres(options)
+
+  await sql.end({ timeout: 10 })
+
+  return [undefined, await sql.end()]
+})
+
 t('Connection ended error', async() => {
   const sql = postgres(options)
 
   sql.end()
   return ['CONNECTION_ENDED', (await sql``.catch(x => x.code))]
+})
+
+t('Connection end does not cancel query', async() => {
+  const sql = postgres(options)
+
+  await sql`select 1`
+
+  const promise = sql`select 1 as x`
+
+  sql.end()
+
+  return [1, (await promise)[0].x]
 })
 
 t('Connection destroyed', async() => {
@@ -371,10 +454,47 @@ t('unsafe simple', async() => {
 
 t('listen and notify', async() => {
   const sql = postgres(options)
+      , channel = 'hello'
 
   return ['world', await new Promise((resolve, reject) =>
-    sql.listen('hello', resolve)
-    .then(() => sql.notify('hello', 'world'))
+    sql.listen(channel, resolve)
+    .then(() => sql.notify(channel, 'world'))
+    .catch(reject)
+    .then(sql.end)
+  )]
+})
+
+t('double listen', async() => {
+  const sql = postgres(options)
+      , channel = 'hello'
+
+  let count = 0
+
+  await new Promise((resolve, reject) =>
+    sql.listen(channel, resolve)
+    .then(() => sql.notify(channel, 'world'))
+    .catch(reject)
+  ).then(() => count++)
+
+  await new Promise((resolve, reject) =>
+    sql.listen(channel, resolve)
+    .then(() => sql.notify(channel, 'world'))
+    .catch(reject)
+  ).then(() => count++)
+
+  // for coverage
+  sql.listen('weee', () => {}).then(sql.end)
+
+  return [2, count]
+})
+
+t('listen and notify with weird name', async() => {
+  const sql = postgres(options)
+      , channel = 'wat-;ø§'
+
+  return ['world', await new Promise((resolve, reject) =>
+    sql.listen(channel, resolve)
+    .then(() => sql.notify(channel, 'world'))
     .catch(reject)
     .then(sql.end)
   )]
@@ -438,7 +558,7 @@ t('sql().then throws not tagged error', async() => {
 t('sql().catch throws not tagged error', async() => {
   let error
   try {
-    sql('select 1').catch(() => {})
+    await sql('select 1')
   } catch(e) {
     error = e.code
   }
@@ -461,6 +581,10 @@ t('dynamic column name', async () => {
 
 t('dynamic select as', async () => {
   return [2, (await sql`select ${ sql({ a: 1, b: 2 }) }`)[0].b]
+})
+
+t('dynamic select as pluck', async () => {
+  return [undefined, (await sql`select ${ sql({ a: 1, b: 2 }, 'a') }`)[0].b]
 })
 
 t('dynamic insert', async () => {
@@ -601,4 +725,59 @@ t('bytea serializes and parses', async() => {
   await sql`insert into test values (${ buf })`
 
   return [0, Buffer.compare(buf, (await sql`select x from test`)[0].x)]
+})
+
+t('Transform row', async() => {
+  const sql = postgres({
+    ...options,
+    transform: { row: x => 1 }
+  })
+
+  return [1, (await sql`select 'wat'`)[0]]
+})
+
+t('Transform row stream', async() => {
+  let result
+  const sql = postgres({
+    ...options,
+    transform: { row: x => 1 }
+  })
+
+  await sql`select 1`.stream(x => result = x)
+
+  return [1, result]
+})
+
+t('Transform value', async() => {
+  const sql = postgres({
+    ...options,
+    transform: { value: x => 1 }
+  })
+
+  return [1, (await sql`select 'wat' as x`)[0].x]
+})
+
+t('Unix socket', async() => {
+  const sql = postgres({
+    ...options,
+    host: '/tmp'
+  })
+
+  return [1, (await sql`select 1 as x`)[0].x]
+})
+
+t('Big result', async() => {
+  return [100000, (await sql`select * from generate_series(1, 100000)`).count]
+})
+
+t('Debug works', async() => {
+  let result
+  const sql = postgres({
+    ...options,
+    debug: (connection_id, str, args) => result = str
+  })
+
+  await sql`select 1`
+
+  return ['select 1', result]
 })
