@@ -536,3 +536,35 @@ t('throws correct error when authentication fails', async() => {
   })
   return ['28P01', await sql`select 1`.catch(e => e.code)]
 })
+
+t('notice works', async() => {
+  let notice
+  const log = console.log
+  console.log = function(x) {
+    notice = x
+  }
+
+  const sql = postgres({
+    ...options
+  })
+
+  await sql`create table if not exists users()`
+  await sql`create table if not exists users()`
+
+  console.log = log
+
+  return ['NOTICE', notice.severity]
+})
+
+t('notice hook works', async() => {
+  let notice
+  const sql = postgres({
+    ...options,
+    onnotice: x => notice = x
+  })
+
+  await sql`create table if not exists users()`
+  await sql`create table if not exists users()`
+
+  return ['NOTICE', notice.severity]
+})
