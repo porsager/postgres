@@ -114,6 +114,10 @@ t('Escape in arrays', async() =>
   ['Hello "you",c:\\windows', (await sql`select ${ sql.array(['Hello "you"', 'c:\\windows']) } as x`)[0].x.join(',')]
 )
 
+t('Escapes', async() => {
+  return ['hej"hej', Object.keys((await sql`select 1 as ${ sql('hej"hej') }`)[0])[0]]
+})
+
 t('null for int', async() => {
   await sql`create table test (x int)`
   return [1, (await sql`insert into test values(${ null })`).count]
