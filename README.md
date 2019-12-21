@@ -25,12 +25,10 @@ const postgres = require('postgres')
 
 const sql = postgres({ ...options }) // will default to the same as psql
 
-const something = await sql`
+await sql`
   select name, age from users
 `
-
-// something = [{ name: 'Murray', age: 68 }, { name: 'Walter', age 78 }]
-
+// > [{ name: 'Murray', age: 68 }, { name: 'Walter', age 78 }]
 ```
 
 ## Connection options `postgres([url], [options])`
