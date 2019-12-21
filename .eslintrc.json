@@ -206,7 +206,7 @@
     ],
     "keyword-spacing": 2,
     "linebreak-style": 2,
-    "lines-around-comment": 2,
+    "lines-around-comment": 0,
     "max-depth": [
       2,
       5
