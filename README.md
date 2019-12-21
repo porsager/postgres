@@ -1,7 +1,7 @@
 <img align="left" width="440" height="140" alt="Fastest full PostgreSQL nodejs client" src="https://raw.githubusercontent.com/porsager/postgres/master/postgresjs.svg?sanitize=true" />
 
 - 🚀 Fastest full featured PostgreSQL client for Node.js
-- 🚯 1300 LOC - 0 dependencies
+- 🚯 1250 LOC - 0 dependencies
 - 🏷 ES6 Tagged Template Strings at the core
 - 🏄‍♀️ Simple surface API
 
