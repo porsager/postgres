@@ -12,12 +12,13 @@
   "files": [
     "/lib"
   ],
-  "author": "Rasmus Porsager <rasmus@porsager.com",
+  "author": "Rasmus Porsager <rasmus@porsager.com>",
   "license": "WTFPL",
   "repository": "porsager/postgres",
   "keywords": [
     "driver",
     "postgresql",
+    "postgres.js",
     "postgres",
     "postgre",
     "client",
