@@ -47,9 +47,9 @@ const sql = postgres('postgres://username:password@host:port/database', {
   ssl         : false,      // True, or options for tls.connect
   max         : 10,         // Max number of connections
   timeout     : 0,          // Idle connection timeout in seconds
-  types       : [],         // Custom types, see more below
-  onnotice    : fn          // Any NOTICE the db sends will be posted here
-  onparameter : fn          // Callback with key, value for server params
+  types       : [],         // Array of custom types, see more below
+  onnotice    : fn          // Defaults to console.log
+  onparameter : fn          // (key, value) when server param change
   debug       : fn          // Is called with (connection, query, parameters)
   transform   : {
     column            : fn, // Transforms incoming column names
@@ -428,13 +428,8 @@ This error is thrown if the user has called [`sql.end()`](#sql_end) and performe
 This error is thrown for any queries that were pending when the timeout to [`sql.end({ timeout: X })`](#sql_destroy) was reached.
 
 
-## NOTICE using `onnotice`
-
-nb. You can use [`onnotice`](#onnotice) to listen to any Postgres `NOTICE` sent on connections. But note that this will be called for every singlee connection to the database.
-
-
 ## Thank you
 
 A really big thank you to @JAForbes who introduced me to Postgres and still holds my hand navigating all the great opportunities we have.
 
-Thanks to @ACXgit for initial tests.
+Thanks to @ACXgit for initial tests and dogfooding.
