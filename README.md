@@ -430,6 +430,6 @@ This error is thrown for any queries that were pending when the timeout to [`sql
 
 ## Thank you
 
-A really big thank you to @JAForbes who introduced me to Postgres and still holds my hand navigating all the great opportunities we have.
+A really big thank you to [@JAForbes](https://twitter.com/jmsfbs) who introduced me to Postgres and still holds my hand navigating all the great opportunities we have.
 
-Thanks to @ACXgit for initial tests and dogfooding.
+Thanks to [@ACXgit](https://twitter.com/andreacoiutti) for initial tests and dogfooding.
