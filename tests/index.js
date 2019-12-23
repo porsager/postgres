@@ -353,6 +353,14 @@ t('sql file cached', async() => {
   return [1, (await sql.file(path.join(__dirname, 'select.sql')))[0].x]
 })
 
+t('Parameters in file', async() => {
+  const result = await sql.file(
+    path.join(__dirname, 'select-param.sql'),
+    ['hello']
+  )
+  return ['hello', result[0].x]
+})
+
 t('Connection ended promise', async() => {
   const sql = postgres(options)
 
