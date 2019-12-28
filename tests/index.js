@@ -681,8 +681,8 @@ t('Multiple queries', async() => {
 t('Multiple statements', async() =>
   [2, await sql.unsafe(`
     select 1 as x;
-    select 2 as x;
-  `).then(([, x]) => x.x)]
+    select 2 as a;
+  `).then(([, [x]]) => x.a)]
 )
 
 t('throws correct error when authentication fails', async() => {
