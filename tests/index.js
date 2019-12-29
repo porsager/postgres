@@ -735,6 +735,16 @@ t('bytea serializes and parses', async() => {
   return [0, Buffer.compare(buf, (await sql`select x from test`)[0].x)]
 })
 
+t('Stream works', async() => {
+  let result
+  await sql`select 1 as x`.stream(({ x }) => result = x)
+  return [1, result]
+})
+
+t('Stream returns empty array', async() => {
+  return [0, (await sql`select 1 as x`.stream(x => {})).length]
+})
+
 t('Transform row', async() => {
   const sql = postgres({
     ...options,
