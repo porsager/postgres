@@ -413,10 +413,7 @@ t('Connection ended error', async() => {
 t('Connection end does not cancel query', async() => {
   const sql = postgres(options)
 
-  await sql`select 1`
-
   const promise = sql`select 1 as x`
-
   sql.end()
 
   return [1, (await promise)[0].x]
@@ -769,6 +766,43 @@ t('Stream works', async() => {
 
 t('Stream returns empty array', async() => {
   return [0, (await sql`select 1 as x`.stream(() => { /* noop */ })).length]
+})
+
+t('Cursor works', async() => {
+  const order = []
+  await sql`select 1 as x union select 2 as x`.cursor(async (x) => {
+    order.push(x.x + 'a')
+    await new Promise(r => setTimeout(r, 100))
+    order.push(x.x + 'b')
+  })
+  return ['1a1b2a2b', order.join('')]
+})
+
+t('Cursor custom n works', async() => {
+  const order = []
+  await sql`select * from generate_series(1,20)`.cursor(10, async (x) => {
+    order.push(x.length)
+  })
+  return ['10,10', order.join(',')]
+})
+
+t('Cursor cancel works', async() => {
+  let result
+  await sql`select * from generate_series(1,10) as x`.cursor(async ({ x }) => {
+    result = x
+    return sql.END
+  })
+  return [1, result]
+})
+
+t('Cursor throw works', async() => {
+  const order = []
+  await sql`select 1 as x union select 2 as x`.cursor(async (x) => {
+    order.push(x.x + 'a')
+    await new Promise(r => setTimeout(r, 100))
+    throw 'watty'
+  }).catch(() => order.push('err'))
+  return ['1aerr', order.join('')]
 })
 
 t('Transform row', async() => {

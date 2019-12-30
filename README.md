@@ -121,6 +121,52 @@ await sql`
 
 ```
 
+## Cursor ```sql` `.cursor([rows = 1], fn) -> Promise```
+
+Use cursors if you need to throttle the amount of rows being returned from a query. New results won't be requested until the promise / async callack function has resolved.
+
+```js
+
+await sql.cursor`
+  select * from generate_series(1,4) as x
+`.cursor(row => {
+  // row = { x: 1 }
+  http.request('https://example.com/wat', { row })
+})
+
+// No more rows
+
+```
+
+A single row will be returned by default, but you can also request batches by setting the number of rows desired in each batch as the first argument. That is usefull if you can do work with the rows in parallel like in this example:
+
+```js
+
+await sql.cursor`
+  select * from generate_series(1,1000) as x
+`.cursor(10, rows => {
+  // rows = [{ x: 1 }, { x: 2 }, ... ]
+  await Promise.all(rows.map(row =>
+    http.request('https://example.com/wat', { row })
+  ))
+})
+
+```
+
+If an error is thrown inside the callback function no more rows will be requested and the promise will reject with the thrown error.
+
+You can also stop receiving any more rows early by returning an end token `sql.END` from the callback function.
+
+```js
+
+await sql.cursor`
+  select * from generate_series(1,1000) as x
+`.cursor(row => {
+  return Math.random() > 0.9 && sql.END
+})
+
+```
+
 ## Listen and notify
 
 When you call listen, a dedicated connection will automatically be made to ensure that you receive notifications in real time. This connection will be used for any further calls to listen. Listen returns a promise which resolves once the `LISTEN` query to Postgres completes, or if there is already a listener active.
