@@ -33,7 +33,7 @@ await sql`
 
 ## Connection options `postgres([url], [options])`
 
-You can use either a `postgres://` url connection string or the options to define your database connection properties.
+You can use either a `postgres://` url connection string or the options to define your database connection properties. Options in the object will override any present in the url.
 
 ```js
 
@@ -64,7 +64,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
 
 ```
 
-More info for `ssl` can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options)
+More info for the `ssl` option can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options)
 
 ## Query ```sql` ` -> Promise```
 
@@ -367,19 +367,18 @@ prexit(async () => {
 
 ```
 
+<details><summary><code>sql.unsafe</code> - Advanced unsafe use cases</summary>
 
-## Unsafe queries `sql.unsafe(query, [args], [options]) -> promise`
+### Unsafe queries `sql.unsafe(query, [args], [options]) -> promise`
 
-If you know what you're doing, you can use `unsafe` to pass any string you'd like to postgres.
+If you know what you're doing, you can use `unsafe` to pass any string you'd like to postgres. Please note that this can lead to sql injection if you're not careful.
 
 ```js
 
-sql.unsafe(danger + `
-  select * from users where id = $1
-`, [user_id])
+sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 
 ```
-
+</details>
 
 ## Errors
 
