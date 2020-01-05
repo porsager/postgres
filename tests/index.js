@@ -301,6 +301,22 @@ t('Login using scram-sha-256', async() => {
   return [true, (await postgres({ ...options, ...login_scram })`select true as x`)[0].x]
 })
 
+t('Support dynamic password function', async() => {
+  return [true, (await postgres({
+    ...options,
+    ...login_scram,
+    pass: () => 'postgres_js_test_scram'
+  })`select true as x`)[0].x]
+})
+
+t('Support dynamic async password function', async() => {
+  return [true, (await postgres({
+    ...options,
+    ...login_scram,
+    pass: () => Promise.resolve('postgres_js_test_scram')
+  })`select true as x`)[0].x]
+})
+
 t('Point type', async() => {
   const sql = postgres({
     ...options,
