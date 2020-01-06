@@ -111,7 +111,7 @@ const users = await sql`
 If you want to handle rows returned by a query one by one you can use `.stream` which returns a promise that resolves once there are no more rows.
 ```js
 
-await sql.stream`
+await sql`
   select created_at, name from events
 `.stream(row => {
   // row = { created_at: '2019-11-22T14:22:00Z', name: 'connected' }
