@@ -106,7 +106,9 @@ const users = await sql`
 
 ```
 
-## Stream ```sql` `.stream(fn) -> Promise```
+## Streams
+
+### ```sql` `.stream(fn) -> Promise```
 
 If you want to handle rows returned by a query one by one you can use `.stream` which returns a promise that resolves once there are no more rows.
 ```js
@@ -116,6 +118,21 @@ await sql`
 `.stream(row => {
   // row = { created_at: '2019-11-22T14:22:00Z', name: 'connected' }
 })
+
+// No more rows
+
+```
+
+### With `for-await`
+
+If you are using a recent version of Node.JS (> v10), can use the new `for-await` to consume streams properly.
+```js
+
+for await (const row of await sql`
+  select created_at, name from events
+`) {
+  // row = { created_at: '2019-11-22T14:22:00Z', name: 'connected' }
+}
 
 // No more rows
 

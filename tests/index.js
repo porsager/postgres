@@ -765,6 +765,30 @@ t('Stream works', async() => {
   return [1, result]
 })
 
+t('Stream works with for-await', async() => {
+  let result
+  for await (const { x } of sql`select 1 as x`)
+    result = x
+  return [1, result]
+})
+
+t('Stream works with for-await with big results', async() => {
+  let result = 0
+  for await (const { generate_series: x } of sql`select * from generate_series(1, 100000)`)
+    result += x;
+  return [4699408878, result]
+})
+
+t('Stream works with for-await with interruption', async() => {
+  let result = 0
+  for await (const { generate_series: x } of sql`select * from generate_series(1, 100000)`) {
+    result += x;
+    if (result > 10000)
+      break;
+  }
+  return [10450, result]
+})
+
 t('Stream returns empty array', async() => {
   return [0, (await sql`select 1 as x`.stream(x => {})).length]
 })
