@@ -3,6 +3,8 @@
   "version": "1.0.1",
   "description": "Fastest full featured PostgreSQL client for Node.js",
   "main": "lib/index.js",
+  "types": "types.d.ts",
+  "typings": "types.d.ts",
   "type": "commonjs",
   "scripts": {
     "test": "node tests/index.js",
