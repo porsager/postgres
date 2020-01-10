@@ -68,7 +68,7 @@ More info for the `ssl` option can be found in the [Node.js docs for tls connect
 
 ## Query ```sql` ` -> Promise```
 
-A query will always return a `Promise` which resolves to either an array `[...]` or `null` depending on the type of query. Destructuring is great to immidiately access the first element.
+A query will always return a `Promise` which resolves to either an array `[...]` or `null` depending on the type of query. Destructuring is great to immediately access the first element.
 
 ```js
 
@@ -87,7 +87,7 @@ const [new_user] = await sql`
 
 #### Query parameters
 
-Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessarry, simply use JS tagged template literals as usual.
+Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessary, simply use JS tagged template literals as usual.
 
 ```js
 
@@ -123,7 +123,7 @@ await sql`
 
 ## Listen and notify
 
-When you call listen, a dedicated connection will automatically be made to ensure that you receive notifications in realtime. This connection will be used for any further calls to listen.
+When you call listen, a dedicated connection will automatically be made to ensure that you receive notifications in real time. This connection will be used for any further calls to listen.
 
 ```js
 
@@ -382,7 +382,7 @@ sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 
 ## Errors
 
-Errors are all thrown to related queries and never globally. Errors comming from Postgres itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
+Errors are all thrown to related queries and never globally. Errors coming from Postgres itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
 
 There are also the following errors specifically for this library.
 
@@ -399,7 +399,7 @@ The postgres protocol doesn't allow more than 65534 (16bit) parameters. If you r
 ##### SASL_SIGNATURE_MISMATCH
 > Message type X not supported
 
-When using SASL authentication the server responds with a signature at the end of the authentication flow which needs to match the one on the client. This is to avoid [man in the middle attacks](https://en.wikipedia.org/wiki/Man-in-the-middle_attack). If you receive this error the connection was canceled because the server did not reply with the expected signature.
+When using SASL authentication the server responds with a signature at the end of the authentication flow which needs to match the one on the client. This is to avoid [man in the middle attacks](https://en.wikipedia.org/wiki/Man-in-the-middle_attack). If you receive this error the connection was cancelled because the server did not reply with the expected signature.
 
 ##### NOT_TAGGED_CALL
 > Query not called as a tagged template literal
