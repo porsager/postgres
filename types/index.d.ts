@@ -1,8 +1,22 @@
 /// <reference types="node" />
 
+/**
+ * Etablish a connection to a PostgreSQL server. 
+ * @param options Connection options - default to the same as psql
+ * @returns An utility function to make queries to the server
+ */
 declare function Postgres<T extends Postgres.CustomTypeList = {}>(options?: Postgres.Options<T>): Postgres.Tag<T>
+/**
+ * Etablish a connection to a PostgreSQL server. 
+ * @param url Connection string used for authentication
+ * @param options Connection options - default to the same as psql
+ * @returns An utility function to make queries to the server
+ */
 declare function Postgres<T extends Postgres.CustomTypeList = {}>(url: string, options?: Postgres.Options<T>): Postgres.Tag<T>
 
+/**
+ * Connection options of Postgres.
+ */
 interface BaseOptions<T extends Postgres.CustomTypeList> {
   /** Postgres ip address or domain name */
   host?: string;
@@ -45,8 +59,23 @@ type UnwrapPromiseArray<T> = T extends any[] ? {
 
 declare namespace Postgres {
 
+  /**
+   * Convert a string to Pascal case.
+   * @param str THe string to convert
+   * @returns The new string in Pascal case
+   */
   function toPascal(str: string): string;
+  /**
+   * Convert a string to Camel case.
+   * @param str THe string to convert
+   * @returns The new string in Camel case
+   */
   function toCamel(str: string): string;
+  /**
+   * Convert a string to Kebab case.
+   * @param str THe string to convert
+   * @returns The new string in Kebab case
+   */
   function toKebab(str: string): string;
 
   interface ConnectionVariables {
@@ -137,8 +166,15 @@ declare namespace Postgres {
   }
 
   interface Tag<TTypes extends CustomTypeList> {
+
+    /**
+     * Execute an SQL query passed as a template string. Can only be used as template string tag.
+     * @param template The template generated from the template string
+     * @param args Interpoled values of the template string
+     * @returns A promise of the query passed to this function
+     */
     (template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise;
-    <T, U extends any[]>(first: T, ...args: U): QueryParameter<T>;
+    <T, U extends any[]>(first: T, ...args: U): QueryParameter<T>; // TODO Rewrite this
 
     array<T extends any[] = any[]>(value: T): QueryArrayValue<T>;
     begin<T>(cb: (sql: TransactionTag<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
