@@ -123,11 +123,11 @@ await sql`
 
 ## Listen and notify
 
-When you call listen, a dedicated connection will automatically be made to ensure that you receive notifications in real time. This connection will be used for any further calls to listen.
+When you call listen, a dedicated connection will automatically be made to ensure that you receive notifications in real time. This connection will be used for any further calls to listen. Listen returns a promise which resolves once the `LISTEN` query to Postgres completes, or if there is already a listener active.
 
 ```js
 
-sql.listen('news', payload => {
+await sql.listen('news', payload => {
   const json = JSON.parse(payload)
   console.log(json.this) // logs 'is'
 })
