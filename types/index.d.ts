@@ -35,7 +35,7 @@ interface BaseOptions<T extends Postgres.CustomTypeList> {
   /** Array of custom types; see more below */
   types?: T;
   /** Defaults to console.log */
-  onnotice?: (notice: string) => void;
+  onnotice?: (notice: Postgres.Notice) => void;
   /** (key; value) when server param change */
   onparameter?: (key: string, value: any) => void;
   /** Is called with (connection; query; parameters) */
@@ -117,6 +117,10 @@ declare namespace Postgres {
     serializers: { [oid: number]: CustomType['serialize'] };
     /** @inheritdoc */
     parsers: { [oid: number]: CustomType['parse'] };
+  }
+
+  interface Notice {
+    [field: string]: string;
   }
 
   interface CustomType {
