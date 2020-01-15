@@ -151,17 +151,17 @@ declare namespace Postgres {
     [column: string]: Serializable;
   }
 
-  interface QueryResult extends Row, Iterable<Row> {  // FIXME Multiple statements
-    [index: number]: Row;
-  }
+  type QueryResult<T> = T;
 
-  interface QueryResultArray extends Array<QueryResult> {
-    count: number;
-    command: string;
-  }
+  type QueryResultArray<T> =
+    (T extends readonly any[] ? T : readonly T[]) &
+    {
+      count: T extends readonly any[] ? T['length'] : number, // For tuples
+      command: string
+    };
 
-  interface QueryResultPromise extends Promise<QueryResultArray> {
-    stream(cb: (row: QueryResult) => void): QueryResultPromise;
+  interface QueryResultPromise<T = unknown> extends Promise<QueryResultArray<T>> {
+    stream(cb: (row: QueryResult<T extends readonly (infer R)[] ? R : T>) => void): QueryResultPromise<T>;
     // cursor(size: number): AsyncIterable<QueryResult>;
     // cursor(size: number, cb: (row: QueryResult) => void): QueryResultPromise;
   }
@@ -179,7 +179,7 @@ declare namespace Postgres {
      * @param args Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    (template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise;
+    <T = any[]>(template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise<T>;
     (...toEscape: string[]): QueryParameter<string>;
     <T>(parametersList: T[]): QueryParameter<T, never>;
     <T extends {}, U extends keyof T extends string ? (keyof T)[] : never>(obj: T, ...keys: U): QueryParameter<T, U>;
@@ -189,8 +189,8 @@ declare namespace Postgres {
     begin<T>(options: string, cb: (sql: TransactionTag<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     end(): Promise<void>;
     end(options?: { timeout?: number }): Promise<void>;
-    file(path: string, options?: { cache?: boolean }): QueryResultPromise;
-    file(path: string, args?: Serializable[], options?: { cache?: boolean }): QueryResultPromise;
+    file<T = any[]>(path: string, options?: { cache?: boolean }): QueryResultPromise<T>;
+    file<T = any[]>(path: string, args?: Serializable[], options?: { cache?: boolean }): QueryResultPromise<T>;
     json(value: any): QueryValue;
     listen(channel: string, cb: (value?: string) => void): QueryResultPromise<void>;
     notify(channel: string, payload: string): QueryResultPromise<void>;
@@ -199,7 +199,7 @@ declare namespace Postgres {
     types: {
       [name in keyof TTypes]: (obj: Parameters<TTypes[name]['serialize']>[0]) => QueryValue<typeof obj>;
     };
-    unsafe(query: string, parameters?: Serializable[]): QueryResultPromise;
+    unsafe<T = any[]>(query: string, parameters?: Serializable[]): QueryResultPromise<T>;
   }
 
   interface TransactionTag<TTypes extends CustomTypeList> extends Tag<TTypes> {
