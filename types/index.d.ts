@@ -84,7 +84,7 @@ declare namespace Postgres {
     /** Other connection parameters */
     [name: string]: any;
   }
-  
+
   interface Options<T extends CustomTypeList> extends BaseOptions<T> {
     /** unix socket path (usually '/tmp') */
     path?: string;
@@ -114,24 +114,30 @@ declare namespace Postgres {
     /** @inheritdoc */
     ssl: boolean;
     /** @inheritdoc */
-    serializers: { [id: number]: CustomType['serialize'] };
+    serializers: { [oid: number]: CustomType['serialize'] };
     /** @inheritdoc */
-    parsers: { [id: number]: CustomType['parse'] };
+    parsers: { [oid: number]: CustomType['parse'] };
   }
 
   interface CustomType {
     to: number,
     from: number[],
     serialize(obj: unknown): unknown,
-    parse(str: any): unknown
+    parse(raw: any): unknown
   }
 
   interface CustomTypeList {
     [name: string]: CustomType
   }
 
-  interface QueryValue<T = any> {
+  interface QueryValue<T = Serializable> {
+    /**
+     * PostgreSQL OID of the type
+     */
     type: number;
+    /**
+     * Value to serialize
+     */
     value: T;
   }
 
@@ -160,7 +166,7 @@ declare namespace Postgres {
     // cursor(size: number, cb: (row: QueryResult) => void): QueryResultPromise;
   }
 
-  interface QueryParameter<T, U extends any[] = T[]> extends Promise<never> { // FIXME Remove promise inheritance as an error is always throws
+  interface QueryParameter<T, U extends any[] = T[]> {
     first: T;
     rest: U;
   }
@@ -168,13 +174,15 @@ declare namespace Postgres {
   interface Tag<TTypes extends CustomTypeList> {
 
     /**
-     * Execute an SQL query passed as a template string. Can only be used as template string tag.
+     * Execute the SQL query passed as a template string. Can only be used as template string tag.
      * @param template The template generated from the template string
      * @param args Interpoled values of the template string
-     * @returns A promise of the query passed to this function
+     * @returns A promise resolving to the result of your query
      */
     (template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise;
-    <T, U extends any[]>(first: T, ...args: U): QueryParameter<T>; // TODO Rewrite this
+    (...toEscape: string[]): QueryParameter<string>;
+    <T>(parametersList: T[]): QueryParameter<T, never>;
+    <T extends {}, U extends keyof T extends string ? (keyof T)[] : never>(obj: T, ...keys: U): QueryParameter<T, U>;
 
     array<T extends any[] = any[]>(value: T): QueryArrayValue<T>;
     begin<T>(cb: (sql: TransactionTag<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
@@ -184,11 +192,13 @@ declare namespace Postgres {
     file(path: string, options?: { cache?: boolean }): QueryResultPromise;
     file(path: string, args?: Serializable[], options?: { cache?: boolean }): QueryResultPromise;
     json(value: any): QueryValue;
-    listen(channel: string, cb: (value?: string) => void): Promise<void>;
-    notify(channel: string, payload: string): Promise<void>;
+    listen(channel: string, cb: (value?: string) => void): QueryResultPromise<void>;
+    notify(channel: string, payload: string): QueryResultPromise<void>;
     options: ParsedOptions<TTypes>;
     parameters: ConnectionVariables;
-    types: { [name in keyof TTypes]: (...args: Parameters<TTypes[name]['serialize']>) => QueryValue<ReturnType<TTypes[name]['parse']>> };
+    types: {
+      [name in keyof TTypes]: (obj: Parameters<TTypes[name]['serialize']>[0]) => QueryValue<typeof obj>;
+    };
     unsafe(query: string, parameters?: Serializable[]): QueryResultPromise;
   }
 
