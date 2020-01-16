@@ -185,8 +185,7 @@ declare namespace Postgres {
      */
     <T = any[]>(template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise<T>;
     (...toEscape: string[]): QueryParameter<string>;
-    <T>(parametersList: T[]): QueryParameter<T, never>;
-    <T extends {}, U extends keyof T extends string ? (keyof T)[] : never>(obj: T, ...keys: U): QueryParameter<T, U>;
+    <T extends {}, U extends (keyof (T extends any[] ? T[number] : T))[]>(obj: T, ...keys: U): QueryParameter<T, U>;
 
     array<T extends any[] = any[]>(value: T): QueryArrayValue<T>;
     begin<T>(cb: (sql: TransactionTag<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
