@@ -68,7 +68,7 @@ More info for the `ssl` option can be found in the [Node.js docs for tls connect
 
 ## Query ```sql` ` -> Promise```
 
-A query will always return a `Promise` which resolves to either an array `[...]` or `null` depending on the type of query. Destructuring is great to immediately access the first element.
+A query will always return a `Promise` which resolves to a results array `[...]{ rows, command }`. Destructuring is great to immediately access the first element.
 
 ```js
 
@@ -108,7 +108,7 @@ const users = await sql`
 
 ## Stream ```sql` `.stream(fn) -> Promise```
 
-If you want to handle rows returned by a query one by one you can use `.stream` which returns a promise that resolves once there are no more rows.
+If you want to handle rows returned by a query one by one, you can use `.stream` which returns a promise that resolves once there are no more rows.
 ```js
 
 await sql`
@@ -141,12 +141,16 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 
 ```
 
+## Tagged template function ``` sql`` ``` 
+[Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) are not just ordinary template literal strings. They allow the function to handle any parameters within before interpolation. This means that they can be used to enforce a safe way of writing queries, which is what Postgres.js does. Any generic value will be serialized according to an inferred type, and replaced by a PostgreSQL protocol placeholders `$1, $2, ...` and then sent to the database as a parameter to let it handle any need for escaping / casting.
+
+This also means you cannot write dynamic queryes or concat queries together by simple string manipulation. To enable dynamic queries in a safe way, the `sql` function doubles as a regular function which escapes any value properly. It also includes overloads for common cases of inserting, selecting, updating and querying.
+
 ## Dynamic query helpers `sql() inside tagged template`
 
 Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic inserts, selects, updates and where queries.
 
 #### Insert
-
 
 ```js
 
@@ -157,20 +161,20 @@ const user = {
 
 sql`
   insert into users ${
-    sql(user)
+    sql(user, 'name', 'age')
   }
 `
 
-```
-
-Is translated into a safe query like this:
-
-```sql
+// Is translated into this query:
 insert into users (name, age) values ($1, $2)
+
 ```
+
+You can leave out the column names and simply do `sql(user)` if you want to get all fields from the object as columns, but be careful not to allow users to supply columns you don't want.
 
 #### Multiple inserts in one query
 If you need to insert multiple rows at the same time it's also much faster to do it with a single `insert`. Simply pass an array of objects to `sql()`.
+
 ```js
 
 const users = [{
@@ -190,9 +194,46 @@ sql`
 
 ```
 
+#### Update
+
+This is also useful for update queries 
+```js
+
+const user = {
+  id: 1,
+  name: 'Muray'
+}
+
+sql`
+  update users set ${
+    sql(user, 'name')
+  } where 
+    id = ${ user.id }
+`
+
+// Is translated into this query:
+update users set name = $1 where id = $2
+```
+
+#### Select
+
+```js
+
+const columns = ['name', 'age']
+
+sql`
+  select ${
+    sql(columns)
+  } from users
+`
+
+// Is translated into this query:
+select name, age from users
+```
+
 #### Arrays `sql.array(Array)`
 
-Postgres has a native array type which is similar to js arrays, but Postgres only allows the same type and shape for nested items. This method automatically infers the item type and translates js arrays into Postgres arrays.
+PostgreSQL has a native array type which is similar to js arrays, but only allows the same type and shape for nested items. This method automatically infers the item type and serializes js arrays into PostgreSQL arrays.
 
 ```js
 
