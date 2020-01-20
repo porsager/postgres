@@ -234,7 +234,7 @@ const [{ json }] = await sql`
 
 ## File query `sql.file(path, [args], [options]) -> Promise`
 
-Using an `sql` file for a query. The contents will be cached in memory so that the file is only read once.
+Using an `.sql` file for a query. The contents will be cached in memory so that the file is only read once.
 
 ```js
 
@@ -367,6 +367,18 @@ prexit(async () => {
 
 ```
 
+## The Connection Pool
+
+Connections are created lazily once a query is created. This means that simply doing const `sql = postgres(...)` won't have any effect other than instantiating a new `sql` instance. 
+
+> No connection will be made until a query is made. 
+
+This means that we get a much simpler story for error handling and reconnections. Queries will be sent over the wire immediately on the next available connection in the pool. Connections are automatically taken out of the pool if you start a transaction using `sql.begin()`, and automatically returned to the pool once your transaction is done.
+
+Any query which was already sent over the wire will be rejected if the connection is lost. It'll automatically defer to the error handling you have for that query, and since connections are lazy it'll automatically try to reconnect the next time a query is made. The benefit of this is no weird generic "onerror" handler that tries to get things back to normal, and also simpler application code since you don't have to handle errors out of context.
+
+There are no guarantees about queries executing in order unless using a transaction with `sql.begin()` or setting `max: 1`. Of course doing a series of queries, one awaiting the other will work as expected, but that's just due to the nature of js async/promise handling, so it's not necessary for this library to be concerned with ordering.
+
 <details><summary><code>sql.unsafe</code> - Advanced unsafe use cases</summary>
 
 ### Unsafe queries `sql.unsafe(query, [args], [options]) -> promise`
@@ -382,7 +394,7 @@ sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 
 ## Errors
 
-Errors are all thrown to related queries and never globally. Errors coming from Postgres itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
+Errors are all thrown to related queries and never globally. Errors coming from PostgreSQL itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
 
 There are also the following errors specifically for this library.
 
