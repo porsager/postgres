@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "test": "node tests/index.js",
-    "lint": "eslint lib",
+    "lint": "eslint lib && eslint tests",
     "prepublishOnly": "npm run lint && npm test"
   },
   "files": [
