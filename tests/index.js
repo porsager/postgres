@@ -874,3 +874,28 @@ t('numeric is returned as string', async() => [
   'string',
   typeof (await sql`select 1.2 as x`)[0].x
 ])
+
+t('Error contains origin', async() => [
+  true,
+  (await sql`selec 1`.catch(err => 'origin' in err))
+])
+
+t('Error contains query string', async() => [
+  'selec 1',
+  (await sql`selec 1`.catch(err => err.query))
+])
+
+t('Error contains query parameters', async() => [
+  '1',
+  (await sql`selec ${ 1 }`.catch(err => err.parameters[0].value))
+])
+
+t('Query string is not enumerable', async() => [
+  -1,
+  (await sql`selec 1`.catch(err => Object.keys(err).indexOf('query')))
+])
+
+t('Query parameters are not enumerable', async() => [
+  -1,
+  (await sql`selec ${ 1 }`.catch(err => Object.keys(err).indexOf('parameters')))
+])

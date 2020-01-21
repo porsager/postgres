@@ -493,6 +493,10 @@ sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 
 Errors are all thrown to related queries and never globally. Errors coming from PostgreSQL itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
 
+Query errors will contain a stored error with the origin of the query to aid in tracing errors.
+
+Query errors will also contain the `query` string and the `parameters` which are not enumerable to avoid accidentally leaking confidential information in logs. To log these it is required to specifically access `error.query` and `error.parameters`.
+
 There are also the following errors specifically for this library.
 
 ##### MESSAGE_NOT_SUPPORTED
