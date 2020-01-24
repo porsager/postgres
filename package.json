@@ -12,7 +12,8 @@
     "prepublishOnly": "npm run lint && npm test"
   },
   "files": [
-    "/lib"
+    "/lib",
+    "/types"
   ],
   "author": "Rasmus Porsager <rasmus@porsager.com>",
   "license": "WTFPL",
