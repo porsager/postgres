@@ -13,6 +13,8 @@ module.exports.ot = (...rest) => (only = true, test(true, ...rest))
 
 async function test(o, name, fn, after) {
   const line = new Error().stack.split('\n')[3].split(':')[1]
+      , timeout = (name.match(/^T([0-9]+)/) || [])[1] || 0.5
+
   await 1
 
   if (only && !o)
@@ -20,7 +22,7 @@ async function test(o, name, fn, after) {
 
   tests[line] = { fn, line, name }
   promise = promise.then(() => Promise.race([
-    new Promise((resolve, reject) => fn.timer = setTimeout(() => reject('Timed out'), 500)),
+    new Promise((resolve, reject) => fn.timer = setTimeout(() => reject('Timed out'), timeout * 1000)),
     fn()
   ]))
     .then(([expected, got]) => {

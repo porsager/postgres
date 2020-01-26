@@ -1,6 +1,7 @@
 const { t, not, ot } = require('./test.js')
 const cp = require('child_process')
 const path = require('path')
+const fs = require('fs')
 
 const postgres = require('../lib')
 
@@ -45,6 +46,24 @@ t('Connects with no options', async() => {
   sql.end()
 
   return [1, result]
+})
+
+t('T2 Multiple hosts', async() => {
+  const sql = postgres('postgres://localhost:5432,localhost:5433')
+      , a = (await sql`show data_directory`)[0].data_directory
+
+  cp.execSync('pg_ctl stop -D "' + a + '"')
+
+  const b = (await sql`show data_directory`)[0].data_directory
+
+  cp.execSync('pg_ctl start -D "' + a + '" -w -l "' + a + '/postgresql.log"')
+  cp.execSync('pg_ctl stop -D "' + b + '"')
+
+  await sql`select 1 as x`
+
+  cp.execSync('pg_ctl start -o "-p 5433" -D "' + b + '" -w -l "' + b + '/postgresql.log"')
+
+  return [1, 1]
 })
 
 t('Uses default database without slash', async() =>
