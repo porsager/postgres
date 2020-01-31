@@ -103,8 +103,8 @@ t('Boolean true', async() =>
 )
 
 t('Date', async() => {
-  const now = Date.now()
-  return [now, (await sql`select ${ now } as x`)[0].x]
+  const now = new Date()
+  return [0, now - (await sql`select ${ now } as x`)[0].x]
 })
 
 t('Json', async() => {
