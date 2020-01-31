@@ -408,6 +408,16 @@ prexit(async () => {
 
 ```
 
+## Numbers, bigint, numeric
+
+`Number` in javascript is only able to represent 2<sup>53</sup>-1 safely which means that types in PostgreSQLs like `bigint` and `numeric` won't fit into `Number`.
+
+Since Node.js v10.4 we can use [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) to match the PostgreSQL type `bigint`, so Postgres.js will use BigInt if running on v10.4 or later. For older versions `bigint` will be returned as a string.
+
+There is currently no way to handle `numeric / decimal` in a native way in Javascript, so these and similar will be returned as `string`.
+
+You can of course handle types like these using [custom types](#types) if you want to.
+
 ## The Connection Pool
 
 Connections are created lazily once a query is created. This means that simply doing const `sql = postgres(...)` won't have any effect other than instantiating a new `sql` instance. 

@@ -87,7 +87,7 @@ t('undefined to null', async() =>
 )
 
 t('Integer', async() =>
-  [1, (await sql`select ${ 1 } as x`)[0].x]
+  ['1', (await sql`select ${ 1 } as x`)[0].x]
 )
 
 t('String', async() =>
@@ -117,7 +117,7 @@ t('Empty array', async() =>
 )
 
 t('Array of Integer', async() =>
-  [3, (await sql`select ${ sql.array([1, 2, 3]) } as x`)[0].x[2]]
+  ['3', (await sql`select ${ sql.array([1, 2, 3]) } as x`)[0].x[2]]
 )
 
 t('Array of String', async() =>
@@ -130,11 +130,11 @@ t('Array of Date', async() => {
 })
 
 t('Nested array n2', async() =>
-  [4, (await sql`select ${ sql.array([[1, 2], [3, 4]]) } as x`)[0].x[1][1]]
+  ['4', (await sql`select ${ sql.array([[1, 2], [3, 4]]) } as x`)[0].x[1][1]]
 )
 
 t('Nested array n3', async() =>
-  [6, (await sql`select ${ sql.array([[[1, 2]], [[3, 4]], [[5, 6]]]) } as x`)[0].x[2][0][1]]
+  ['6', (await sql`select ${ sql.array([[[1, 2]], [[3, 4]], [[5, 6]]]) } as x`)[0].x[2][0][1]]
 )
 
 t('Escape in arrays', async() =>
@@ -202,7 +202,7 @@ t('Transaction succeeds on caught savepoint', async() => {
     await sql`insert into test values(3)`
   })
 
-  return [2, (await sql`select count(1) from test`)[0].count]
+  return [typeof BigInt === 'undefined' ? '2' : 2n, (await sql`select count(1) from test`)[0].count]
 }, () => sql`drop table test`)
 
 t('Savepoint returns Result', async() => {
@@ -251,7 +251,7 @@ t('Transaction waits', async() => {
 }, () => sql`drop table test`)
 
 t('Helpers in Transaction', async() => {
-  return [1, (await sql.begin(async sql =>
+  return ['1', (await sql.begin(async sql =>
     await sql`select ${ sql({ x: 1 }) }`
   ))[0].x]
 })
@@ -614,7 +614,7 @@ t('dynamic column name', async() => {
 })
 
 t('dynamic select as', async() => {
-  return [2, (await sql`select ${ sql({ a: 1, b: 2 }) }`)[0].b]
+  return ['2', (await sql`select ${ sql({ a: 1, b: 2 }) }`)[0].b]
 })
 
 t('dynamic select as pluck', async() => {
@@ -825,3 +825,18 @@ t('Debug works', async() => {
 
   return ['select 1', result]
 })
+
+t('bigint is returned as BigInt', async() => [
+  'bigint',
+  typeof (await sql`select 9223372036854777 as x`)[0].x
+])
+
+ot('int is returned as Number', async() => [
+  'number',
+  typeof (await sql`select 123 as x`)[0].x
+])
+
+ot('numeric is returned as string', async() => [
+  'string',
+  typeof (await sql`select 1.2 as x`)[0].x
+])
