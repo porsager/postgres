@@ -831,12 +831,12 @@ t('bigint is returned as BigInt', async() => [
   typeof (await sql`select 9223372036854777 as x`)[0].x
 ])
 
-ot('int is returned as Number', async() => [
+t('int is returned as Number', async() => [
   'number',
   typeof (await sql`select 123 as x`)[0].x
 ])
 
-ot('numeric is returned as string', async() => [
+t('numeric is returned as string', async() => [
   'string',
   typeof (await sql`select 1.2 as x`)[0].x
 ])
