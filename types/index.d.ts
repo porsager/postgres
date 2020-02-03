@@ -5,19 +5,19 @@
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function Postgres<T extends Postgres.CustomTypeList = {}>(options?: Postgres.Options<T>): Postgres.Tag<T>
+declare function Postgres<T extends Postgres.PostgresTypeList = {}>(options?: Postgres.Options<T>): Postgres.Sql<T>
 /**
  * Etablish a connection to a PostgreSQL server. 
  * @param url Connection string used for authentication
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function Postgres<T extends Postgres.CustomTypeList = {}>(url: string, options?: Postgres.Options<T>): Postgres.Tag<T>
+declare function Postgres<T extends Postgres.PostgresTypeList = {}>(url: string, options?: Postgres.Options<T>): Postgres.Sql<T>
 
 /**
  * Connection options of Postgres.
  */
-interface BaseOptions<T extends Postgres.CustomTypeList> {
+interface BaseOptions<T extends Postgres.PostgresTypeList> {
   /** Postgres ip address or domain name */
   host?: string;
   /** Postgres server port */
@@ -85,7 +85,7 @@ declare namespace Postgres {
     [name: string]: any;
   }
 
-  interface Options<T extends CustomTypeList> extends BaseOptions<T> {
+  interface Options<T extends PostgresTypeList> extends BaseOptions<T> {
     /** unix socket path (usually '/tmp') */
     path?: string;
     /** Password of database user */
@@ -94,7 +94,7 @@ declare namespace Postgres {
     password?: Options<T>['pass']; // FIXME Is it a doc error ?
   }
 
-  interface ParsedOptions<T extends CustomTypeList> extends BaseOptions<T> {
+  interface ParsedOptions<T extends PostgresTypeList> extends BaseOptions<T> {
     /** @inheritdoc */
     port: number;
     /** @inheritdoc */
@@ -114,24 +114,24 @@ declare namespace Postgres {
     /** @inheritdoc */
     ssl: boolean;
     /** @inheritdoc */
-    serializers: { [oid: number]: CustomType['serialize'] };
+    serializers: { [oid: number]: PostgresType['serialize'] };
     /** @inheritdoc */
-    parsers: { [oid: number]: CustomType['parse'] };
+    parsers: { [oid: number]: PostgresType['parse'] };
   }
 
   interface Notice {
     [field: string]: string;
   }
 
-  interface CustomType {
+  interface PostgresType {
     to: number,
     from: number[],
     serialize(obj: unknown): unknown,
     parse(raw: any): unknown
   }
 
-  interface CustomTypeList {
-    [name: string]: CustomType
+  interface PostgresTypeList {
+    [name: string]: PostgresType
   }
 
   interface QueryValue<T = Serializable> {
@@ -175,7 +175,7 @@ declare namespace Postgres {
     rest: U;
   }
 
-  interface Sql<TTypes extends CustomTypeList> {
+  interface Sql<TTypes extends PostgresTypeList> {
 
     /**
      * Execute the SQL query passed as a template string. Can only be used as template string tag.
@@ -188,8 +188,8 @@ declare namespace Postgres {
     <T extends {}, U extends (keyof (T extends any[] ? T[number] : T))[]>(obj: T, ...keys: U): QueryParameter<T, U>;
 
     array<T extends any[] = any[]>(value: T): QueryArrayValue<T>;
-    begin<T>(cb: (sql: TransactionTag<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
-    begin<T>(options: string, cb: (sql: TransactionTag<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
+    begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
+    begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     end(): Promise<void>;
     end(options?: { timeout?: number }): Promise<void>;
     file<T = any[]>(path: string, options?: { cache?: boolean }): QueryResultPromise<T>;
@@ -205,7 +205,7 @@ declare namespace Postgres {
     unsafe<T = any[]>(query: string, parameters?: Serializable[]): QueryResultPromise<T>;
   }
 
-  interface TransactionSql<TTypes extends CustomTypeList> extends Sql<TTypes> {
+  interface TransactionSql<TTypes extends PostgresTypeList> extends Sql<TTypes> {
     savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
   }
