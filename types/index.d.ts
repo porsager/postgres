@@ -50,7 +50,7 @@ interface BaseOptions<T extends Postgres.CustomTypeList> {
     row?: (row: Postgres.Row) => any;
   };
   /** Connection parameters */
-  connection?: Postgres.ConnectionVariables;
+  connection?: Postgres.ConnectionParameters;
 }
 
 type UnwrapPromiseArray<T> = T extends any[] ? {
@@ -78,7 +78,7 @@ declare namespace Postgres {
    */
   function toKebab(str: string): string;
 
-  interface ConnectionVariables {
+  interface ConnectionParameters {
     /** Default application_name */
     application_name?: string;
     /** Other connection parameters */
@@ -175,7 +175,7 @@ declare namespace Postgres {
     rest: U;
   }
 
-  interface Tag<TTypes extends CustomTypeList> {
+  interface Sql<TTypes extends CustomTypeList> {
 
     /**
      * Execute the SQL query passed as a template string. Can only be used as template string tag.
@@ -198,16 +198,16 @@ declare namespace Postgres {
     listen(channel: string, cb: (value?: string) => void): QueryResultPromise<void>;
     notify(channel: string, payload: string): QueryResultPromise<void>;
     options: ParsedOptions<TTypes>;
-    parameters: ConnectionVariables;
+    parameters: ConnectionParameters;
     types: {
       [name in keyof TTypes]: (obj: Parameters<TTypes[name]['serialize']>[0]) => QueryValue<typeof obj>;
     };
     unsafe<T = any[]>(query: string, parameters?: Serializable[]): QueryResultPromise<T>;
   }
 
-  interface TransactionTag<TTypes extends CustomTypeList> extends Tag<TTypes> {
-    savepoint<T>(cb: (sql: TransactionTag<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
-    savepoint<T>(name: string, cb: (sql: TransactionTag<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
+  interface TransactionSql<TTypes extends CustomTypeList> extends Sql<TTypes> {
+    savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
+    savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
   }
 
 }
