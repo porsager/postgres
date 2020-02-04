@@ -1,6 +1,7 @@
+/* eslint no-console: 0 */
+
 const util = require('util')
 
-let all = 0
 let done = 0
 let only = false
 let ignored = 0
@@ -56,12 +57,15 @@ function exit() {
       success = false
       x.cleanup
         ? console.error('⛔️', x.name + ' at line', x.line, 'cleanup failed', '\n', util.inspect(x.cleanup))
-        : console.error('⛔️', x.name + ' at line', x.line, x.failed ? 'failed' : 'never finished', '\n', util.inspect(x.error))
+        : console.error('⛔️', x.name + ' at line', x.line, x.failed
+          ? 'failed'
+          : 'never finished', '\n', util.inspect(x.error)
+        )
     }
   })
 
   ignored && console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's', '\n'))
   !only && success && !ignored
     ? console.log('All good')
-    : process.exit(1)
+    : process.exit(1) // eslint-disable-line
 }

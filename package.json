@@ -1,6 +1,6 @@
 {
   "name": "postgres",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Fastest full featured PostgreSQL client for Node.js",
   "main": "lib/index.js",
   "types": "types/index.d.ts",
@@ -8,7 +8,7 @@
   "type": "commonjs",
   "scripts": {
     "test": "node tests/index.js",
-    "lint": "eslint lib",
+    "lint": "eslint lib && eslint tests",
     "prepublishOnly": "npm run lint && npm test"
   },
   "files": [

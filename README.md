@@ -68,7 +68,7 @@ More info for the `ssl` option can be found in the [Node.js docs for tls connect
 
 ## Query ```sql` ` -> Promise```
 
-A query will always return a `Promise` which resolves to either an array `[...]` or `null` depending on the type of query. Destructuring is great to immidiately access the first element.
+A query will always return a `Promise` which resolves to a results array `[...]{ rows, command }`. Destructuring is great to immediately access the first element.
 
 ```js
 
@@ -87,7 +87,7 @@ const [new_user] = await sql`
 
 #### Query parameters
 
-Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessarry, simply use JS tagged template literals as usual.
+Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessary, simply use JS tagged template literals as usual.
 
 ```js
 
@@ -108,7 +108,7 @@ const users = await sql`
 
 ## Stream ```sql` `.stream(fn) -> Promise```
 
-If you want to handle rows returned by a query one by one you can use `.stream` which returns a promise that resolves once there are no more rows.
+If you want to handle rows returned by a query one by one, you can use `.stream` which returns a promise that resolves once there are no more rows.
 ```js
 
 await sql`
@@ -121,13 +121,59 @@ await sql`
 
 ```
 
-## Listen and notify
+## Cursor ```sql` `.cursor([rows = 1], fn) -> Promise```
 
-When you call listen, a dedicated connection will automatically be made to ensure that you receive notifications in realtime. This connection will be used for any further calls to listen.
+Use cursors if you need to throttle the amount of rows being returned from a query. New results won't be requested until the promise / async callack function has resolved.
 
 ```js
 
-sql.listen('news', payload => {
+await sql.cursor`
+  select * from generate_series(1,4) as x
+`.cursor(row => {
+  // row = { x: 1 }
+  http.request('https://example.com/wat', { row })
+})
+
+// No more rows
+
+```
+
+A single row will be returned by default, but you can also request batches by setting the number of rows desired in each batch as the first argument. That is usefull if you can do work with the rows in parallel like in this example:
+
+```js
+
+await sql.cursor`
+  select * from generate_series(1,1000) as x
+`.cursor(10, rows => {
+  // rows = [{ x: 1 }, { x: 2 }, ... ]
+  await Promise.all(rows.map(row =>
+    http.request('https://example.com/wat', { row })
+  ))
+})
+
+```
+
+If an error is thrown inside the callback function no more rows will be requested and the promise will reject with the thrown error.
+
+You can also stop receiving any more rows early by returning an end token `sql.END` from the callback function.
+
+```js
+
+await sql.cursor`
+  select * from generate_series(1,1000) as x
+`.cursor(row => {
+  return Math.random() > 0.9 && sql.END
+})
+
+```
+
+## Listen and notify
+
+When you call listen, a dedicated connection will automatically be made to ensure that you receive notifications in real time. This connection will be used for any further calls to listen. Listen returns a promise which resolves once the `LISTEN` query to Postgres completes, or if there is already a listener active.
+
+```js
+
+await sql.listen('news', payload => {
   const json = JSON.parse(payload)
   console.log(json.this) // logs 'is'
 })
@@ -141,12 +187,16 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 
 ```
 
+## Tagged template function ``` sql`` ``` 
+[Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) are not just ordinary template literal strings. They allow the function to handle any parameters within before interpolation. This means that they can be used to enforce a safe way of writing queries, which is what Postgres.js does. Any generic value will be serialized according to an inferred type, and replaced by a PostgreSQL protocol placeholders `$1, $2, ...` and then sent to the database as a parameter to let it handle any need for escaping / casting.
+
+This also means you cannot write dynamic queryes or concat queries together by simple string manipulation. To enable dynamic queries in a safe way, the `sql` function doubles as a regular function which escapes any value properly. It also includes overloads for common cases of inserting, selecting, updating and querying.
+
 ## Dynamic query helpers `sql() inside tagged template`
 
 Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic inserts, selects, updates and where queries.
 
 #### Insert
-
 
 ```js
 
@@ -157,20 +207,20 @@ const user = {
 
 sql`
   insert into users ${
-    sql(user)
+    sql(user, 'name', 'age')
   }
 `
 
-```
-
-Is translated into a safe query like this:
-
-```sql
+// Is translated into this query:
 insert into users (name, age) values ($1, $2)
+
 ```
+
+You can leave out the column names and simply do `sql(user)` if you want to get all fields from the object as columns, but be careful not to allow users to supply columns you don't want.
 
 #### Multiple inserts in one query
 If you need to insert multiple rows at the same time it's also much faster to do it with a single `insert`. Simply pass an array of objects to `sql()`.
+
 ```js
 
 const users = [{
@@ -190,9 +240,46 @@ sql`
 
 ```
 
+#### Update
+
+This is also useful for update queries 
+```js
+
+const user = {
+  id: 1,
+  name: 'Muray'
+}
+
+sql`
+  update users set ${
+    sql(user, 'name')
+  } where 
+    id = ${ user.id }
+`
+
+// Is translated into this query:
+update users set name = $1 where id = $2
+```
+
+#### Select
+
+```js
+
+const columns = ['name', 'age']
+
+sql`
+  select ${
+    sql(columns)
+  } from users
+`
+
+// Is translated into this query:
+select name, age from users
+```
+
 #### Arrays `sql.array(Array)`
 
-Postgres has a native array type which is similar to js arrays, but Postgres only allows the same type and shape for nested items. This method automatically infers the item type and translates js arrays into Postgres arrays.
+PostgreSQL has a native array type which is similar to js arrays, but only allows the same type and shape for nested items. This method automatically infers the item type and serializes js arrays into PostgreSQL arrays.
 
 ```js
 
@@ -234,7 +321,7 @@ const [{ json }] = await sql`
 
 ## File query `sql.file(path, [args], [options]) -> Promise`
 
-Using an `sql` file for a query. The contents will be cached in memory so that the file is only read once.
+Using an `.sql` file for a query. The contents will be cached in memory so that the file is only read once.
 
 ```js
 
@@ -367,6 +454,28 @@ prexit(async () => {
 
 ```
 
+## Numbers, bigint, numeric
+
+`Number` in javascript is only able to represent 2<sup>53</sup>-1 safely which means that types in PostgreSQLs like `bigint` and `numeric` won't fit into `Number`.
+
+Since Node.js v10.4 we can use [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) to match the PostgreSQL type `bigint`, so Postgres.js will use BigInt if running on v10.4 or later. For older versions `bigint` will be returned as a string.
+
+There is currently no way to handle `numeric / decimal` in a native way in Javascript, so these and similar will be returned as `string`.
+
+You can of course handle types like these using [custom types](#types) if you want to.
+
+## The Connection Pool
+
+Connections are created lazily once a query is created. This means that simply doing const `sql = postgres(...)` won't have any effect other than instantiating a new `sql` instance. 
+
+> No connection will be made until a query is made. 
+
+This means that we get a much simpler story for error handling and reconnections. Queries will be sent over the wire immediately on the next available connection in the pool. Connections are automatically taken out of the pool if you start a transaction using `sql.begin()`, and automatically returned to the pool once your transaction is done.
+
+Any query which was already sent over the wire will be rejected if the connection is lost. It'll automatically defer to the error handling you have for that query, and since connections are lazy it'll automatically try to reconnect the next time a query is made. The benefit of this is no weird generic "onerror" handler that tries to get things back to normal, and also simpler application code since you don't have to handle errors out of context.
+
+There are no guarantees about queries executing in order unless using a transaction with `sql.begin()` or setting `max: 1`. Of course doing a series of queries, one awaiting the other will work as expected, but that's just due to the nature of js async/promise handling, so it's not necessary for this library to be concerned with ordering.
+
 <details><summary><code>sql.unsafe</code> - Advanced unsafe use cases</summary>
 
 ### Unsafe queries `sql.unsafe(query, [args], [options]) -> promise`
@@ -382,7 +491,11 @@ sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 
 ## Errors
 
-Errors are all thrown to related queries and never globally. Errors comming from Postgres itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
+Errors are all thrown to related queries and never globally. Errors coming from PostgreSQL itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
+
+Query errors will contain a stored error with the origin of the query to aid in tracing errors.
+
+Query errors will also contain the `query` string and the `parameters` which are not enumerable to avoid accidentally leaking confidential information in logs. To log these it is required to specifically access `error.query` and `error.parameters`.
 
 There are also the following errors specifically for this library.
 
@@ -399,7 +512,7 @@ The postgres protocol doesn't allow more than 65534 (16bit) parameters. If you r
 ##### SASL_SIGNATURE_MISMATCH
 > Message type X not supported
 
-When using SASL authentication the server responds with a signature at the end of the authentication flow which needs to match the one on the client. This is to avoid [man in the middle attacks](https://en.wikipedia.org/wiki/Man-in-the-middle_attack). If you receive this error the connection was canceled because the server did not reply with the expected signature.
+When using SASL authentication the server responds with a signature at the end of the authentication flow which needs to match the one on the client. This is to avoid [man in the middle attacks](https://en.wikipedia.org/wiki/Man-in-the-middle_attack). If you receive this error the connection was cancelled because the server did not reply with the expected signature.
 
 ##### NOT_TAGGED_CALL
 > Query not called as a tagged template literal

@@ -1,4 +1,6 @@
-const { t, not, ot } = require('./test.js')
+/* eslint no-console: 0 */
+
+const { t, not, ot } = require('./test.js') // eslint-disable-line
 const cp = require('child_process')
 const path = require('path')
 
@@ -86,7 +88,7 @@ t('undefined to null', async() =>
 )
 
 t('Integer', async() =>
-  [1, (await sql`select ${ 1 } as x`)[0].x]
+  ['1', (await sql`select ${ 1 } as x`)[0].x]
 )
 
 t('String', async() =>
@@ -102,8 +104,8 @@ t('Boolean true', async() =>
 )
 
 t('Date', async() => {
-  const now = Date.now()
-  return [now, (await sql`select ${ now } as x`)[0].x]
+  const now = new Date()
+  return [0, now - (await sql`select ${ now } as x`)[0].x]
 })
 
 t('Json', async() => {
@@ -116,7 +118,7 @@ t('Empty array', async() =>
 )
 
 t('Array of Integer', async() =>
-  [3, (await sql`select ${ sql.array([1, 2, 3]) } as x`)[0].x[2]]
+  ['3', (await sql`select ${ sql.array([1, 2, 3]) } as x`)[0].x[2]]
 )
 
 t('Array of String', async() =>
@@ -129,11 +131,11 @@ t('Array of Date', async() => {
 })
 
 t('Nested array n2', async() =>
-  [4, (await sql`select ${ sql.array([[1, 2], [3, 4]]) } as x`)[0].x[1][1]]
+  ['4', (await sql`select ${ sql.array([[1, 2], [3, 4]]) } as x`)[0].x[1][1]]
 )
 
 t('Nested array n3', async() =>
-  [6, (await sql`select ${ sql.array([[[1, 2]], [[3, 4]], [[5, 6]]]) } as x`)[0].x[2][0][1]]
+  ['6', (await sql`select ${ sql.array([[[1, 2]], [[3, 4]], [[5, 6]]]) } as x`)[0].x[2][0][1]]
 )
 
 t('Escape in arrays', async() =>
@@ -201,7 +203,7 @@ t('Transaction succeeds on caught savepoint', async() => {
     await sql`insert into test values(3)`
   })
 
-  return [2, (await sql`select count(1) from test`)[0].count]
+  return [typeof BigInt === 'undefined' ? '2' : 2n, (await sql`select count(1) from test`)[0].count]
 }, () => sql`drop table test`)
 
 t('Savepoint returns Result', async() => {
@@ -219,7 +221,7 @@ t('Parallel transactions', async() => {
   await sql`create table test (a int)`
   return ['11', (await Promise.all([
     sql.begin(sql => sql`select 1`),
-    sql.begin(sql => sql`select 1`),
+    sql.begin(sql => sql`select 1`)
   ])).map(x => x.count).join('')]
 }, () => sql`drop table test`)
 
@@ -245,12 +247,12 @@ t('Transaction waits', async() => {
 
   return ['11', (await Promise.all([
     sql.begin(sql => sql`select 1`),
-    sql.begin(sql => sql`select 1`),
+    sql.begin(sql => sql`select 1`)
   ])).map(x => x.count).join('')]
 }, () => sql`drop table test`)
 
 t('Helpers in Transaction', async() => {
-  return [1, (await sql.begin(async sql =>
+  return ['1', (await sql.begin(async sql =>
     await sql`select ${ sql({ x: 1 }) }`
   ))[0].x]
 })
@@ -261,7 +263,7 @@ t('Throw syntax error', async() =>
 
 t('Connect using uri', async() =>
   [true, await new Promise((resolve, reject) => {
-    const sql = postgres('postgres://' + login.user + ':' + (login.pass || '') + '@localhost:5432/' + options.db, {
+    const sql = postgres('postgres://' + login.user + ':' + (login.pass || '') + '@localhost:5432/' + options.db, {
       timeout: 0.1
     })
     sql`select 1`.then(() => resolve(true), reject)
@@ -412,10 +414,7 @@ t('Connection ended error', async() => {
 t('Connection end does not cancel query', async() => {
   const sql = postgres(options)
 
-  await sql`select 1`
-
   const promise = sql`select 1 as x`
-
   sql.end()
 
   return [1, (await promise)[0].x]
@@ -516,7 +515,7 @@ t('double listen', async() => {
   ).then(() => count++)
 
   // for coverage
-  sql.listen('weee', () => {}).then(sql.end)
+  sql.listen('weee', () => { /* noop */ }).then(sql.end)
 
   return [2, count]
 })
@@ -572,7 +571,7 @@ t('await sql() throws not tagged error', async() => {
   let error
   try {
     await sql('select 1')
-  } catch(e) {
+  } catch (e) {
     error = e.code
   }
   return ['NOT_TAGGED_CALL', error]
@@ -581,8 +580,8 @@ t('await sql() throws not tagged error', async() => {
 t('sql().then throws not tagged error', async() => {
   let error
   try {
-    sql('select 1').then(() => {})
-  } catch(e) {
+    sql('select 1').then(() => { /* noop */ })
+  } catch (e) {
     error = e.code
   }
   return ['NOT_TAGGED_CALL', error]
@@ -592,7 +591,7 @@ t('sql().catch throws not tagged error', async() => {
   let error
   try {
     await sql('select 1')
-  } catch(e) {
+  } catch (e) {
     error = e.code
   }
   return ['NOT_TAGGED_CALL', error]
@@ -601,45 +600,45 @@ t('sql().catch throws not tagged error', async() => {
 t('sql().finally throws not tagged error', async() => {
   let error
   try {
-    sql('select 1').finally(() => {})
-  } catch(e) {
+    sql('select 1').finally(() => { /* noop */ })
+  } catch (e) {
     error = e.code
   }
   return ['NOT_TAGGED_CALL', error]
 })
 
-t('dynamic column name', async () => {
+t('dynamic column name', async() => {
   return ['!not_valid', Object.keys((await sql`select 1 as ${ sql('!not_valid') }`)[0])[0]]
 })
 
-t('dynamic select as', async () => {
-  return [2, (await sql`select ${ sql({ a: 1, b: 2 }) }`)[0].b]
+t('dynamic select as', async() => {
+  return ['2', (await sql`select ${ sql({ a: 1, b: 2 }) }`)[0].b]
 })
 
-t('dynamic select as pluck', async () => {
+t('dynamic select as pluck', async() => {
   return [undefined, (await sql`select ${ sql({ a: 1, b: 2 }, 'a') }`)[0].b]
 })
 
-t('dynamic insert', async () => {
+t('dynamic insert', async() => {
   await sql`create table test (a int, b text)`
   const x = { a: 42, b: 'the answer' }
 
   return ['the answer', (await sql`insert into test ${ sql(x) } returning *`)[0].b]
 }, () => sql`drop table test`)
 
-t('dynamic insert pluck', async () => {
+t('dynamic insert pluck', async() => {
   await sql`create table test (a int, b text)`
   const x = { a: 42, b: 'the answer' }
 
   return [null, (await sql`insert into test ${ sql(x, 'a') } returning *`)[0].b]
 }, () => sql`drop table test`)
 
-t('array insert', async () => {
+t('array insert', async() => {
   await sql`create table test (a int, b int)`
-  return [2, (await sql`insert into test (a, b) values (${ [1,2] }) returning *`)[0].b]
+  return [2, (await sql`insert into test (a, b) values (${ [1, 2] }) returning *`)[0].b]
 }, () => sql`drop table test`)
 
-t('parameters in()', async () => {
+t('parameters in()', async() => {
   return [2, (await sql`
     with rows as (
       select * from (values (1), (2), (3), (4)) as x(a)
@@ -648,34 +647,34 @@ t('parameters in()', async () => {
   `).count]
 })
 
-t('dynamic multi row insert', async () => {
+t('dynamic multi row insert', async() => {
   await sql`create table test (a int, b text)`
   const x = { a: 42, b: 'the answer' }
 
   return ['the answer', (await sql`insert into test ${ sql([x, x]) } returning *`)[1].b]
 }, () => sql`drop table test`)
 
-t('dynamic update', async () => {
+t('dynamic update', async() => {
   await sql`create table test (a int, b text)`
   await sql`insert into test (a, b) values (17, 'wrong')`
 
   return ['the answer', (await sql`update test set ${ sql({ a: 42, b: 'the answer' }) } returning *`)[0].b]
 }, () => sql`drop table test`)
 
-t('dynamic update pluck', async () => {
+t('dynamic update pluck', async() => {
   await sql`create table test (a int, b text)`
   await sql`insert into test (a, b) values (17, 'wrong')`
 
   return ['wrong', (await sql`update test set ${ sql({ a: 42, b: 'the answer' }, 'a') } returning *`)[0].b]
 }, () => sql`drop table test`)
 
-t('dynamic select array', async () => {
+t('dynamic select array', async() => {
   await sql`create table test (a int, b text)`
   await sql`insert into test (a, b) values (42, 'yay')`
   return ['yay', (await sql`select ${ sql(['a', 'b']) } from test`)[0].b]
 }, () => sql`drop table test`)
 
-t('dynamic select args', async () => {
+t('dynamic select args', async() => {
   await sql`create table test (a int, b text)`
   await sql`insert into test (a, b) values (42, 'yay')`
   return ['yay', (await sql`select ${ sql('a', 'b') } from test`)[0].b]
@@ -767,13 +766,50 @@ t('Stream works', async() => {
 })
 
 t('Stream returns empty array', async() => {
-  return [0, (await sql`select 1 as x`.stream(x => {})).length]
+  return [0, (await sql`select 1 as x`.stream(() => { /* noop */ })).length]
+})
+
+t('Cursor works', async() => {
+  const order = []
+  await sql`select 1 as x union select 2 as x`.cursor(async (x) => {
+    order.push(x.x + 'a')
+    await new Promise(r => setTimeout(r, 100))
+    order.push(x.x + 'b')
+  })
+  return ['1a1b2a2b', order.join('')]
+})
+
+t('Cursor custom n works', async() => {
+  const order = []
+  await sql`select * from generate_series(1,20)`.cursor(10, async (x) => {
+    order.push(x.length)
+  })
+  return ['10,10', order.join(',')]
+})
+
+t('Cursor cancel works', async() => {
+  let result
+  await sql`select * from generate_series(1,10) as x`.cursor(async ({ x }) => {
+    result = x
+    return sql.END
+  })
+  return [1, result]
+})
+
+t('Cursor throw works', async() => {
+  const order = []
+  await sql`select 1 as x union select 2 as x`.cursor(async (x) => {
+    order.push(x.x + 'a')
+    await new Promise(r => setTimeout(r, 100))
+    throw 'watty'
+  }).catch(() => order.push('err'))
+  return ['1aerr', order.join('')]
 })
 
 t('Transform row', async() => {
   const sql = postgres({
     ...options,
-    transform: { row: x => 1 }
+    transform: { row: () => 1 }
   })
 
   return [1, (await sql`select 'wat'`)[0]]
@@ -783,7 +819,7 @@ t('Transform row stream', async() => {
   let result
   const sql = postgres({
     ...options,
-    transform: { row: x => 1 }
+    transform: { row: () => 1 }
   })
 
   await sql`select 1`.stream(x => result = x)
@@ -794,7 +830,7 @@ t('Transform row stream', async() => {
 t('Transform value', async() => {
   const sql = postgres({
     ...options,
-    transform: { value: x => 1 }
+    transform: { value: () => 1 }
   })
 
   return [1, (await sql`select 'wat' as x`)[0].x]
@@ -817,10 +853,50 @@ t('Debug works', async() => {
   let result
   const sql = postgres({
     ...options,
-    debug: (connection_id, str, args) => result = str
+    debug: (connection_id, str) => result = str
   })
 
   await sql`select 1`
 
   return ['select 1', result]
 })
+
+t('bigint is returned as BigInt', async() => [
+  'bigint',
+  typeof (await sql`select 9223372036854777 as x`)[0].x
+])
+
+t('int is returned as Number', async() => [
+  'number',
+  typeof (await sql`select 123 as x`)[0].x
+])
+
+t('numeric is returned as string', async() => [
+  'string',
+  typeof (await sql`select 1.2 as x`)[0].x
+])
+
+t('Error contains origin', async() => [
+  true,
+  (await sql`selec 1`.catch(err => 'origin' in err))
+])
+
+t('Error contains query string', async() => [
+  'selec 1',
+  (await sql`selec 1`.catch(err => err.query))
+])
+
+t('Error contains query parameters', async() => [
+  '1',
+  (await sql`selec ${ 1 }`.catch(err => err.parameters[0].value))
+])
+
+t('Query string is not enumerable', async() => [
+  -1,
+  (await sql`selec 1`.catch(err => Object.keys(err).indexOf('query')))
+])
+
+t('Query parameters are not enumerable', async() => [
+  -1,
+  (await sql`selec ${ 1 }`.catch(err => Object.keys(err).indexOf('parameters')))
+])
