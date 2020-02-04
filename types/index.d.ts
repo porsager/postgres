@@ -157,15 +157,15 @@ declare namespace Postgres {
 
   type QueryResult<T> = T;
 
-  type QueryResultArray<T> =
-    (T extends readonly any[] ? T : readonly T[]) &
+  type QueryResultArray<T extends Row | Row[]> =
+    (T extends readonly Row[] ? T : readonly T[]) &
     {
-      count: T extends readonly any[] ? T['length'] : number, // For tuples
+      count: T extends readonly Row[] ? T['length'] : number, // For tuples
       command: string
     };
 
-  interface QueryResultPromise<T = unknown> extends Promise<QueryResultArray<T>> {
-    stream(cb: (row: QueryResult<T extends readonly (infer R)[] ? R : T>) => void): QueryResultPromise<T>;
+  interface QueryResultPromise<T extends Row | Row[] = any[]> extends Promise<QueryResultArray<T>> {
+    stream(cb: (row: QueryResult<T extends Row[] ? T[number] : T>) => void): QueryResultPromise<T>;
     // cursor(size: number): AsyncIterable<QueryResult>;
     // cursor(size: number, cb: (row: QueryResult) => void): QueryResultPromise;
   }
@@ -183,7 +183,7 @@ declare namespace Postgres {
      * @param args Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T = any[]>(template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise<T>;
+    <T extends Row | Row[] = any[]>(template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise<T>;
     (...toEscape: string[]): QueryParameter<string>;
     <T extends {}, U extends (keyof (T extends any[] ? T[number] : T))[]>(obj: T, ...keys: U): QueryParameter<T, U>;
 
@@ -195,8 +195,8 @@ declare namespace Postgres {
     file<T = any[]>(path: string, options?: { cache?: boolean }): QueryResultPromise<T>;
     file<T = any[]>(path: string, args?: Serializable[], options?: { cache?: boolean }): QueryResultPromise<T>;
     json(value: any): QueryValue;
-    listen(channel: string, cb: (value?: string) => void): QueryResultPromise<void>;
-    notify(channel: string, payload: string): QueryResultPromise<void>;
+    listen(channel: string, cb: (value?: string) => void): QueryResultPromise<never[]>;
+    notify(channel: string, payload: string): QueryResultPromise<never[]>;
     options: ParsedOptions<TTypes>;
     parameters: ConnectionParameters;
     types: {
