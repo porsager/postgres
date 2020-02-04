@@ -164,10 +164,10 @@ declare namespace Postgres {
       command: string
     };
 
-  interface QueryResultPromise<T extends Row | Row[] = any[]> extends Promise<QueryResultArray<T>> {
-    stream(cb: (row: QueryResult<T extends Row[] ? T[number] : T>) => void): QueryResultPromise<T>;
-    cursor(cb: (row: QueryResult<T extends Row[] ? T[number] : T>) => void): QueryResultPromise;
-    cursor(size: number, cb: (row: QueryResult<T extends Row[] ? T : T[]>) => void): QueryResultPromise;
+  interface QueryResultPromise<TRow extends Row[]> extends Promise<QueryResultArray<TRow>> {
+    stream(cb: (row: QueryResult<TRow[number]>) => void): QueryResultPromise<TRow>;
+    cursor(cb: (row: QueryResult<TRow[number]>) => void): QueryResultPromise<TRow>;
+    cursor<T extends number>(size: T, cb: (row: QueryResult<T extends 1 ? TRow[number] : TRow>) => void): QueryResultPromise<TRow>;
   }
 
   interface QueryParameter<T, U extends any[] = T[]> {
@@ -183,7 +183,7 @@ declare namespace Postgres {
      * @param args Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends Row | Row[] = any[]>(template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise<T>;
+    <T extends Row | Row[] = any[]>(template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise<T extends Row[] ? T : T[]>;
     (...toEscape: string[]): QueryParameter<string>;
     <T extends {}, U extends (keyof (T extends any[] ? T[number] : T))[]>(obj: T, ...keys: U): QueryParameter<T, U>;
 
@@ -194,8 +194,8 @@ declare namespace Postgres {
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     end(): Promise<void>;
     end(options?: { timeout?: number }): Promise<void>;
-    file<T = any[]>(path: string, options?: { cache?: boolean }): QueryResultPromise<T>;
-    file<T = any[]>(path: string, args?: Serializable[], options?: { cache?: boolean }): QueryResultPromise<T>;
+    file<T extends Row | Row[] = any[]>(path: string, options?: { cache?: boolean }): QueryResultPromise<T extends Row[] ? T : T[]>;
+    file<T extends Row | Row[] = any[]>(path: string, args?: Serializable[], options?: { cache?: boolean }): QueryResultPromise<T extends Row[] ? T : T[]>;
     json(value: any): QueryValue;
     listen(channel: string, cb: (value?: string) => void): QueryResultPromise<never[]>;
     notify(channel: string, payload: string): QueryResultPromise<never[]>;
@@ -204,7 +204,7 @@ declare namespace Postgres {
     types: {
       [name in keyof TTypes]: (obj: Parameters<TTypes[name]['serialize']>[0]) => QueryValue<typeof obj>;
     };
-    unsafe<T = any[]>(query: string, parameters?: Serializable[]): QueryResultPromise<T>;
+    unsafe<T extends Row | Row[] = any[]>(query: string, parameters?: Serializable[]): QueryResultPromise<T extends Row[] ? T : T[]>;
   }
 
   interface TransactionSql<TTypes extends PostgresTypeList> extends Sql<TTypes> {
