@@ -20,10 +20,17 @@ $ npm install postgres
 
 **Use**
 ```js
-
+// db.js
 const postgres = require('postgres')
 
 const sql = postgres({ ...options }) // will default to the same as psql
+
+module.exports = sql
+```
+
+```js
+// other.js
+const sql = require('./db.js')
 
 await sql`
   select name, age from users
