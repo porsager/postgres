@@ -166,8 +166,8 @@ declare namespace Postgres {
 
   interface QueryResultPromise<T extends Row | Row[] = any[]> extends Promise<QueryResultArray<T>> {
     stream(cb: (row: QueryResult<T extends Row[] ? T[number] : T>) => void): QueryResultPromise<T>;
-    // cursor(size: number): AsyncIterable<QueryResult>;
-    // cursor(size: number, cb: (row: QueryResult) => void): QueryResultPromise;
+    cursor(cb: (row: QueryResult<T extends Row[] ? T[number] : T>) => void): QueryResultPromise;
+    cursor(size: number, cb: (row: QueryResult<T extends Row[] ? T : T[]>) => void): QueryResultPromise;
   }
 
   interface QueryParameter<T, U extends any[] = T[]> {
@@ -186,6 +186,8 @@ declare namespace Postgres {
     <T extends Row | Row[] = any[]>(template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise<T>;
     (...toEscape: string[]): QueryParameter<string>;
     <T extends {}, U extends (keyof (T extends any[] ? T[number] : T))[]>(obj: T, ...keys: U): QueryParameter<T, U>;
+
+    END: {};
 
     array<T extends any[] = any[]>(value: T): QueryArrayValue<T>;
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
