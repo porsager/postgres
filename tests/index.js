@@ -875,10 +875,16 @@ t('numeric is returned as string', async() => [
   typeof (await sql`select 1.2 as x`)[0].x
 ])
 
-t('Error contains origin', async() => [
-  true,
-  (await sql`selec 1`.catch(err => 'origin' in err))
-])
+function get() {
+  return sql`selec 1`
+}
+
+t('Async stack trace', async() => {
+  return [
+    parseInt(new Error().stack.split('\n')[1].split(':')[1]) + 1,
+    parseInt(await sql.begin(sql => sql`select.sql`).catch(x => x.stack.split('\n').pop().split(':')[1]))
+  ]
+})
 
 t('Error contains query string', async() => [
   'selec 1',
