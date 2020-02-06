@@ -882,8 +882,25 @@ function get() {
 t('Async stack trace', async() => {
   return [
     parseInt(new Error().stack.split('\n')[1].split(':')[1]) + 1,
-    parseInt(await sql.begin(sql => sql`select.sql`).catch(x => x.stack.split('\n').pop().split(':')[1]))
+    parseInt(await sql`select.sql`.catch(x => x.stack.split('\n').pop().split(':')[1]))
   ]
+})
+
+t('Debug has long async stack trace', async() => {
+  const sql = postgres({ debug: true })
+
+  return [
+    'watyo',
+    await yo().catch(x => x.stack.match(/wat|yo/g).join(''))
+  ]
+
+  function yo() {
+    return wat()
+  }
+
+  function wat() {
+    return sql`selec 1`
+  }
 })
 
 t('Error contains query string', async() => [
