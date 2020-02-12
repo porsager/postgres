@@ -425,6 +425,13 @@ t('Connection destroyed', async() => {
   return ['CONNECTION_DESTROYED', await sql``.catch(x => x.code)]
 })
 
+t('Connection destroyed with query before', async() => {
+  const sql = postgres(options)
+  let error = sql`select pg_sleep(0.2)`.catch(err => err.code)
+  sql.end({ timeout: 0 })
+  return ['CONNECTION_DESTROYED', await error]
+})
+
 t('Message not supported', async() => {
   await sql`create table test (x int)`
   return ['MESSAGE_NOT_SUPPORTED', await sql`copy test to stdout`.catch(x => x.code)]
