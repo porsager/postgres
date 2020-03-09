@@ -113,6 +113,19 @@ const users = await sql`
 
 ```
 
+Arrays will be handled by replacement parameters too, so `where in` queries are also simple.
+
+```js
+
+const users = await sql`
+  select 
+    * 
+  from users
+  where age in (${ [68, 75, 23] })
+`
+
+```
+
 ## Stream ```sql` `.stream(fn) -> Promise```
 
 If you want to handle rows returned by a query one by one, you can use `.stream` which returns a promise that resolves once there are no more rows.
