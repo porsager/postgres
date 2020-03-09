@@ -546,6 +546,11 @@ This error is thrown if the user has called [`sql.end()`](#sql_end) and performe
 
 This error is thrown for any queries that were pending when the timeout to [`sql.end({ timeout: X })`](#sql_destroy) was reached.
 
+## Migration tools
+
+Postgres.js doesn't come with any migration solution since it's way out of scope, but here are some modules that supports Postgres.js for migrations:
+
+- https://github.com/lukeed/ley
 
 ## Thank you
 
