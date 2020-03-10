@@ -82,10 +82,6 @@ t('null', async() =>
   [null, (await sql`select ${ null } as x`)[0].x]
 )
 
-t('undefined to null', async() =>
-  [null, (await sql`select ${ undefined } as x`)[0].x]
-)
-
 t('Integer', async() =>
   ['1', (await sql`select ${ 1 } as x`)[0].x]
 )
@@ -255,6 +251,20 @@ t('Helpers in Transaction', async() => {
     await sql`select ${ sql({ x: 1 }) }`
   ))[0].x]
 })
+
+t('Undefined values throws', async() => {
+  let error
+
+  await sql`
+    select ${ undefined } as x
+  `.catch(x => error = x.code)
+
+  return ['UNDEFINED_VALUE', error]
+})
+
+t('Null sets to null', async() =>
+  [null, (await sql`select ${ null } as x`)[0].x]
+)
 
 t('Throw syntax error', async() =>
   ['42601', (await sql`wat 1`.catch(x => x)).code]

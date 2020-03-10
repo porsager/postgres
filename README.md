@@ -519,6 +519,11 @@ Query errors will also contain the `query` string and the `parameters` which are
 
 There are also the following errors specifically for this library.
 
+##### UNDEFINED_VALUE
+> Undefined values are not allowed
+
+Postgres.js won't accept `undefined` as values in tagged template queries since it becomes ambigious what to do with the value. If you want to set something to null, use `null` explicitly.
+
 ##### MESSAGE_NOT_SUPPORTED
 > X (X) is not supported
 
