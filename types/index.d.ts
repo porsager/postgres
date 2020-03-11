@@ -132,7 +132,7 @@ declare namespace Postgres {
     [name: string]: PostgresType
   }
 
-  interface QueryValue<T = Serializable> {
+  interface Parameter<T = Serializable> {
     /**
      * PostgreSQL OID of the type
      */
@@ -143,33 +143,31 @@ declare namespace Postgres {
     value: T;
   }
 
-  interface QueryArrayValue<T extends any[] = any[]> extends QueryValue<T> {
+  interface ArrayParameter<T extends any[] = any[]> extends Parameter<T> {
     array: true;
   }
 
   type Serializable = any;
 
   interface Row {
-    [column: string]: Serializable;
+    [column: string]: any;
   }
 
-  type QueryResult<T> = T;
-
-  type QueryResultArray<T extends readonly Row[]> =
-    T &
-    {
-      count: T['length'], // For tuples
-      command: string
-    };
-
-  interface QueryResultPromise<TRow extends readonly Row[]> extends Promise<QueryResultArray<TRow>> {
-    stream(cb: (row: QueryResult<TRow[number]>) => void): QueryResultPromise<TRow>;
-    cursor(cb: (row: QueryResult<TRow[number]>) => void): QueryResultPromise<TRow>;
-    cursor(size: 1, cb: (row: QueryResult<TRow[number]>) => void): QueryResultPromise<TRow>;
-    cursor(size: number, cb: (row: QueryResult<TRow>) => void): QueryResultPromise<TRow>;
+  interface ResultInfo<T extends number> {
+    count: T, // For tuples
+    command: string
   }
 
-  interface QueryParameter<T, U extends any[] = T[]> {
+  type RowList<T extends readonly any[]> = T & ResultInfo<T['length']>;
+
+  interface PendingQuery<TRow extends readonly Row[]> extends Promise<RowList<TRow>> {
+    stream(cb: (row: TRow[number]) => void): Promise<RowList<[]>>;
+    cursor(cb: (row: TRow[number]) => void): Promise<RowList<[]>>;
+    cursor(size: 1, cb: (row: TRow[number]) => void): Promise<RowList<[]>>;
+    cursor(size: number, cb: (row: TRow) => void): Promise<RowList<[]>>;
+  }
+
+  interface Helper<T, U extends any[] = T[]> {
     first: T;
     rest: U;
   }
@@ -182,28 +180,42 @@ declare namespace Postgres {
      * @param args Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends Row | Row[] = Row[]>(template: TemplateStringsArray, ...args: Serializable[]): QueryResultPromise<T extends Row[] ? T : T[]>;
-    (...toEscape: string[]): QueryParameter<string>;
-    <T extends {}, U extends (keyof (T extends any[] ? T[number] : T))[]>(obj: T, ...keys: U): QueryParameter<T, U>;
+    <T extends Row | Row[] = Row>(template: TemplateStringsArray, ...args: Serializable[]): PendingQuery<T extends Row[] ? T : T[]>;
 
-    END: {};
+    /**
+     * Escape column names
+     * @param columns Columns to escape
+     * @returns A formated representation of the column names
+     */
+    (columns: string[]): Helper<string>;
+    (...columns: string[]): Helper<string>;
 
-    array<T extends any[] = Row[]>(value: T): QueryArrayValue<T>;
+    /**
+     * Extract properties from an object or from an array of objects
+     * @param objOrArray An object or an array of objects to extract properties from
+     * @param keys Keys to extract from the object or from objets inside the array
+     * @returns A formated representation of the parameter
+     */
+    <T extends object, U extends (keyof (T extends any[] ? T[number] : T))[]>(objOrArray: T, ...keys: U): Helper<T, U>;
+
+    END: {}; // FIXME unique symbol ?
+
+    array<T extends Serializable[] = Serializable[]>(value: T): ArrayParameter<T>;
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     end(): Promise<void>;
     end(options?: { timeout?: number }): Promise<void>;
-    file<T extends Row | Row[] = Row[]>(path: string, options?: { cache?: boolean }): QueryResultPromise<T extends Row[] ? T : T[]>;
-    file<T extends Row | Row[] = Row[]>(path: string, args?: Serializable[], options?: { cache?: boolean }): QueryResultPromise<T extends Row[] ? T : T[]>;
-    json(value: any): QueryValue;
-    listen(channel: string, cb: (value?: string) => void): QueryResultPromise<never[]>;
-    notify(channel: string, payload: string): QueryResultPromise<never[]>;
+    file<T extends Row | Row[] = Row>(path: string, options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
+    file<T extends Row | Row[] = Row>(path: string, args?: Serializable[], options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
+    json(value: any): Parameter;
+    listen(channel: string, cb: (value?: string) => void): PendingQuery<never[]>;
+    notify(channel: string, payload: string): PendingQuery<never[]>;
     options: ParsedOptions<TTypes>;
     parameters: ConnectionParameters;
     types: {
-      [name in keyof TTypes]: (obj: Parameters<TTypes[name]['serialize']>[0]) => QueryValue<typeof obj>;
+      [name in keyof TTypes]: (obj: Parameters<TTypes[name]['serialize']>[0]) => Parameter<typeof obj>;
     };
-    unsafe<T extends Row | Row[] = any[]>(query: string, parameters?: Serializable[]): QueryResultPromise<T extends Row[] ? T : T[]>;
+    unsafe<T extends Row | Row[] = any[]>(query: string, parameters?: Serializable[]): PendingQuery<T extends Row[] ? T : T[]>;
   }
 
   interface TransactionSql<TTypes extends PostgresTypeList> extends Sql<TTypes> {
