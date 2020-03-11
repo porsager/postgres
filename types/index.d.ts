@@ -147,7 +147,12 @@ declare namespace Postgres {
     array: true;
   }
 
-  type Serializable = any;
+  type Serializable = null
+    | boolean
+    | number
+    | string
+    | Date
+    | object;
 
   interface Row {
     [column: string]: any;
