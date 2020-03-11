@@ -143,7 +143,7 @@ await sql`
 
 ## Cursor ```sql` `.cursor([rows = 1], fn) -> Promise```
 
-Use cursors if you need to throttle the amount of rows being returned from a query. New results won't be requested until the promise / async callack function has resolved.
+Use cursors if you need to throttle the amount of rows being returned from a query. New results won't be requested until the promise / async callback function has resolved.
 
 ```js
 
@@ -210,7 +210,7 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 ## Tagged template function ``` sql`` ``` 
 [Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) are not just ordinary template literal strings. They allow the function to handle any parameters within before interpolation. This means that they can be used to enforce a safe way of writing queries, which is what Postgres.js does. Any generic value will be serialized according to an inferred type, and replaced by a PostgreSQL protocol placeholders `$1, $2, ...` and then sent to the database as a parameter to let it handle any need for escaping / casting.
 
-This also means you cannot write dynamic queryes or concat queries together by simple string manipulation. To enable dynamic queries in a safe way, the `sql` function doubles as a regular function which escapes any value properly. It also includes overloads for common cases of inserting, selecting, updating and querying.
+This also means you cannot write dynamic queries or concat queries together by simple string manipulation. To enable dynamic queries in a safe way, the `sql` function doubles as a regular function which escapes any value properly. It also includes overloads for common cases of inserting, selecting, updating and querying.
 
 ## Dynamic query helpers `sql() inside tagged template`
 
@@ -522,7 +522,7 @@ There are also the following errors specifically for this library.
 ##### UNDEFINED_VALUE
 > Undefined values are not allowed
 
-Postgres.js won't accept `undefined` as values in tagged template queries since it becomes ambigious what to do with the value. If you want to set something to null, use `null` explicitly.
+Postgres.js won't accept `undefined` as values in tagged template queries since it becomes ambiguous what to do with the value. If you want to set something to null, use `null` explicitly.
 
 ##### MESSAGE_NOT_SUPPORTED
 > X (X) is not supported
