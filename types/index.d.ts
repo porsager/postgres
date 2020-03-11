@@ -1,5 +1,3 @@
-/// <reference types="node" />
-
 /**
  * Etablish a connection to a PostgreSQL server. 
  * @param options Connection options - default to the same as psql
@@ -27,7 +25,7 @@ interface BaseOptions<T extends Postgres.PostgresTypeList> {
   /** Username of database user */
   username?: string;
   /** True; or options for tls.connect */
-  ssl?: boolean | import('tls').TlsOptions;
+  ssl?: boolean | object;
   /** Max number of connections */
   max?: number;
   /** Idle connection timeout in seconds */
