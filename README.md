@@ -68,8 +68,17 @@ const sql = postgres('postgres://username:password@host:port/database', {
     ...                                // Other connection parameters
   }
 })
-
 ```
+
+If you don't specify a connection string or options, the following environment variables will be used if they are set:
+
+| Option     | Environment Variables    |
+| ---------- | ------------------------ |
+| `host`     | `PGHOST`                 |
+| `port`     | `PGPORT`                 |
+| `database` | `PGDATABASE`             |
+| `username` | `PGUSERNAME` or `PGUSER` |
+| `password` | `PGPASSWORD`             |
 
 More info for the `ssl` option can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options)
 
