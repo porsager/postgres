@@ -43,7 +43,6 @@ await sql`
 You can use either a `postgres://` url connection string or the options to define your database connection properties. Options in the object will override any present in the url.
 
 ```js
-
 const sql = postgres('postgres://username:password@host:port/database', {
   host        : '',         // Postgres ip address or domain name
   port        : 5432,       // Postgres server port
@@ -68,10 +67,25 @@ const sql = postgres('postgres://username:password@host:port/database', {
     ...                                // Other connection parameters
   }
 })
-
 ```
 
 More info for the `ssl` option can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options)
+
+### Environment Variables for Options
+
+It is also possible to connect to the database without a connection string or options, which will read the options from the environment variables in the table below:
+
+```js
+const sql = postgres()
+```
+
+| Option     | Environment Variables    |
+| ---------- | ------------------------ |
+| `host`     | `PGHOST`                 |
+| `port`     | `PGPORT`                 |
+| `database` | `PGDATABASE`             |
+| `username` | `PGUSERNAME` or `PGUSER` |
+| `password` | `PGPASSWORD`             |
 
 ## Query ```sql` ` -> Promise```
 
