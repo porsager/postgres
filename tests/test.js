@@ -12,7 +12,7 @@ module.exports.not = () => ignored++
 module.exports.t = (...rest) => test(false, ...rest)
 module.exports.ot = (...rest) => (only = true, test(true, ...rest))
 
-async function test(o, name, fn, after) {
+async function test(o, name, fn) {
   const line = new Error().stack.split('\n')[3].split(':')[1]
   await 1
 
@@ -33,11 +33,6 @@ async function test(o, name, fn, after) {
     .catch(err => {
       tests[line].failed = true
       tests[line].error = err instanceof Error ? err : new Error(util.inspect(err))
-    })
-    .then(() => after && after())
-    .catch((err) => {
-      tests[line].succeeded = false
-      tests[line].cleanup = err
     })
     .then(() => {
       ++done === Object.keys(tests).length && exit()
