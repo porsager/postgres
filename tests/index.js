@@ -29,7 +29,7 @@ const options = {
   db: 'postgres_js_test',
   user: login.user,
   pass: login.pass,
-  timeout: 0.5,
+  idle_timeout: 0.2,
   max: 1
 }
 
@@ -273,7 +273,7 @@ t('Throw syntax error', async() =>
 t('Connect using uri', async() =>
   [true, await new Promise((resolve, reject) => {
     const sql = postgres('postgres://' + login.user + ':' + (login.pass || '') + '@localhost:5432/' + options.db, {
-      timeout: 0.1
+      idle_timeout: options.idle_timeout
     })
     sql`select 1`.then(() => resolve(true), reject)
   })]
@@ -282,7 +282,7 @@ t('Connect using uri', async() =>
 t('Fail with proper error on no host', async() =>
   ['ECONNREFUSED', (await new Promise((resolve, reject) => {
     const sql = postgres('postgres://localhost:33333/' + options.db, {
-      timeout: 0.1
+      idle_timeout: options.idle_timeout
     })
     sql`select 1`.then(reject, resolve)
   })).code]
@@ -292,7 +292,7 @@ t('Connect using SSL', async() =>
   [true, (await new Promise((resolve, reject) => {
     postgres({
       ssl: { rejectUnauthorized: false },
-      timeout: 0.1
+      idle_timeout: options.idle_timeout
     })`select 1`.then(() => resolve(true), reject)
   }))]
 )
@@ -741,9 +741,7 @@ t('notice works', async() => {
     notice = x
   }
 
-  const sql = postgres({
-    ...options
-  })
+  const sql = postgres(options)
 
   await sql`create table if not exists users()`
   await sql`create table if not exists users()`
@@ -904,7 +902,7 @@ t('Async stack trace', async() => {
 })
 
 t('Debug has long async stack trace', async() => {
-  const sql = postgres({ debug: true })
+  const sql = postgres({ ...options, debug: true })
 
   return [
     'watyo',

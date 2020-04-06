@@ -52,7 +52,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   password    : '',         // Password of database user
   ssl         : false,      // True, or options for tls.connect
   max         : 10,         // Max number of connections
-  timeout     : 0,          // Idle connection timeout in seconds
+  idle_timeout: 0,          // Idle connection timeout in seconds
   types       : [],         // Array of custom types, see more below
   onnotice    : fn          // Defaults to console.log
   onparameter : fn          // (key, value) when server param change
