@@ -493,11 +493,19 @@ prexit(async () => {
 
 `Number` in javascript is only able to represent 2<sup>53</sup>-1 safely which means that types in PostgreSQLs like `bigint` and `numeric` won't fit into `Number`.
 
-Since Node.js v10.4 we can use [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) to match the PostgreSQL type `bigint`, so Postgres.js will use BigInt if running on v10.4 or later. For older versions `bigint` will be returned as a string.
+Since Node.js v10.4 we can use [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) to match the PostgreSQL type `bigint` which is returned for eg. `count(*)`. Unfortunately it doesn't work with `JSON.stringify` out of the box, so Postgres.js will return it as a string. 
 
-There is currently no way to handle `numeric / decimal` in a native way in Javascript, so these and similar will be returned as `string`.
+If you want to use `BigInt` you can add this custom type:
 
-You can of course handle types like these using [custom types](#types) if you want to.
+```js
+const sql = postgres({
+  types: {
+    bigint: postgres.BigInt
+  }
+})
+```
+
+There is currently no way to handle `numeric / decimal` in a native way in Javascript, so these and similar will be returned as `string`. You can also handle types like these using [custom types](#types) if you want to.
 
 ## The Connection Pool
 

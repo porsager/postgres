@@ -198,7 +198,7 @@ t('Transaction succeeds on caught savepoint', async() => {
     await sql`insert into test values(3)`
   })
 
-  return [typeof BigInt === 'undefined' ? '2' : 2n, (await sql`select count(1) from test`)[0].count, await sql`drop table test`]
+  return ['2', (await sql`select count(1) from test`)[0].count, await sql`drop table test`]
 })
 
 t('Savepoint returns Result', async() => {
@@ -875,8 +875,8 @@ t('Debug works', async() => {
   return ['select 1', result]
 })
 
-t('bigint is returned as BigInt', async() => [
-  'bigint',
+t('bigint is returned as String', async() => [
+  'string',
   typeof (await sql`select 9223372036854777 as x`)[0].x
 ])
 
@@ -889,10 +889,6 @@ t('numeric is returned as string', async() => [
   'string',
   typeof (await sql`select 1.2 as x`)[0].x
 ])
-
-function get() {
-  return sql`selec 1`
-}
 
 t('Async stack trace', async() => {
   return [
