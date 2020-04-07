@@ -44,25 +44,26 @@ You can use either a `postgres://` url connection string or the options to defin
 
 ```js
 const sql = postgres('postgres://username:password@host:port/database', {
-  host        : '',         // Postgres ip address or domain name
-  port        : 5432,       // Postgres server port
-  path        : '',         // unix socket path (usually '/tmp')
-  database    : '',         // Name of database to connect to
-  username    : '',         // Username of database user
-  password    : '',         // Password of database user
-  ssl         : false,      // True, or options for tls.connect
-  max         : 10,         // Max number of connections
-  idle_timeout: 0,          // Idle connection timeout in seconds
-  types       : [],         // Array of custom types, see more below
-  onnotice    : fn          // Defaults to console.log
-  onparameter : fn          // (key, value) when server param change
-  debug       : fn          // Is called with (connection, query, parameters)
-  transform   : {
+  host            : '',         // Postgres ip address or domain name
+  port            : 5432,       // Postgres server port
+  path            : '',         // unix socket path (usually '/tmp')
+  database        : '',         // Name of database to connect to
+  username        : '',         // Username of database user
+  password        : '',         // Password of database user
+  ssl             : false,      // True, or options for tls.connect
+  max             : 10,         // Max number of connections
+  idle_timeout    : 0,          // Idle connection timeout in seconds
+  connect_timeout : 30,         // Connect timeout in seconds
+  types           : [],         // Array of custom types, see more below
+  onnotice        : fn          // Defaults to console.log
+  onparameter     : fn          // (key, value) when server param change
+  debug           : fn          // Is called with (connection, query, params)
+  transform       : {
     column            : fn, // Transforms incoming column names
     value             : fn, // Transforms incoming row values
     row               : fn  // Transforms entire rows
   },
-  connection  : {
+  connection      : {
     application_name  : 'postgres.js', // Default application_name
     ...                                // Other connection parameters
   }
@@ -577,6 +578,11 @@ This error is thrown if the user has called [`sql.end()`](#sql_end) and performe
 > write CONNECTION_DESTROYED host:port
 
 This error is thrown for any queries that were pending when the timeout to [`sql.end({ timeout: X })`](#sql_destroy) was reached.
+
+##### CONNECTION_CONNECT_TIMEOUT
+> write CONNECTION_CONNECT_TIMEOUT host:port
+
+This error is thrown if the startup phase of the connection (tcp, protocol negotiation and auth) took more than the default 30 seconds or what was specified using `connect_timeout` or `PGCONNECT_TIMEOUT`.
 
 ## Migration tools
 
