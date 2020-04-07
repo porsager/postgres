@@ -935,7 +935,7 @@ t('Query parameters are not enumerable', async() => [
 ])
 
 t('connect_timeout throws proper error', async() => [
-  'CONNECTION_CONNECT_TIMEOUT',
+  'CONNECT_TIMEOUT',
   await postgres({
     ...options,
     ...login_scram,
@@ -953,7 +953,7 @@ t('requests works after single connect_timeout', async() => {
   })
 
   return [
-    'CONNECTION_CONNECT_TIMEOUT,,1',
+    'CONNECT_TIMEOUT,,1',
     [
       await sql`select 1 as x`.catch(x => x.code),
       await new Promise(r => setTimeout(r, 10)),
@@ -961,3 +961,7 @@ t('requests works after single connect_timeout', async() => {
     ].join(',')
   ]
 })
+
+t('Postgres errors are of type PostgresError', async() =>
+  [true, (await sql`bad keyword`.catch(e => e)) instanceof sql.PostgresError]
+)
