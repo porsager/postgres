@@ -24,7 +24,11 @@ async function test(o, name, fn) {
     new Promise((resolve, reject) => fn.timer = setTimeout(() => reject('Timed out'), 500)),
     fn()
   ]))
-    .then(([expected, got]) => {
+    .then((x) => {
+      if (!Array.isArray(x))
+        throw new Error('Test should return result array')
+
+      const [expected, got] = x
       if (expected !== got)
         throw new Error(expected + ' != ' + util.inspect(got))
       tests[line].succeeded = true

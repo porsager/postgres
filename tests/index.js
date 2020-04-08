@@ -785,7 +785,7 @@ t('Stream returns empty array', async() => {
 
 t('Cursor works', async() => {
   const order = []
-  await sql`select 1 as x union select 2 as x`.cursor(async (x) => {
+  await sql`select 1 as x union select 2 as x`.cursor(async(x) => {
     order.push(x.x + 'a')
     await new Promise(r => setTimeout(r, 100))
     order.push(x.x + 'b')
@@ -795,7 +795,7 @@ t('Cursor works', async() => {
 
 t('Cursor custom n works', async() => {
   const order = []
-  await sql`select * from generate_series(1,20)`.cursor(10, async (x) => {
+  await sql`select * from generate_series(1,20)`.cursor(10, async(x) => {
     order.push(x.length)
   })
   return ['10,10', order.join(',')]
@@ -803,7 +803,7 @@ t('Cursor custom n works', async() => {
 
 t('Cursor cancel works', async() => {
   let result
-  await sql`select * from generate_series(1,10) as x`.cursor(async ({ x }) => {
+  await sql`select * from generate_series(1,10) as x`.cursor(async({ x }) => {
     result = x
     return sql.END
   })
@@ -812,10 +812,10 @@ t('Cursor cancel works', async() => {
 
 t('Cursor throw works', async() => {
   const order = []
-  await sql`select 1 as x union select 2 as x`.cursor(async (x) => {
+  await sql`select 1 as x union select 2 as x`.cursor(async(x) => {
     order.push(x.x + 'a')
     await new Promise(r => setTimeout(r, 100))
-    throw 'watty'
+    throw new Error('watty')
   }).catch(() => order.push('err'))
   return ['1aerr', order.join('')]
 })
@@ -965,3 +965,24 @@ t('requests works after single connect_timeout', async() => {
 t('Postgres errors are of type PostgresError', async() =>
   [true, (await sql`bad keyword`.catch(e => e)) instanceof sql.PostgresError]
 )
+
+t('Result has columns spec', async() =>
+  ['x', (await sql`select 1 as x`).columns[0].name]
+)
+
+t('Stream has result as second argument', async() => {
+  let x
+  await sql`select 1 as x`.stream((_, result) => x = result)
+  return ['x', x.columns[0].name]
+})
+
+t('Result as arrays', async() => {
+  const sql = postgres({
+    ...options,
+    transform: {
+      row: x => Object.values(x)
+    }
+  })
+
+  return ['1,2', (await sql`select 1 as a, 2 as b`)[0].join(',')]
+})
