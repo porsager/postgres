@@ -86,13 +86,21 @@ declare namespace Postgres {
   interface Options<T extends PostgresTypeList> extends BaseOptions<T> {
     /** unix socket path (usually '/tmp') */
     path?: string;
+    /** Password of database user (an alias for `password`) */
+    pass?: Options<T>['password'];
     /** Password of database user */
-    pass?: string | (() => string | Promise<string>);
-    /** Password of database user */
-    password?: Options<T>['pass']; // FIXME Is it a doc error ?
+    password?: string | (() => string | Promise<string>);
+    /** Name of database to connect to (an alias for `database`) */
+    db?: Options<T>['database'];
+    /** Username of database user (an alias for `username`) */
+    user?: Options<T>['username'];
+    /** Postgres ip address or domain name (an alias for `host`) */
+    hostname?: Options<T>['host'];
   }
 
   interface ParsedOptions<T extends PostgresTypeList> extends BaseOptions<T> {
+    /** @inheritdoc */
+    host: string;
     /** @inheritdoc */
     port: number;
     /** @inheritdoc */
