@@ -53,6 +53,20 @@ interface BaseOptions<T extends Postgres.PostgresTypeList> {
   connection?: Postgres.ConnectionParameters;
 }
 
+declare class PostgresError extends Error {
+  name: 'PostgresError';
+  severity_local: string;
+  severity: string;
+  code: string;
+  position: string;
+  file: string;
+  line: string;
+  routine: string;
+
+  // Disable user-side creation of PostgresError
+  private constructor();
+}
+
 type UnwrapPromiseArray<T> = T extends any[] ? {
   [k in keyof T]: T[k] extends Promise<infer R> ? R : T[k]
 } : T;
@@ -218,6 +232,7 @@ declare namespace Postgres {
     <T extends object, U extends (keyof (T extends any[] ? T[number] : T))[]>(objOrArray: T, ...keys: U): Helper<T, U>;
 
     END: {}; // FIXME unique symbol ?
+    PostgresError: typeof PostgresError;
 
     array<T extends Serializable[] = Serializable[]>(value: T): ArrayParameter<T>;
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
