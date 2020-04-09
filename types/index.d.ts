@@ -39,7 +39,7 @@ interface BaseOptions<T extends Postgres.PostgresTypeList> {
   /** (key; value) when server param change */
   onparameter?: (key: string, value: any) => void;
   /** Is called with (connection; query; parameters) */
-  debug?: (connection: number, query: string, parameters: any[]) => void;
+  debug?: boolean | ((connection: number, query: string, parameters: any[]) => void);
   /** Transform hooks */
   transform?: {
     /** Transforms incoming column names */
@@ -150,10 +150,10 @@ declare namespace Postgres {
   }
 
   interface PostgresType {
-    to: number,
-    from: number[],
-    serialize(obj: unknown): unknown,
-    parse(raw: any): unknown
+    to: number;
+    from: number[];
+    serialize(obj: unknown): unknown;
+    parse(raw: any): unknown;
   }
 
   interface PostgresTypeList {
