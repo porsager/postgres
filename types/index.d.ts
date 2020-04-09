@@ -1,11 +1,11 @@
 /**
- * Etablish a connection to a PostgreSQL server. 
+ * Establish a connection to a PostgreSQL server.
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
 declare function Postgres<T extends Postgres.PostgresTypeList = {}>(options?: Postgres.Options<T>): Postgres.Sql<T>
 /**
- * Etablish a connection to a PostgreSQL server. 
+ * Establish a connection to a PostgreSQL server.
  * @param url Connection string used for authentication
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
