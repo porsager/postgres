@@ -29,7 +29,7 @@ interface BaseOptions<T extends Postgres.PostgresTypeList> {
   /** Max number of connections */
   max?: number;
   /** Idle connection timeout in seconds */
-  timeout?: number;
+  idle_timeout?: number;
   /** Array of custom types; see more below */
   types?: T;
   /** Defaults to console.log */
