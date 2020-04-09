@@ -30,7 +30,7 @@ const options = {
   db: 'postgres_js_test',
   user: login.user,
   pass: login.pass,
-  timeout: 0.5,
+  idle_timeout: 0.2,
   max: 1
 }
 
@@ -71,8 +71,8 @@ t('Result has command', async() =>
 )
 
 t('Create table', async() =>
-  ['CREATE TABLE', (await sql`create table test(int int)`).command]
-, () => sql`drop table test`)
+  ['CREATE TABLE', (await sql`create table test(int int)`).command, await sql`drop table test`]
+)
 
 t('Drop table', async() => {
   await sql`create table test(int int)`
@@ -81,10 +81,6 @@ t('Drop table', async() => {
 
 t('null', async() =>
   [null, (await sql`select ${ null } as x`)[0].x]
-)
-
-t('undefined to null', async() =>
-  [null, (await sql`select ${ undefined } as x`)[0].x]
 )
 
 t('Integer', async() =>
@@ -148,16 +144,16 @@ t('Escapes', async() => {
 
 t('null for int', async() => {
   await sql`create table test (x int)`
-  return [1, (await sql`insert into test values(${ null })`).count]
-}, () => sql`drop table test`)
+  return [1, (await sql`insert into test values(${ null })`).count, await sql`drop table test`]
+})
 
 t('Transaction throws', async() => {
   await sql`create table test (a int)`
   return ['22P02', await sql.begin(async sql => {
     await sql`insert into test values(1)`
     await sql`insert into test values('hej')`
-  }).catch(x => x.code)]
-}, () => sql`drop table test`)
+  }).catch(x => x.code), await sql`drop table test`]
+})
 
 t('Transaction rolls back', async() => {
   await sql`create table test (a int)`
@@ -165,8 +161,8 @@ t('Transaction rolls back', async() => {
     await sql`insert into test values(1)`
     await sql`insert into test values('hej')`
   }).catch(() => { /* ignore */ })
-  return [0, (await sql`select a from test`).count]
-}, () => sql`drop table test`)
+  return [0, (await sql`select a from test`).count, await sql`drop table test`]
+})
 
 t('Transaction throws on uncaught savepoint', async() => {
   await sql`create table test (a int)`
@@ -177,8 +173,8 @@ t('Transaction throws on uncaught savepoint', async() => {
       await sql`insert into test values(2)`
       throw new Error('fail')
     })
-  }).catch(() => 'fail'))]
-}, () => sql`drop table test`)
+  }).catch(() => 'fail')), await sql`drop table test`]
+})
 
 t('Transaction throws on uncaught named savepoint', async() => {
   await sql`create table test (a int)`
@@ -189,8 +185,8 @@ t('Transaction throws on uncaught named savepoint', async() => {
       await sql`insert into test values(2)`
       throw new Error('fail')
     })
-  }).catch(() => 'fail'))]
-}, () => sql`drop table test`)
+  }).catch(() => 'fail')), await sql`drop table test`]
+})
 
 t('Transaction succeeds on caught savepoint', async() => {
   await sql`create table test (a int)`
@@ -203,8 +199,8 @@ t('Transaction succeeds on caught savepoint', async() => {
     await sql`insert into test values(3)`
   })
 
-  return [typeof BigInt === 'undefined' ? '2' : 2n, (await sql`select count(1) from test`)[0].count]
-}, () => sql`drop table test`)
+  return ['2', (await sql`select count(1) from test`)[0].count, await sql`drop table test`]
+})
 
 t('Savepoint returns Result', async() => {
   let result
@@ -222,8 +218,8 @@ t('Parallel transactions', async() => {
   return ['11', (await Promise.all([
     sql.begin(sql => sql`select 1`),
     sql.begin(sql => sql`select 1`)
-  ])).map(x => x.count).join('')]
-}, () => sql`drop table test`)
+  ])).map(x => x.count).join(''), await sql`drop table test`]
+})
 
 t('Transactions array', async() => {
   await sql`create table test (a int)`
@@ -231,8 +227,8 @@ t('Transactions array', async() => {
   return ['11', (await sql.begin(sql => [
     sql`select 1`.then(x => x),
     sql`select 1`
-  ])).map(x => x.count).join('')]
-}, () => sql`drop table test`)
+  ])).map(x => x.count).join(''), await sql`drop table test`]
+})
 
 t('Transaction waits', async() => {
   await sql`create table test (a int)`
@@ -248,14 +244,28 @@ t('Transaction waits', async() => {
   return ['11', (await Promise.all([
     sql.begin(sql => sql`select 1`),
     sql.begin(sql => sql`select 1`)
-  ])).map(x => x.count).join('')]
-}, () => sql`drop table test`)
+  ])).map(x => x.count).join(''), await sql`drop table test`]
+})
 
 t('Helpers in Transaction', async() => {
   return ['1', (await sql.begin(async sql =>
     await sql`select ${ sql({ x: 1 }) }`
   ))[0].x]
 })
+
+t('Undefined values throws', async() => {
+  let error
+
+  await sql`
+    select ${ undefined } as x
+  `.catch(x => error = x.code)
+
+  return ['UNDEFINED_VALUE', error]
+})
+
+t('Null sets to null', async() =>
+  [null, (await sql`select ${ null } as x`)[0].x]
+)
 
 t('Throw syntax error', async() =>
   ['42601', (await sql`wat 1`.catch(x => x)).code]
@@ -264,7 +274,7 @@ t('Throw syntax error', async() =>
 t('Connect using uri', async() =>
   [true, await new Promise((resolve, reject) => {
     const sql = postgres('postgres://' + login.user + ':' + (login.pass || '') + '@localhost:5432/' + options.db, {
-      timeout: 0.1
+      idle_timeout: options.idle_timeout
     })
     sql`select 1`.then(() => resolve(true), reject)
   })]
@@ -273,7 +283,7 @@ t('Connect using uri', async() =>
 t('Fail with proper error on no host', async() =>
   ['ECONNREFUSED', (await new Promise((resolve, reject) => {
     const sql = postgres('postgres://localhost:33333/' + options.db, {
-      timeout: 0.1
+      idle_timeout: options.idle_timeout
     })
     sql`select 1`.then(reject, resolve)
   })).code]
@@ -283,7 +293,7 @@ t('Connect using SSL', async() =>
   [true, (await new Promise((resolve, reject) => {
     postgres({
       ssl: { rejectUnauthorized: false },
-      timeout: 0.1
+      idle_timeout: options.idle_timeout
     })`select 1`.then(() => resolve(true), reject)
   }))]
 )
@@ -335,8 +345,8 @@ t('Point type', async() => {
 
   await sql`create table test (x point)`
   await sql`insert into test (x) values (${ sql.types.point([10, 20]) })`
-  return [20, (await sql`select x from test`)[0].x[1]]
-}, () => sql`drop table test`)
+  return [20, (await sql`select x from test`)[0].x[1], await sql`drop table test`]
+})
 
 t('Point type array', async() => {
   const sql = postgres({
@@ -353,8 +363,8 @@ t('Point type array', async() => {
 
   await sql`create table test (x point[])`
   await sql`insert into test (x) values (${ sql.array([sql.types.point([10, 20]), sql.types.point([20, 30])]) })`
-  return [30, (await sql`select x from test`)[0].x[1][1]]
-}, () => sql`drop table test`)
+  return [30, (await sql`select x from test`)[0].x[1][1], await sql`drop table test`]
+})
 
 t('sql file', async() =>
   [1, (await sql.file(path.join(__dirname, 'select.sql')))[0].x]
@@ -426,10 +436,17 @@ t('Connection destroyed', async() => {
   return ['CONNECTION_DESTROYED', await sql``.catch(x => x.code)]
 })
 
+t('Connection destroyed with query before', async() => {
+  const sql = postgres(options)
+  let error = sql`select pg_sleep(0.2)`.catch(err => err.code)
+  sql.end({ timeout: 0 })
+  return ['CONNECTION_DESTROYED', await error]
+})
+
 t('Message not supported', async() => {
   await sql`create table test (x int)`
-  return ['MESSAGE_NOT_SUPPORTED', await sql`copy test to stdout`.catch(x => x.code)]
-}, () => sql`drop table test`)
+  return ['MESSAGE_NOT_SUPPORTED', await sql`copy test to stdout`.catch(x => x.code), await sql`drop table test`]
+})
 
 t('transform column', async() => {
   const sql = postgres({
@@ -439,8 +456,8 @@ t('transform column', async() => {
 
   await sql`create table test (hello_world int)`
   await sql`insert into test values (1)`
-  return ['dlrow_olleh', Object.keys((await sql`select * from test`)[0])[0]]
-}, () => sql`drop table test`)
+  return ['dlrow_olleh', Object.keys((await sql`select * from test`)[0])[0], await sql`drop table test`]
+})
 
 t('column toPascal', async() => {
   const sql = postgres({
@@ -450,8 +467,8 @@ t('column toPascal', async() => {
 
   await sql`create table test (hello_world int)`
   await sql`insert into test values (1)`
-  return ['HelloWorld', Object.keys((await sql`select * from test`)[0])[0]]
-}, () => sql`drop table test`)
+  return ['HelloWorld', Object.keys((await sql`select * from test`)[0])[0], await sql`drop table test`]
+})
 
 t('column toCamel', async() => {
   const sql = postgres({
@@ -461,8 +478,8 @@ t('column toCamel', async() => {
 
   await sql`create table test (hello_world int)`
   await sql`insert into test values (1)`
-  return ['helloWorld', Object.keys((await sql`select * from test`)[0])[0]]
-}, () => sql`drop table test`)
+  return ['helloWorld', Object.keys((await sql`select * from test`)[0])[0], await sql`drop table test`]
+})
 
 t('column toKebab', async() => {
   const sql = postgres({
@@ -472,13 +489,13 @@ t('column toKebab', async() => {
 
   await sql`create table test (hello_world int)`
   await sql`insert into test values (1)`
-  return ['hello-world', Object.keys((await sql`select * from test`)[0])[0]]
-}, () => sql`drop table test`)
+  return ['hello-world', Object.keys((await sql`select * from test`)[0])[0], await sql`drop table test`]
+})
 
 t('unsafe', async() => {
   await sql`create table test (x int)`
-  return [1, (await sql.unsafe('insert into test values ($1) returning *', [1]))[0].x]
-}, () => sql`drop table test`)
+  return [1, (await sql.unsafe('insert into test values ($1) returning *', [1]))[0].x, await sql`drop table test`]
+})
 
 t('unsafe simple', async() => {
   return [1, (await sql.unsafe('select 1 as x'))[0].x]
@@ -547,21 +564,21 @@ t('big query body', async() => {
   await sql`create table test (x int)`
   return [1000, (await sql`insert into test ${
     sql([...Array(1000).keys()].map(x => ({ x })))
-  }`).count]
-}, () => sql`drop table test`)
+  }`).count, await sql`drop table test`]
+})
 
 t('Throws if more than 65534 parameters', async() => {
   await sql`create table test (x int)`
   return ['MAX_PARAMETERS_EXCEEDED', (await sql`insert into test ${
     sql([...Array(65535).keys()].map(x => ({ x })))
-  }`.catch(e => e.code))]
-}, () => sql`drop table test`)
+  }`.catch(e => e.code)), await sql`drop table test`]
+})
 
 t('let postgres do implicit cast of unknown types', async() => {
   await sql`create table test (x timestamp with time zone)`
   const [{ x }] = await sql`insert into test values (${ new Date().toISOString() }) returning *`
-  return [true, x instanceof Date]
-}, () => sql`drop table test`)
+  return [true, x instanceof Date, await sql`drop table test`]
+})
 
 t('only allows one statement', async() =>
   ['42601', await sql`select 1; select 2`.catch(e => e.code)]
@@ -623,20 +640,20 @@ t('dynamic insert', async() => {
   await sql`create table test (a int, b text)`
   const x = { a: 42, b: 'the answer' }
 
-  return ['the answer', (await sql`insert into test ${ sql(x) } returning *`)[0].b]
-}, () => sql`drop table test`)
+  return ['the answer', (await sql`insert into test ${ sql(x) } returning *`)[0].b, await sql`drop table test`]
+})
 
 t('dynamic insert pluck', async() => {
   await sql`create table test (a int, b text)`
   const x = { a: 42, b: 'the answer' }
 
-  return [null, (await sql`insert into test ${ sql(x, 'a') } returning *`)[0].b]
-}, () => sql`drop table test`)
+  return [null, (await sql`insert into test ${ sql(x, 'a') } returning *`)[0].b, await sql`drop table test`]
+})
 
 t('array insert', async() => {
   await sql`create table test (a int, b int)`
-  return [2, (await sql`insert into test (a, b) values (${ [1, 2] }) returning *`)[0].b]
-}, () => sql`drop table test`)
+  return [2, (await sql`insert into test (a, b) values (${ [1, 2] }) returning *`)[0].b, await sql`drop table test`]
+})
 
 t('parameters in()', async() => {
   return [2, (await sql`
@@ -651,34 +668,34 @@ t('dynamic multi row insert', async() => {
   await sql`create table test (a int, b text)`
   const x = { a: 42, b: 'the answer' }
 
-  return ['the answer', (await sql`insert into test ${ sql([x, x]) } returning *`)[1].b]
-}, () => sql`drop table test`)
+  return ['the answer', (await sql`insert into test ${ sql([x, x]) } returning *`)[1].b, await sql`drop table test`]
+})
 
 t('dynamic update', async() => {
   await sql`create table test (a int, b text)`
   await sql`insert into test (a, b) values (17, 'wrong')`
 
-  return ['the answer', (await sql`update test set ${ sql({ a: 42, b: 'the answer' }) } returning *`)[0].b]
-}, () => sql`drop table test`)
+  return ['the answer', (await sql`update test set ${ sql({ a: 42, b: 'the answer' }) } returning *`)[0].b, await sql`drop table test`]
+})
 
 t('dynamic update pluck', async() => {
   await sql`create table test (a int, b text)`
   await sql`insert into test (a, b) values (17, 'wrong')`
 
-  return ['wrong', (await sql`update test set ${ sql({ a: 42, b: 'the answer' }, 'a') } returning *`)[0].b]
-}, () => sql`drop table test`)
+  return ['wrong', (await sql`update test set ${ sql({ a: 42, b: 'the answer' }, 'a') } returning *`)[0].b, await sql`drop table test`]
+})
 
 t('dynamic select array', async() => {
   await sql`create table test (a int, b text)`
   await sql`insert into test (a, b) values (42, 'yay')`
-  return ['yay', (await sql`select ${ sql(['a', 'b']) } from test`)[0].b]
-}, () => sql`drop table test`)
+  return ['yay', (await sql`select ${ sql(['a', 'b']) } from test`)[0].b, await sql`drop table test`]
+})
 
 t('dynamic select args', async() => {
   await sql`create table test (a int, b text)`
   await sql`insert into test (a, b) values (42, 'yay')`
-  return ['yay', (await sql`select ${ sql('a', 'b') } from test`)[0].b]
-}, () => sql`drop table test`)
+  return ['yay', (await sql`select ${ sql('a', 'b') } from test`)[0].b, await sql`drop table test`]
+})
 
 t('connection parameters', async() => {
   const sql = postgres({
@@ -725,9 +742,7 @@ t('notice works', async() => {
     notice = x
   }
 
-  const sql = postgres({
-    ...options
-  })
+  const sql = postgres(options)
 
   await sql`create table if not exists users()`
   await sql`create table if not exists users()`
@@ -771,7 +786,7 @@ t('Stream returns empty array', async() => {
 
 t('Cursor works', async() => {
   const order = []
-  await sql`select 1 as x union select 2 as x`.cursor(async (x) => {
+  await sql`select 1 as x union select 2 as x`.cursor(async(x) => {
     order.push(x.x + 'a')
     await new Promise(r => setTimeout(r, 100))
     order.push(x.x + 'b')
@@ -781,7 +796,7 @@ t('Cursor works', async() => {
 
 t('Cursor custom n works', async() => {
   const order = []
-  await sql`select * from generate_series(1,20)`.cursor(10, async (x) => {
+  await sql`select * from generate_series(1,20)`.cursor(10, async(x) => {
     order.push(x.length)
   })
   return ['10,10', order.join(',')]
@@ -789,7 +804,7 @@ t('Cursor custom n works', async() => {
 
 t('Cursor cancel works', async() => {
   let result
-  await sql`select * from generate_series(1,10) as x`.cursor(async ({ x }) => {
+  await sql`select * from generate_series(1,10) as x`.cursor(async({ x }) => {
     result = x
     return sql.END
   })
@@ -798,10 +813,10 @@ t('Cursor cancel works', async() => {
 
 t('Cursor throw works', async() => {
   const order = []
-  await sql`select 1 as x union select 2 as x`.cursor(async (x) => {
+  await sql`select 1 as x union select 2 as x`.cursor(async(x) => {
     order.push(x.x + 'a')
     await new Promise(r => setTimeout(r, 100))
-    throw 'watty'
+    throw new Error('watty')
   }).catch(() => order.push('err'))
   return ['1aerr', order.join('')]
 })
@@ -861,8 +876,8 @@ t('Debug works', async() => {
   return ['select 1', result]
 })
 
-t('bigint is returned as BigInt', async() => [
-  'bigint',
+t('bigint is returned as String', async() => [
+  'string',
   typeof (await sql`select 9223372036854777 as x`)[0].x
 ])
 
@@ -876,10 +891,29 @@ t('numeric is returned as string', async() => [
   typeof (await sql`select 1.2 as x`)[0].x
 ])
 
-t('Error contains origin', async() => [
-  true,
-  (await sql`selec 1`.catch(err => 'origin' in err))
-])
+t('Async stack trace', async() => {
+  return [
+    parseInt(new Error().stack.split('\n')[1].split(':')[1]) + 1,
+    parseInt(await sql`select.sql`.catch(x => x.stack.split('\n').pop().split(':')[1]))
+  ]
+})
+
+t('Debug has long async stack trace', async() => {
+  const sql = postgres({ ...options, debug: true })
+
+  return [
+    'watyo',
+    await yo().catch(x => x.stack.match(/wat|yo/g).join(''))
+  ]
+
+  function yo() {
+    return wat()
+  }
+
+  function wat() {
+    return sql`selec 1`
+  }
+})
 
 t('Error contains query string', async() => [
   'selec 1',
@@ -900,3 +934,56 @@ t('Query parameters are not enumerable', async() => [
   -1,
   (await sql`selec ${ 1 }`.catch(err => Object.keys(err).indexOf('parameters')))
 ])
+
+t('connect_timeout throws proper error', async() => [
+  'CONNECT_TIMEOUT',
+  await postgres({
+    ...options,
+    ...login_scram,
+    connect_timeout: 0.001
+  })`select 1`.catch(e => e.code)
+])
+
+t('requests works after single connect_timeout', async() => {
+  let first = true
+
+  const sql = postgres({
+    ...options,
+    ...login_scram,
+    connect_timeout: { valueOf() { return first ? (first = false, 0.001) : 1 } }
+  })
+
+  return [
+    'CONNECT_TIMEOUT,,1',
+    [
+      await sql`select 1 as x`.catch(x => x.code),
+      await new Promise(r => setTimeout(r, 10)),
+      (await sql`select 1 as x`)[0].x
+    ].join(',')
+  ]
+})
+
+t('Postgres errors are of type PostgresError', async() =>
+  [true, (await sql`bad keyword`.catch(e => e)) instanceof sql.PostgresError]
+)
+
+t('Result has columns spec', async() =>
+  ['x', (await sql`select 1 as x`).columns[0].name]
+)
+
+t('Stream has result as second argument', async() => {
+  let x
+  await sql`select 1 as x`.stream((_, result) => x = result)
+  return ['x', x.columns[0].name]
+})
+
+t('Result as arrays', async() => {
+  const sql = postgres({
+    ...options,
+    transform: {
+      row: x => Object.values(x)
+    }
+  })
+
+  return ['1,2', (await sql`select 1 as a, 2 as b`)[0].join(',')]
+})

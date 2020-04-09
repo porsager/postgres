@@ -12,7 +12,7 @@ module.exports.not = () => ignored++
 module.exports.t = (...rest) => test(false, ...rest)
 module.exports.ot = (...rest) => (only = true, test(true, ...rest))
 
-async function test(o, name, fn, after) {
+async function test(o, name, fn) {
   const line = new Error().stack.split('\n')[3].split(':')[1]
   await 1
 
@@ -24,7 +24,11 @@ async function test(o, name, fn, after) {
     new Promise((resolve, reject) => fn.timer = setTimeout(() => reject('Timed out'), 500)),
     fn()
   ]))
-    .then(([expected, got]) => {
+    .then((x) => {
+      if (!Array.isArray(x))
+        throw new Error('Test should return result array')
+
+      const [expected, got] = x
       if (expected !== got)
         throw new Error(expected + ' != ' + util.inspect(got))
       tests[line].succeeded = true
@@ -33,11 +37,6 @@ async function test(o, name, fn, after) {
     .catch(err => {
       tests[line].failed = true
       tests[line].error = err instanceof Error ? err : new Error(util.inspect(err))
-    })
-    .then(() => after && after())
-    .catch((err) => {
-      tests[line].succeeded = false
-      tests[line].cleanup = err
     })
     .then(() => {
       ++done === Object.keys(tests).length && exit()

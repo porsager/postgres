@@ -20,10 +20,17 @@ $ npm install postgres
 
 **Use**
 ```js
-
+// db.js
 const postgres = require('postgres')
 
 const sql = postgres({ ...options }) // will default to the same as psql
+
+module.exports = sql
+```
+
+```js
+// other.js
+const sql = require('./db.js')
 
 await sql`
   select name, age from users
@@ -36,35 +43,50 @@ await sql`
 You can use either a `postgres://` url connection string or the options to define your database connection properties. Options in the object will override any present in the url.
 
 ```js
-
 const sql = postgres('postgres://username:password@host:port/database', {
-  host        : '',         // Postgres ip address or domain name
-  port        : 5432,       // Postgres server port
-  path        : '',         // unix socket path (usually '/tmp')
-  database    : '',         // Name of database to connect to
-  username    : '',         // Username of database user
-  password    : '',         // Password of database user
-  ssl         : false,      // True, or options for tls.connect
-  max         : 10,         // Max number of connections
-  timeout     : 0,          // Idle connection timeout in seconds
-  types       : [],         // Array of custom types, see more below
-  onnotice    : fn          // Defaults to console.log
-  onparameter : fn          // (key, value) when server param change
-  debug       : fn          // Is called with (connection, query, parameters)
-  transform   : {
+  host            : '',         // Postgres ip address or domain name
+  port            : 5432,       // Postgres server port
+  path            : '',         // unix socket path (usually '/tmp')
+  database        : '',         // Name of database to connect to
+  username        : '',         // Username of database user
+  password        : '',         // Password of database user
+  ssl             : false,      // True, or options for tls.connect
+  max             : 10,         // Max number of connections
+  idle_timeout    : 0,          // Idle connection timeout in seconds
+  connect_timeout : 30,         // Connect timeout in seconds
+  types           : [],         // Array of custom types, see more below
+  onnotice        : fn          // Defaults to console.log
+  onparameter     : fn          // (key, value) when server param change
+  debug           : fn          // Is called with (connection, query, params)
+  transform       : {
     column            : fn, // Transforms incoming column names
     value             : fn, // Transforms incoming row values
     row               : fn  // Transforms entire rows
   },
-  connection  : {
+  connection      : {
     application_name  : 'postgres.js', // Default application_name
     ...                                // Other connection parameters
   }
 })
-
 ```
 
 More info for the `ssl` option can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options)
+
+### Environment Variables for Options
+
+It is also possible to connect to the database without a connection string or options, which will read the options from the environment variables in the table below:
+
+```js
+const sql = postgres()
+```
+
+| Option     | Environment Variables    |
+| ---------- | ------------------------ |
+| `host`     | `PGHOST`                 |
+| `port`     | `PGPORT`                 |
+| `database` | `PGDATABASE`             |
+| `username` | `PGUSERNAME` or `PGUSER` |
+| `password` | `PGPASSWORD`             |
 
 ## Query ```sql` ` -> Promise```
 
@@ -106,6 +128,19 @@ const users = await sql`
 
 ```
 
+Arrays will be handled by replacement parameters too, so `where in` queries are also simple.
+
+```js
+
+const users = await sql`
+  select 
+    * 
+  from users
+  where age in (${ [68, 75, 23] })
+`
+
+```
+
 ## Stream ```sql` `.stream(fn) -> Promise```
 
 If you want to handle rows returned by a query one by one, you can use `.stream` which returns a promise that resolves once there are no more rows.
@@ -123,7 +158,7 @@ await sql`
 
 ## Cursor ```sql` `.cursor([rows = 1], fn) -> Promise```
 
-Use cursors if you need to throttle the amount of rows being returned from a query. New results won't be requested until the promise / async callack function has resolved.
+Use cursors if you need to throttle the amount of rows being returned from a query. New results won't be requested until the promise / async callback function has resolved.
 
 ```js
 
@@ -190,7 +225,7 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 ## Tagged template function ``` sql`` ``` 
 [Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) are not just ordinary template literal strings. They allow the function to handle any parameters within before interpolation. This means that they can be used to enforce a safe way of writing queries, which is what Postgres.js does. Any generic value will be serialized according to an inferred type, and replaced by a PostgreSQL protocol placeholders `$1, $2, ...` and then sent to the database as a parameter to let it handle any need for escaping / casting.
 
-This also means you cannot write dynamic queryes or concat queries together by simple string manipulation. To enable dynamic queries in a safe way, the `sql` function doubles as a regular function which escapes any value properly. It also includes overloads for common cases of inserting, selecting, updating and querying.
+This also means you cannot write dynamic queries or concat queries together by simple string manipulation. To enable dynamic queries in a safe way, the `sql` function doubles as a regular function which escapes any value properly. It also includes overloads for common cases of inserting, selecting, updating and querying.
 
 ## Dynamic query helpers `sql() inside tagged template`
 
@@ -458,11 +493,19 @@ prexit(async () => {
 
 `Number` in javascript is only able to represent 2<sup>53</sup>-1 safely which means that types in PostgreSQLs like `bigint` and `numeric` won't fit into `Number`.
 
-Since Node.js v10.4 we can use [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) to match the PostgreSQL type `bigint`, so Postgres.js will use BigInt if running on v10.4 or later. For older versions `bigint` will be returned as a string.
+Since Node.js v10.4 we can use [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) to match the PostgreSQL type `bigint` which is returned for eg. `count(*)`. Unfortunately it doesn't work with `JSON.stringify` out of the box, so Postgres.js will return it as a string. 
 
-There is currently no way to handle `numeric / decimal` in a native way in Javascript, so these and similar will be returned as `string`.
+If you want to use `BigInt` you can add this custom type:
 
-You can of course handle types like these using [custom types](#types) if you want to.
+```js
+const sql = postgres({
+  types: {
+    bigint: postgres.BigInt
+  }
+})
+```
+
+There is currently no way to handle `numeric / decimal` in a native way in Javascript, so these and similar will be returned as `string`. You can also handle types like these using [custom types](#types) if you want to.
 
 ## The Connection Pool
 
@@ -498,6 +541,11 @@ Query errors will contain a stored error with the origin of the query to aid in 
 Query errors will also contain the `query` string and the `parameters` which are not enumerable to avoid accidentally leaking confidential information in logs. To log these it is required to specifically access `error.query` and `error.parameters`.
 
 There are also the following errors specifically for this library.
+
+##### UNDEFINED_VALUE
+> Undefined values are not allowed
+
+Postgres.js won't accept `undefined` as values in tagged template queries since it becomes ambiguous what to do with the value. If you want to set something to null, use `null` explicitly.
 
 ##### MESSAGE_NOT_SUPPORTED
 > X (X) is not supported
@@ -539,6 +587,16 @@ This error is thrown if the user has called [`sql.end()`](#sql_end) and performe
 
 This error is thrown for any queries that were pending when the timeout to [`sql.end({ timeout: X })`](#sql_destroy) was reached.
 
+##### CONNECTION_CONNECT_TIMEOUT
+> write CONNECTION_CONNECT_TIMEOUT host:port
+
+This error is thrown if the startup phase of the connection (tcp, protocol negotiation and auth) took more than the default 30 seconds or what was specified using `connect_timeout` or `PGCONNECT_TIMEOUT`.
+
+## Migration tools
+
+Postgres.js doesn't come with any migration solution since it's way out of scope, but here are some modules that supports Postgres.js for migrations:
+
+- https://github.com/lukeed/ley
 
 ## Thank you
 
