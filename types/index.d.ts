@@ -186,18 +186,28 @@ declare namespace Postgres {
     [column: string]: any;
   }
 
-  interface ResultInfo<T extends number> {
-    count: T, // For tuples
-    command: string
+  interface Column<T extends string> {
+    name: T;
+    type: number;
+    parse(raw: any): unknown;
   }
 
-  type RowList<T extends readonly any[]> = T & ResultInfo<T['length']>;
+  type ColumnList<T> = (T extends string ? Column<T> : never)[];
+
+  interface ResultMeta<T extends number, U extends Row> {
+    count: T; // For tuples
+    command: string;
+    columns: ColumnList<keyof U>;
+  }
+
+  type ExecutionResult<T extends Row> = [] & ResultMeta<number, T>;
+  type RowList<T extends readonly Row[]> = T & ResultMeta<T['length'], T[number]>;
 
   interface PendingQuery<TRow extends readonly Row[]> extends Promise<RowList<TRow>> {
-    stream(cb: (row: TRow[number]) => void): Promise<RowList<[]>>;
-    cursor(cb: (row: TRow[number]) => void): Promise<RowList<[]>>;
-    cursor(size: 1, cb: (row: TRow[number]) => void): Promise<RowList<[]>>;
-    cursor(size: number, cb: (row: TRow) => void): Promise<RowList<[]>>;
+    stream(cb: (row: TRow[number], result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(cb: (row: TRow[number]) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(size: 1, cb: (row: TRow[number]) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(size: number, cb: (row: TRow) => void): Promise<ExecutionResult<TRow[number]>>;
   }
 
   interface Helper<T, U extends any[] = T[]> {
