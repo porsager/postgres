@@ -78,6 +78,8 @@ declare namespace Postgres {
    */
   function toKebab(str: string): string;
 
+  const BitInt: PostgresType;
+
   interface ConnectionParameters {
     /** Default application_name */
     application_name?: string;
