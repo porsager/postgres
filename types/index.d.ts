@@ -30,6 +30,8 @@ interface BaseOptions<T extends Postgres.PostgresTypeList> {
   max?: number;
   /** Idle connection timeout in seconds */
   idle_timeout?: number;
+  /** Connect timeout in seconds */
+  connect_timeout?: number;
   /** Array of custom types; see more below */
   types?: T;
   /** Defaults to console.log */
@@ -113,6 +115,8 @@ declare namespace Postgres {
     pass: null;
     /** @inheritdoc */
     max: number;
+    /** @inheritdoc */
+    connect_timeout?: number;
     /** @inheritdoc */
     types: T;
     /** @inheritdoc */
