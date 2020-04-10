@@ -63,6 +63,18 @@ declare class PostgresError extends Error {
   line: string;
   routine: string;
 
+  detail?: string;
+  hint?: string;
+  internal_position?: string;
+  internal_query?: string;
+  where?: string;
+  schema_name?: string;
+  table_name?: string;
+  column_name?: string;
+  data?: string;
+  type_name?: string;
+  constraint_name?: string;
+
   // Disable user-side creation of PostgresError
   private constructor();
 }
@@ -174,6 +186,60 @@ declare namespace postgres {
   interface ArrayParameter<T extends Serializable[] = Serializable[]> extends Parameter<T> {
     array: true;
   }
+
+  interface ConnectionError extends globalThis.Error {
+    code: never
+    | 'CONNECTION_DESTROYED'
+    | 'CONNECT_TIMEOUT'
+    | 'CONNECTION_CLOSED'
+    | 'CONNECTION_ENDED';
+    errno: this['code'];
+    address: string;
+    port?: number;
+  }
+
+  interface NotSupportedError extends globalThis.Error {
+    code: 'MESSAGE_NOT_SUPPORTED';
+    name: never
+    | 'CopyInResponse'
+    | 'CopyOutResponse'
+    | 'ParameterDescription'
+    | 'FunctionCallResponse'
+    | 'NegotiateProtocolVersion'
+    | 'CopyBothResponse';
+  }
+
+  interface GenericError extends globalThis.Error {
+    code: never
+    | 'NOT_TAGGED_CALL'
+    | 'UNDEFINED_VALUE'
+    | 'MAX_PARAMETERS_EXCEEDED'
+    | 'SASL_SIGNATURE_MISMATCH';
+    message: string;
+  }
+
+  interface AuthNotImplementedError extends globalThis.Error {
+    code: 'AUTH_TYPE_NOT_IMPLEMENTED';
+    type: number
+    | 'KerberosV5'
+    | 'CleartextPassword'
+    | 'MD5Password'
+    | 'SCMCredential'
+    | 'GSS'
+    | 'GSSContinue'
+    | 'SSPI'
+    | 'SASL'
+    | 'SASLContinue'
+    | 'SASLFinal';
+    message: string;
+  }
+
+  type Error = never
+    | PostgresError
+    | ConnectionError
+    | NotSupportedError
+    | GenericError
+    | AuthNotImplementedError;
 
   type Serializable = null
     | boolean
