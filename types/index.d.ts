@@ -103,7 +103,7 @@ declare namespace postgres {
 
   interface Options<T extends PostgresTypeList> extends BaseOptions<T> {
     /** unix socket path (usually '/tmp') */
-    path?: string;
+    path?: string | (() => string);
     /** Password of database user (an alias for `password`) */
     pass?: Options<T>['password'];
     /** Password of database user */
@@ -171,7 +171,7 @@ declare namespace postgres {
     value: T;
   }
 
-  interface ArrayParameter<T extends any[] = any[]> extends Parameter<T> {
+  interface ArrayParameter<T extends Serializable[] = Serializable[]> extends Parameter<T> {
     array: true;
   }
 
@@ -194,20 +194,20 @@ declare namespace postgres {
 
   type ColumnList<T> = (T extends string ? Column<T> : never)[];
 
-  interface ResultMeta<T extends number, U extends Row> {
+  interface ResultMeta<T extends number, U> {
     count: T; // For tuples
     command: string;
-    columns: ColumnList<keyof U>;
+    columns: ColumnList<U>;
   }
 
-  type ExecutionResult<T extends Row> = [] & ResultMeta<number, T>;
-  type RowList<T extends readonly Row[]> = T & ResultMeta<T['length'], T[number]>;
+  type ExecutionResult<T> = [] & ResultMeta<number, T>;
+  type RowList<T extends readonly Row[]> = T & ResultMeta<T['length'], ColumnList<keyof T[number]>>;
 
   interface PendingQuery<TRow extends readonly Row[]> extends Promise<RowList<TRow>> {
-    stream(cb: (row: TRow[number], result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
-    cursor(cb: (row: TRow[number]) => void): Promise<ExecutionResult<TRow[number]>>;
-    cursor(size: 1, cb: (row: TRow[number]) => void): Promise<ExecutionResult<TRow[number]>>;
-    cursor(size: number, cb: (row: TRow) => void): Promise<ExecutionResult<TRow[number]>>;
+    stream(cb: (row: TRow[number], result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<keyof TRow[number]>>;
+    cursor(cb: (row: TRow[number]) => void): Promise<ExecutionResult<keyof TRow[number]>>;
+    cursor(size: 1, cb: (row: TRow[number]) => void): Promise<ExecutionResult<keyof TRow[number]>>;
+    cursor(size: number, cb: (rows: TRow) => void): Promise<ExecutionResult<keyof TRow[number]>>;
   }
 
   interface Helper<T, U extends any[] = T[]> {
