@@ -3,19 +3,19 @@
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function Postgres<T extends Postgres.PostgresTypeList = {}>(options?: Postgres.Options<T>): Postgres.Sql<T>
+declare function postgres<T extends postgres.PostgresTypeList = {}>(options?: postgres.Options<T>): postgres.Sql<T>
 /**
  * Establish a connection to a PostgreSQL server.
  * @param url Connection string used for authentication
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function Postgres<T extends Postgres.PostgresTypeList = {}>(url: string, options?: Postgres.Options<T>): Postgres.Sql<T>
+declare function postgres<T extends postgres.PostgresTypeList = {}>(url: string, options?: postgres.Options<T>): postgres.Sql<T>
 
 /**
  * Connection options of Postgres.
  */
-interface BaseOptions<T extends Postgres.PostgresTypeList> {
+interface BaseOptions<T extends postgres.PostgresTypeList> {
   /** Postgres ip address or domain name */
   host?: string;
   /** Postgres server port */
@@ -35,7 +35,7 @@ interface BaseOptions<T extends Postgres.PostgresTypeList> {
   /** Array of custom types; see more below */
   types?: T;
   /** Defaults to console.log */
-  onnotice?: (notice: Postgres.Notice) => void;
+  onnotice?: (notice: postgres.Notice) => void;
   /** (key; value) when server param change */
   onparameter?: (key: string, value: any) => void;
   /** Is called with (connection; query; parameters) */
@@ -47,10 +47,10 @@ interface BaseOptions<T extends Postgres.PostgresTypeList> {
     /** Transforms incoming row values */
     value?: (value: any) => any;
     /** Transforms entire rows */
-    row?: (row: Postgres.Row) => any;
+    row?: (row: postgres.Row) => any;
   };
   /** Connection parameters */
-  connection?: Postgres.ConnectionParameters;
+  connection?: postgres.ConnectionParameters;
 }
 
 declare class PostgresError extends Error {
@@ -71,7 +71,7 @@ type UnwrapPromiseArray<T> = T extends any[] ? {
   [k in keyof T]: T[k] extends Promise<infer R> ? R : T[k]
 } : T;
 
-declare namespace Postgres {
+declare namespace postgres {
 
   /**
    * Convert a string to Pascal case.
@@ -269,4 +269,4 @@ declare namespace Postgres {
 
 }
 
-export = Postgres;
+export = postgres;
