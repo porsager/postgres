@@ -3,54 +3,62 @@
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends postgres.PostgresTypeList = {}>(options?: postgres.Options<T>): postgres.Sql<T>
+declare function postgres<T extends PostgresTypeMap = {}>(options?: postgres.Options<T>): postgres.Sql<T>
 /**
  * Establish a connection to a PostgreSQL server.
  * @param url Connection string used for authentication
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends postgres.PostgresTypeList = {}>(url: string, options?: postgres.Options<T>): postgres.Sql<T>
+declare function postgres<T extends PostgresTypeMap = {}>(url: string, options?: postgres.Options<T>): postgres.Sql<T>
 
 /**
  * Connection options of Postgres.
  */
-interface BaseOptions<T extends postgres.PostgresTypeList> {
+interface BaseOptions<T extends PostgresTypeMap> {
   /** Postgres ip address or domain name */
-  host?: string;
+  host: string;
   /** Postgres server port */
-  port?: number;
+  port: number;
   /** Name of database to connect to */
-  database?: string;
+  database: string;
   /** Username of database user */
-  username?: string;
+  username: string;
   /** True; or options for tls.connect */
-  ssl?: boolean | object;
+  ssl: boolean | object;
   /** Max number of connections */
-  max?: number;
+  max: number;
   /** Idle connection timeout in seconds */
-  idle_timeout?: number;
+  idle_timeout: number | undefined;
   /** Connect timeout in seconds */
-  connect_timeout?: number;
+  connect_timeout: number;
   /** Array of custom types; see more below */
-  types?: T;
+  types: PostgresTypeList<T>;
   /** Defaults to console.log */
-  onnotice?: (notice: postgres.Notice) => void;
+  onnotice: (notice: postgres.Notice) => void;
   /** (key; value) when server param change */
-  onparameter?: (key: string, value: any) => void;
+  onparameter: (key: string, value: any) => void;
   /** Is called with (connection; query; parameters) */
-  debug?: boolean | ((connection: number, query: string, parameters: any[]) => void);
+  debug: boolean | ((connection: number, query: string, parameters: any[]) => void);
   /** Transform hooks */
-  transform?: {
+  transform: {
     /** Transforms incoming column names */
-    column?: (column: string) => any;
+    column?: (column: string) => string;
     /** Transforms incoming row values */
     value?: (value: any) => any;
     /** Transforms entire rows */
     row?: (row: postgres.Row) => any;
   };
   /** Connection parameters */
-  connection?: postgres.ConnectionParameters;
+  connection: postgres.ConnectionParameters;
+}
+
+type PostgresTypeList<T extends PostgresTypeMap> = {
+  [name in keyof T]: postgres.PostgresType<T[name]>;
+};
+
+interface PostgresTypeMap {
+  [name: string]: unknown;
 }
 
 declare class PostgresError extends Error {
@@ -104,7 +112,7 @@ declare namespace postgres {
    */
   function toKebab(str: string): string;
 
-  const BigInt: PostgresType;
+  const BigInt: PostgresType<BigInt>;
 
   interface ConnectionParameters {
     /** Default application_name */
@@ -113,7 +121,7 @@ declare namespace postgres {
     [name: string]: any;
   }
 
-  interface Options<T extends PostgresTypeList> extends BaseOptions<T> {
+  interface Options<T extends PostgresTypeMap> extends Partial<BaseOptions<T>> {
     /** unix socket path (usually '/tmp') */
     path?: string | (() => string);
     /** Password of database user (an alias for `password`) */
@@ -128,32 +136,10 @@ declare namespace postgres {
     hostname?: Options<T>['host'];
   }
 
-  interface ParsedOptions<T extends PostgresTypeList> extends BaseOptions<T> {
-    /** @inheritdoc */
-    host: string;
-    /** @inheritdoc */
-    port: number;
-    /** @inheritdoc */
-    path: string | false;
-    /** @inheritdoc */
-    database: string;
-    /** @inheritdoc */
-    user: string;
+  interface ParsedOptions<T extends PostgresTypeMap> extends BaseOptions<T> {
     /** @inheritdoc */
     pass: null;
-    /** @inheritdoc */
-    max: number;
-    /** @inheritdoc */
-    connect_timeout?: number;
-    /** @inheritdoc */
-    types: T;
-    /** @inheritdoc */
-    transform: NonNullable<Options<T>['transform']>
-    /** @inheritdoc */
-    ssl: boolean;
-    /** @inheritdoc */
     serializers: { [oid: number]: PostgresType['serialize'] };
-    /** @inheritdoc */
     parsers: { [oid: number]: PostgresType['parse'] };
   }
 
@@ -161,15 +147,11 @@ declare namespace postgres {
     [field: string]: string;
   }
 
-  interface PostgresType {
+  interface PostgresType<T = unknown> {
     to: number;
     from: number[];
-    serialize(obj: unknown): unknown;
-    parse(raw: any): unknown;
-  }
-
-  interface PostgresTypeList {
-    [name: string]: PostgresType
+    serialize(obj: T): Serializable;
+    parse(raw: any): T;
   }
 
   interface Parameter<T = Serializable> {
@@ -255,7 +237,7 @@ declare namespace postgres {
   interface Column<T extends string> {
     name: T;
     type: number;
-    parse(raw: any): unknown;
+    parser(raw: string): string;
   }
 
   type ColumnList<T> = (T extends string ? Column<T> : never)[];
@@ -267,7 +249,7 @@ declare namespace postgres {
   }
 
   type ExecutionResult<T> = [] & ResultMeta<number, T>;
-  type RowList<T extends readonly Row[]> = T & ResultMeta<T['length'], ColumnList<keyof T[number]>>;
+  type RowList<T extends readonly Row[]> = T & ResultMeta<T['length'], keyof T[number]>;
 
   interface PendingQuery<TRow extends readonly Row[]> extends Promise<RowList<TRow>> {
     stream(cb: (row: TRow[number], result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<keyof TRow[number]>>;
@@ -281,7 +263,7 @@ declare namespace postgres {
     rest: U;
   }
 
-  interface Sql<TTypes extends PostgresTypeList> {
+  interface Sql<TTypes extends PostgresTypeMap> {
 
     /**
      * Execute the SQL query passed as a template string. Can only be used as template string tag.
@@ -323,12 +305,12 @@ declare namespace postgres {
     options: ParsedOptions<TTypes>;
     parameters: ConnectionParameters;
     types: {
-      [name in keyof TTypes]: (obj: Parameters<TTypes[name]['serialize']>[0]) => Parameter<typeof obj>;
+      [name in keyof TTypes]: <T extends TTypes[name]>(obj: T) => Parameter<T>;
     };
     unsafe<T extends Row | Row[] = any[]>(query: string, parameters?: Serializable[]): PendingQuery<T extends Row[] ? T : T[]>;
   }
 
-  interface TransactionSql<TTypes extends PostgresTypeList> extends Sql<TTypes> {
+  interface TransactionSql<TTypes extends PostgresTypeMap> extends Sql<TTypes> {
     savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
   }
