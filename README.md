@@ -229,7 +229,7 @@ This also means you cannot write dynamic queries or concat queries together by s
 
 ## Dynamic query helpers - `sql()` inside tagged template
 
-Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic inserts, selects, updates and `where` queries.
+Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic `insert`, `select` and `update` queries, and pass `where` parameters.
 
 #### Insert
 
