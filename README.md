@@ -227,9 +227,9 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 
 This also means you cannot write dynamic queries or concat queries together by simple string manipulation. To enable dynamic queries in a safe way, the `sql` function doubles as a regular function which escapes any value properly. It also includes overloads for common cases of inserting, selecting, updating and querying.
 
-## Dynamic query helpers `sql() inside tagged template`
+## Dynamic query helpers - `sql()` inside tagged template
 
-Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic inserts, selects, updates and where queries.
+Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic `insert`, `select` and `update` queries, and pass `where` parameters.
 
 #### Insert
 
@@ -272,7 +272,6 @@ sql`
     sql(users, 'name', 'age')
   }
 `
-
 ```
 
 #### Update
@@ -310,6 +309,20 @@ sql`
 
 // Is translated into this query:
 select name, age from users
+```
+
+#### Dynamic table name
+
+```js
+
+const table = 'users'
+
+sql`
+  select id from ${sql(table)}
+`
+
+// Is translated into this query:
+select id from users
 ```
 
 #### Arrays `sql.array(Array)`
