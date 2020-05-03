@@ -30,6 +30,7 @@ const options = {
   user: login.user,
   pass: login.pass,
   idle_timeout: 0.2,
+  debug: true,
   max: 1
 }
 
@@ -891,6 +892,7 @@ t('numeric is returned as string', async() => [
 ])
 
 t('Async stack trace', async() => {
+  const sql = postgres({ ...options, debug: false })
   return [
     parseInt(new Error().stack.split('\n')[1].split(':')[1]) + 1,
     parseInt(await sql`select.sql`.catch(x => x.stack.split('\n').pop().split(':')[1]))
@@ -924,15 +926,31 @@ t('Error contains query parameters', async() => [
   (await sql`selec ${ 1 }`.catch(err => err.parameters[0].value))
 ])
 
-t('Query string is not enumerable', async() => [
+t('Query string is not enumerable', async() => {
+  const sql = postgres({ ...options, debug: false })
+  return [
   -1,
   (await sql`selec 1`.catch(err => Object.keys(err).indexOf('query')))
-])
+  ]
+})
 
-t('Query parameters are not enumerable', async() => [
-  -1,
-  (await sql`selec ${ 1 }`.catch(err => Object.keys(err).indexOf('parameters')))
-])
+t('Query and parameters are not enumerable if debug is not set', async() => {
+  const sql = postgres({ ...options, debug: false })
+
+  return [
+    false,
+    (await sql`selec ${ 1 }`.catch(err => err.propertyIsEnumerable('parameters') || err.propertyIsEnumerable('query')))
+  ]
+})
+
+t('Query and parameters are enumerable if debug is set', async() => {
+  const sql = postgres({ ...options, debug: true })
+
+  return [
+    true,
+    (await sql`selec ${ 1 }`.catch(err => err.propertyIsEnumerable('parameters') && err.propertyIsEnumerable('query')))
+  ]
+})
 
 t('connect_timeout throws proper error', async() => [
   'CONNECT_TIMEOUT',
