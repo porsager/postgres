@@ -109,7 +109,7 @@ t('Json', async() => {
 })
 
 t('Empty array', async() =>
-  [0, (await sql`select ${ sql.array([]) } as x`)[0].x.length]
+  [true, Array.isArray((await sql`select ${ sql.array([]) }::int[] as x`)[0].x)]
 )
 
 t('Array of Integer', async() =>
@@ -985,4 +985,22 @@ t('Result as arrays', async() => {
   })
 
   return ['1,2', (await sql`select 1 as a, 2 as b`)[0].join(',')]
+})
+
+t('Insert empty array', async() => {
+  await sql`create table tester (ints int[])`
+  return [
+    Array.isArray((await sql`insert into tester (ints) values (${ sql.array([]) }) returning *`)[0].ints),
+    true,
+    await sql`drop table tester`
+  ]
+})
+
+t('Insert array in sql()', async() => {
+  await sql`create table tester (ints int[])`
+  return [
+    Array.isArray((await sql`insert into tester ${ sql({ ints: sql.array([]) })} returning *`)[0].ints),
+    true,
+    await sql`drop table tester`
+  ]
 })
