@@ -3,19 +3,19 @@
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends PostgresTypeMap = {}>(options?: postgres.Options<T>): postgres.Sql<T>
+declare function postgres<T extends JSToPostgresTypeMap>(options?: postgres.Options<T>): postgres.Sql<JSToPostgresTypeMap extends T ? {} : T>
 /**
  * Establish a connection to a PostgreSQL server.
  * @param url Connection string used for authentication
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends PostgresTypeMap = {}>(url: string, options?: postgres.Options<T>): postgres.Sql<T>
+declare function postgres<T extends JSToPostgresTypeMap>(url: string, options?: postgres.Options<T>): postgres.Sql<JSToPostgresTypeMap extends T ? {} : T>
 
 /**
  * Connection options of Postgres.
  */
-interface BaseOptions<T extends PostgresTypeMap> {
+interface BaseOptions<T extends JSToPostgresTypeMap> {
   /** Postgres ip address or domain name */
   host: string;
   /** Postgres server port */
@@ -53,11 +53,13 @@ interface BaseOptions<T extends PostgresTypeMap> {
   connection: Partial<postgres.ConnectionParameters>;
 }
 
-type PostgresTypeList<T extends PostgresTypeMap> = {
-  [name in keyof T]: postgres.PostgresType<T[name]>;
+type PostgresTypeList<T> = {
+  [name in keyof T]: T[name] extends (...args: any) => unknown
+  ? postgres.PostgresType<T[name]>
+  : postgres.PostgresType;
 };
 
-interface PostgresTypeMap {
+interface JSToPostgresTypeMap {
   [name: string]: unknown;
 }
 
@@ -112,7 +114,7 @@ declare namespace postgres {
    */
   function toKebab(str: string): string;
 
-  const BigInt: PostgresType<BigInt>;
+  const BigInt: PostgresType<(number: BigInt) => string>;
 
   interface ConnectionParameters {
     /** Default application_name */
@@ -121,7 +123,7 @@ declare namespace postgres {
     [name: string]: any;
   }
 
-  interface Options<T extends PostgresTypeMap> extends Partial<BaseOptions<T>> {
+  interface Options<T extends JSToPostgresTypeMap> extends Partial<BaseOptions<T>> {
     /** unix socket path (usually '/tmp') */
     path?: string | (() => string);
     /** Password of database user (an alias for `password`) */
@@ -136,25 +138,25 @@ declare namespace postgres {
     hostname?: Options<T>['host'];
   }
 
-  interface ParsedOptions<T extends PostgresTypeMap> extends BaseOptions<T> {
+  interface ParsedOptions<T extends JSToPostgresTypeMap> extends BaseOptions<T> {
     /** @inheritdoc */
     pass: null;
-    serializers: { [oid: number]: PostgresType['serialize'] };
-    parsers: { [oid: number]: PostgresType['parse'] };
+    serializers: { [oid: number]: T[keyof T] };
+    parsers: { [oid: number]: T[keyof T] };
   }
 
   interface Notice {
     [field: string]: string;
   }
 
-  interface PostgresType<T = unknown> {
+  interface PostgresType<T extends (...args: any) => any = (...args: any) => any> {
     to: number;
     from: number[];
-    serialize(obj: T): Serializable;
-    parse(raw: any): T;
+    serialize: T;
+    parse: (raw: ReturnType<T>) => unknown;
   }
 
-  interface Parameter<T = Serializable> {
+  interface Parameter<T = SerializableParameter> {
     /**
      * PostgreSQL OID of the type
      */
@@ -165,7 +167,7 @@ declare namespace postgres {
     value: T;
   }
 
-  interface ArrayParameter<T extends Serializable[] = Serializable[]> extends Parameter<T> {
+  interface ArrayParameter<T extends SerializableParameter[] = SerializableParameter[]> extends Parameter<T | T[]> {
     array: true;
   }
 
@@ -228,7 +230,15 @@ declare namespace postgres {
     | number
     | string
     | Date
-    | object;
+    | Buffer;
+
+  type SerializableParameter = Serializable
+    | Helper<any>
+    | Parameter<any>
+    | ArrayParameter
+    | SerializableParameter[];
+
+  type HelperSerializable = { [index: string]: SerializableParameter } | { [index: string]: SerializableParameter }[];
 
   interface Row {
     [column: string]: any;
@@ -263,7 +273,7 @@ declare namespace postgres {
     rest: U;
   }
 
-  interface Sql<TTypes extends PostgresTypeMap> {
+  interface Sql<TTypes extends JSToPostgresTypeMap> {
 
     /**
      * Execute the SQL query passed as a template string. Can only be used as template string tag.
@@ -271,7 +281,7 @@ declare namespace postgres {
      * @param args Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends Row | Row[] = Row>(template: TemplateStringsArray, ...args: Serializable[]): PendingQuery<T extends Row[] ? T : T[]>;
+    <T extends Row | Row[] = Row>(template: TemplateStringsArray, ...args: SerializableParameter[]): PendingQuery<T extends Row[] ? T : T[]>;
 
     /**
      * Escape column names
@@ -287,29 +297,31 @@ declare namespace postgres {
      * @param keys Keys to extract from the object or from objets inside the array
      * @returns A formated representation of the parameter
      */
-    <T extends object, U extends (keyof (T extends any[] ? T[number] : T))[]>(objOrArray: T, ...keys: U): Helper<T, U>;
+    <T extends HelperSerializable, U extends (keyof (T extends any[] ? T[number] : T))[]>(objOrArray: T, ...keys: U): Helper<T, U>;
 
     END: {}; // FIXME unique symbol ?
     PostgresError: typeof PostgresError;
 
-    array<T extends Serializable[] = Serializable[]>(value: T): ArrayParameter<T>;
+    array<T extends SerializableParameter[] = SerializableParameter[]>(value: T): ArrayParameter<T>;
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     end(options?: { timeout?: number }): Promise<void>;
     file<T extends Row | Row[] = Row>(path: string, options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
-    file<T extends Row | Row[] = Row>(path: string, args: Serializable[], options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
+    file<T extends Row | Row[] = Row>(path: string, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
     json(value: any): Parameter;
     listen(channel: string, cb: (value?: string) => void): PendingQuery<never[]>;
     notify(channel: string, payload: string): PendingQuery<never[]>;
     options: ParsedOptions<TTypes>;
     parameters: ConnectionParameters;
     types: {
-      [name in keyof TTypes]: <T extends TTypes[name]>(obj: T) => Parameter<T>;
+      [name in keyof TTypes]: TTypes[name] extends (...args: any) => any
+      ? (...args: Parameters<TTypes[name]>) => postgres.Parameter<ReturnType<TTypes[name]>>
+      : (...args: any) => postgres.Parameter<any>;
     };
-    unsafe<T extends Row | Row[] = any[]>(query: string, parameters?: Serializable[]): PendingQuery<T extends Row[] ? T : T[]>;
+    unsafe<T extends Row | Row[] = any[]>(query: string, parameters?: SerializableParameter[]): PendingQuery<T extends Row[] ? T : T[]>;
   }
 
-  interface TransactionSql<TTypes extends PostgresTypeMap> extends Sql<TTypes> {
+  interface TransactionSql<TTypes extends JSToPostgresTypeMap> extends Sql<TTypes> {
     savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
   }
