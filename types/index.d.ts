@@ -295,10 +295,9 @@ declare namespace postgres {
     array<T extends Serializable[] = Serializable[]>(value: T): ArrayParameter<T>;
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
-    end(): Promise<void>;
     end(options?: { timeout?: number }): Promise<void>;
     file<T extends Row | Row[] = Row>(path: string, options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
-    file<T extends Row | Row[] = Row>(path: string, args?: Serializable[], options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
+    file<T extends Row | Row[] = Row>(path: string, args: Serializable[], options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
     json(value: any): Parameter;
     listen(channel: string, cb: (value?: string) => void): PendingQuery<never[]>;
     notify(channel: string, payload: string): PendingQuery<never[]>;
