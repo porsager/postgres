@@ -50,7 +50,7 @@ interface BaseOptions<T extends PostgresTypeMap> {
     row?: (row: postgres.Row) => any;
   };
   /** Connection parameters */
-  connection: postgres.ConnectionParameters;
+  connection: Partial<postgres.ConnectionParameters>;
 }
 
 type PostgresTypeList<T extends PostgresTypeMap> = {
@@ -116,7 +116,7 @@ declare namespace postgres {
 
   interface ConnectionParameters {
     /** Default application_name */
-    application_name?: string;
+    application_name: string;
     /** Other connection parameters */
     [name: string]: any;
   }
