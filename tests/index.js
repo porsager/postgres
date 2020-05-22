@@ -5,6 +5,7 @@ const cp = require('child_process')
 const path = require('path')
 
 const postgres = require('../lib')
+const delay = ms => new Promise(r => setTimeout(r, ms))
 
 const login = {
   user: 'postgres_js_test'
@@ -30,7 +31,7 @@ const options = {
   user: login.user,
   pass: login.pass,
   idle_timeout: 0.2,
-  debug: true,
+  debug: false,
   max: 1
 }
 
@@ -385,7 +386,7 @@ t('sql file throws', async() =>
 
 t('sql file cached', async() => {
   await sql.file(path.join(__dirname, 'select.sql'))
-  await new Promise(r => setTimeout(r, 20))
+  await delay(20)
 
   return [1, (await sql.file(path.join(__dirname, 'select.sql')))[0].x]
 })
@@ -416,7 +417,6 @@ t('Connection ended timeout', async() => {
 
 t('Connection ended error', async() => {
   const sql = postgres(options)
-
   sql.end()
   return ['CONNECTION_ENDED', (await sql``.catch(x => x.code))]
 })
@@ -547,6 +547,21 @@ t('listen and notify with weird name', async() => {
     .catch(reject)
     .then(sql.end)
   )]
+})
+
+t('listen reconnects', async() => {
+  const listener = postgres(options)
+      , xs = []
+
+  const { state: { pid } } = await listener.listen('test', x => xs.push(x))
+  await sql.notify('test', 'a')
+  await sql`select pg_terminate_backend(${ pid }::int)`
+  await delay(50)
+  await sql.notify('test', 'b')
+  await delay(50)
+  listener.end()
+
+  return ['ab', xs.join('')]
 })
 
 t('responds with server parameters (application_name)', async() =>
@@ -788,7 +803,7 @@ t('Cursor works', async() => {
   const order = []
   await sql`select 1 as x union select 2 as x`.cursor(async(x) => {
     order.push(x.x + 'a')
-    await new Promise(r => setTimeout(r, 100))
+    await delay(100)
     order.push(x.x + 'b')
   })
   return ['1a1b2a2b', order.join('')]
@@ -815,7 +830,7 @@ t('Cursor throw works', async() => {
   const order = []
   await sql`select 1 as x union select 2 as x`.cursor(async(x) => {
     order.push(x.x + 'a')
-    await new Promise(r => setTimeout(r, 100))
+    await delay(100)
     throw new Error('watty')
   }).catch(() => order.push('err'))
   return ['1aerr', order.join('')]
