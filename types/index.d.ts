@@ -252,14 +252,17 @@ declare namespace postgres {
 
   type ColumnList<T> = (T extends string ? Column<T> : never)[];
 
-  interface ResultMeta<T extends number, U> {
+  interface ResultMeta<T extends number | null> {
     count: T; // For tuples
     command: string;
+  }
+
+  interface ResultQueryMeta<T extends number | null, U> extends ResultMeta<T> {
     columns: ColumnList<U>;
   }
 
-  type ExecutionResult<T> = [] & ResultMeta<number, T>;
-  type RowList<T extends readonly Row[]> = T & ResultMeta<T['length'], keyof T[number]>;
+  type ExecutionResult<T> = [] & ResultQueryMeta<number, T>;
+  type RowList<T extends readonly Row[]> = T & ResultQueryMeta<T['length'], keyof T[number]>;
 
   interface PendingQuery<TRow extends readonly Row[]> extends Promise<RowList<TRow>> {
     stream(cb: (row: TRow[number], result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<keyof TRow[number]>>;
@@ -267,6 +270,8 @@ declare namespace postgres {
     cursor(size: 1, cb: (row: TRow[number]) => void): Promise<ExecutionResult<keyof TRow[number]>>;
     cursor(size: number, cb: (rows: TRow) => void): Promise<ExecutionResult<keyof TRow[number]>>;
   }
+
+  interface PendingRequest extends Promise<[] & ResultMeta<null>> { }
 
   interface Helper<T, U extends any[] = T[]> {
     first: T;
@@ -309,8 +314,8 @@ declare namespace postgres {
     file<T extends Row | Row[] = Row>(path: string, options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
     file<T extends Row | Row[] = Row>(path: string, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
     json(value: any): Parameter;
-    listen(channel: string, cb: (value?: string) => void): PendingQuery<never[]>;
-    notify(channel: string, payload: string): PendingQuery<never[]>;
+    listen(channel: string, cb: (value?: string) => void): PendingRequest;
+    notify(channel: string, payload: string): PendingRequest;
     options: ParsedOptions<TTypes>;
     parameters: ConnectionParameters;
     types: {
