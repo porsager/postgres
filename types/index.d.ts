@@ -252,9 +252,16 @@ declare namespace postgres {
 
   type ColumnList<T> = (T extends string ? Column<T> : never)[];
 
+  interface State {
+    state: 'I';
+    pid: number;
+    secret: number;
+  }
+
   interface ResultMeta<T extends number | null> {
     count: T; // For tuples
     command: string;
+    state: State;
   }
 
   interface ResultQueryMeta<T extends number | null, U> extends ResultMeta<T> {
