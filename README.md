@@ -227,9 +227,9 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 
 This also means you cannot write dynamic queries or concat queries together by simple string manipulation. To enable dynamic queries in a safe way, the `sql` function doubles as a regular function which escapes any value properly. It also includes overloads for common cases of inserting, selecting, updating and querying.
 
-## Dynamic query helpers `sql() inside tagged template`
+## Dynamic query helpers - `sql()` inside tagged template
 
-Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic inserts, selects, updates and where queries.
+Postgres.js has a safe, ergonomic way to aid you in writing queries. This makes it easier to write dynamic `insert`, `select` and `update` queries, and pass `where` parameters.
 
 #### Insert
 
@@ -272,7 +272,6 @@ sql`
     sql(users, 'name', 'age')
   }
 `
-
 ```
 
 #### Update
@@ -310,6 +309,20 @@ sql`
 
 // Is translated into this query:
 select name, age from users
+```
+
+#### Dynamic table name
+
+```js
+
+const table = 'users'
+
+sql`
+  select id from ${sql(table)}
+`
+
+// Is translated into this query:
+select id from users
 ```
 
 #### Arrays `sql.array(Array)`
@@ -472,7 +485,7 @@ const [custom] = sql`
 
 ## Teardown / Cleanup
 
-To ensure proper teardown and cleanup on server restarts use `sql.end({ timeout: null })` before `process.exit()`
+To ensure proper teardown and cleanup on server restarts use `sql.end({ timeout: null })` before `process.exit()`.
 
 Calling `sql.end()` will reject new queries and return a Promise which resolves when all queries are finished and the underlying connections are closed. If a timeout is provided any pending queries will be rejected once the timeout is reached and the connections will be destroyed.
 

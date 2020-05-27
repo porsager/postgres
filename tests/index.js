@@ -5,7 +5,8 @@ const cp = require('child_process')
 const path = require('path')
 
 /** @type {import('../types')} */
-const postgres = require('..')
+const postgres = require('../lib')
+const delay = ms => new Promise(r => setTimeout(r, ms))
 
 const login = {
   user: 'postgres_js_test'
@@ -31,6 +32,7 @@ const options = {
   user: login.user,
   pass: login.pass,
   idle_timeout: 0.2,
+  debug: false,
   max: 1
 }
 
@@ -110,7 +112,7 @@ t('Json', async() => {
 })
 
 t('Empty array', async() =>
-  [0, (await sql`select ${ sql.array([]) } as x`)[0].x.length]
+  [true, Array.isArray((await sql`select ${ sql.array([]) }::int[] as x`)[0].x)]
 )
 
 t('Array of Integer', async() =>
@@ -385,7 +387,7 @@ t('sql file throws', async() =>
 
 t('sql file cached', async() => {
   await sql.file(path.join(__dirname, 'select.sql'))
-  await new Promise(r => setTimeout(r, 20))
+  await delay(20)
 
   return [1, (await sql.file(path.join(__dirname, 'select.sql')))[0].x]
 })
@@ -416,7 +418,6 @@ t('Connection ended timeout', async() => {
 
 t('Connection ended error', async() => {
   const sql = postgres(options)
-
   sql.end()
   return ['CONNECTION_ENDED', (await sql``.catch(x => x.code))]
 })
@@ -547,6 +548,21 @@ t('listen and notify with weird name', async() => {
     .catch(reject)
     .then(sql.end)
   )]
+})
+
+t('listen reconnects', async() => {
+  const listener = postgres(options)
+      , xs = []
+
+  const { state: { pid } } = await listener.listen('test', x => xs.push(x))
+  await sql.notify('test', 'a')
+  await sql`select pg_terminate_backend(${ pid }::int)`
+  await delay(50)
+  await sql.notify('test', 'b')
+  await delay(50)
+  listener.end()
+
+  return ['ab', xs.join('')]
 })
 
 t('responds with server parameters (application_name)', async() =>
@@ -788,7 +804,7 @@ t('Cursor works', async() => {
   const order = []
   await sql`select 1 as x union select 2 as x`.cursor(async(x) => {
     order.push(x.x + 'a')
-    await new Promise(r => setTimeout(r, 100))
+    await delay(100)
     order.push(x.x + 'b')
   })
   return ['1a1b2a2b', order.join('')]
@@ -815,7 +831,7 @@ t('Cursor throw works', async() => {
   const order = []
   await sql`select 1 as x union select 2 as x`.cursor(async(x) => {
     order.push(x.x + 'a')
-    await new Promise(r => setTimeout(r, 100))
+    await delay(100)
     throw new Error('watty')
   }).catch(() => order.push('err'))
   return ['1aerr', order.join('')]
@@ -892,6 +908,7 @@ t('numeric is returned as string', async() => [
 ])
 
 t('Async stack trace', async() => {
+  const sql = postgres({ ...options, debug: false })
   return [
     parseInt(new Error().stack.split('\n')[1].split(':')[1]) + 1,
     parseInt(await sql`select.sql`.catch(x => x.stack.split('\n').pop().split(':')[1]))
@@ -925,15 +942,31 @@ t('Error contains query parameters', async() => [
   (await sql`selec ${ 1 }`.catch(err => err.parameters[0].value))
 ])
 
-t('Query string is not enumerable', async() => [
+t('Query string is not enumerable', async() => {
+  const sql = postgres({ ...options, debug: false })
+  return [
   -1,
   (await sql`selec 1`.catch(err => Object.keys(err).indexOf('query')))
-])
+  ]
+})
 
-t('Query parameters are not enumerable', async() => [
-  -1,
-  (await sql`selec ${ 1 }`.catch(err => Object.keys(err).indexOf('parameters')))
-])
+t('Query and parameters are not enumerable if debug is not set', async() => {
+  const sql = postgres({ ...options, debug: false })
+
+  return [
+    false,
+    (await sql`selec ${ 1 }`.catch(err => err.propertyIsEnumerable('parameters') || err.propertyIsEnumerable('query')))
+  ]
+})
+
+t('Query and parameters are enumerable if debug is set', async() => {
+  const sql = postgres({ ...options, debug: true })
+
+  return [
+    true,
+    (await sql`selec ${ 1 }`.catch(err => err.propertyIsEnumerable('parameters') && err.propertyIsEnumerable('query')))
+  ]
+})
 
 t('connect_timeout throws proper error', async() => [
   'CONNECT_TIMEOUT',
@@ -986,4 +1019,22 @@ t('Result as arrays', async() => {
   })
 
   return ['1,2', (await sql`select 1 as a, 2 as b`)[0].join(',')]
+})
+
+t('Insert empty array', async() => {
+  await sql`create table tester (ints int[])`
+  return [
+    Array.isArray((await sql`insert into tester (ints) values (${ sql.array([]) }) returning *`)[0].ints),
+    true,
+    await sql`drop table tester`
+  ]
+})
+
+t('Insert array in sql()', async() => {
+  await sql`create table tester (ints int[])`
+  return [
+    Array.isArray((await sql`insert into tester ${ sql({ ints: sql.array([]) })} returning *`)[0].ints),
+    true,
+    await sql`drop table tester`
+  ]
 })
