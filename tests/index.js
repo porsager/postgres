@@ -4,6 +4,7 @@ const { t, not, ot } = require('./test.js') // eslint-disable-line
 const cp = require('child_process')
 const path = require('path')
 
+/** @type {import('../types')} */
 const postgres = require('../lib')
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
