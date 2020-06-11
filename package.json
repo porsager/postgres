@@ -16,7 +16,7 @@
     "/types"
   ],
   "author": "Rasmus Porsager <rasmus@porsager.com>",
-  "license": "WTFPL",
+  "license": "Unlicense",
   "repository": "porsager/postgres",
   "keywords": [
     "driver",
