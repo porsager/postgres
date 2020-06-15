@@ -162,11 +162,11 @@ Use cursors if you need to throttle the amount of rows being returned from a que
 
 ```js
 
-await sql.cursor`
+await sql`
   select * from generate_series(1,4) as x
-`.cursor(row => {
+`.cursor(async row => {
   // row = { x: 1 }
-  http.request('https://example.com/wat', { row })
+  await http.request('https://example.com/wat', { row })
 })
 
 // No more rows
@@ -177,9 +177,9 @@ A single row will be returned by default, but you can also request batches by se
 
 ```js
 
-await sql.cursor`
+await sql`
   select * from generate_series(1,1000) as x
-`.cursor(10, rows => {
+`.cursor(10, async rows => {
   // rows = [{ x: 1 }, { x: 2 }, ... ]
   await Promise.all(rows.map(row =>
     http.request('https://example.com/wat', { row })
@@ -194,7 +194,7 @@ You can also stop receiving any more rows early by returning an end token `sql.E
 
 ```js
 
-await sql.cursor`
+await sql`
   select * from generate_series(1,1000) as x
 `.cursor(row => {
   return Math.random() > 0.9 && sql.END
