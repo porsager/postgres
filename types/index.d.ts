@@ -244,6 +244,24 @@ declare namespace postgres {
     [column: string]: any;
   }
 
+  interface UnlabeledRow<T = any> {
+    '?column?': T;
+  }
+
+  type MaybeRow = Row | undefined;
+
+  type TransformRow<T> = T extends Serializable
+    ? { '?column?': T; }
+    : T extends MaybeRow
+    ? T
+    : Row;
+
+  type AsRowList<T> = T extends any[]
+    ? readonly any[] extends T
+    ? TransformRow<T[number]>[]
+    : T
+    : TransformRow<T | undefined>[];
+
   interface Column<T extends string> {
     name: T;
     type: number;
@@ -269,13 +287,13 @@ declare namespace postgres {
   }
 
   type ExecutionResult<T> = [] & ResultQueryMeta<number, T>;
-  type RowList<T extends readonly Row[]> = T & ResultQueryMeta<T['length'], keyof T[number]>;
+  type RowList<T extends MaybeRow[]> = T & ResultQueryMeta<T extends { length: infer R } ? R extends number ? R : number : number, keyof T[number]>;
 
-  interface PendingQuery<TRow extends readonly Row[]> extends Promise<RowList<TRow>> {
-    stream(cb: (row: TRow[number], result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<keyof TRow[number]>>;
-    cursor(cb: (row: TRow[number]) => void): Promise<ExecutionResult<keyof TRow[number]>>;
-    cursor(size: 1, cb: (row: TRow[number]) => void): Promise<ExecutionResult<keyof TRow[number]>>;
-    cursor(size: number, cb: (rows: TRow) => void): Promise<ExecutionResult<keyof TRow[number]>>;
+  interface PendingQuery<TRow extends MaybeRow[]> extends Promise<RowList<TRow>> {
+    stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<NonNullable<TRow[number]>>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
+    cursor(cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
+    cursor(size: 1, cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
+    cursor(size: number, cb: (rows: NonNullable<TRow[number]>[]) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
   }
 
   interface PendingRequest extends Promise<[] & ResultMeta<null>> { }
@@ -293,7 +311,7 @@ declare namespace postgres {
      * @param args Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends Row | Row[] = Row>(template: TemplateStringsArray, ...args: SerializableParameter[]): PendingQuery<T extends Row[] ? T : T[]>;
+    <T = Row[]>(template: TemplateStringsArray, ...args: SerializableParameter[]): PendingQuery<AsRowList<T>>;
 
     /**
      * Escape column names
@@ -318,8 +336,8 @@ declare namespace postgres {
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     end(options?: { timeout?: number }): Promise<void>;
-    file<T extends Row | Row[] = Row>(path: string, options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
-    file<T extends Row | Row[] = Row>(path: string, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
+    file<T = Row[]>(path: string, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
+    file<T = Row[]>(path: string, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
     json(value: any): Parameter;
     listen(channel: string, cb: (value?: string) => void): PendingRequest;
     notify(channel: string, payload: string): PendingRequest;
@@ -330,7 +348,7 @@ declare namespace postgres {
       ? (...args: Parameters<TTypes[name]>) => postgres.Parameter<ReturnType<TTypes[name]>>
       : (...args: any) => postgres.Parameter<any>;
     };
-    unsafe<T extends Row | Row[] = any[]>(query: string, parameters?: SerializableParameter[]): PendingQuery<T extends Row[] ? T : T[]>;
+    unsafe<T = Row[]>(query: string, parameters?: SerializableParameter[]): PendingQuery<AsRowList<T>>;
   }
 
   interface TransactionSql<TTypes extends JSToPostgresTypeMap> extends Sql<TTypes> {
