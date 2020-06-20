@@ -543,6 +543,20 @@ If you know what you're doing, you can use `unsafe` to pass any string you'd lik
 sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 
 ```
+
+Indexed parameters will be escaped by postgres.
+```js
+
+sql.unsafe('select ' + danger + ' from users where id = $1', [dragons])
+
+```
+
+Named parameters may contain letters, numbers, and underscores, however they must start with a letter.  Named parameters get converted to indexed parameters, which will be escaped by postgres.
+```js
+// $var_1 is valid, but $1_var is invalid
+sql.unsafe('select ' + danger + ' from users where id = $id', {id: dragons})
+```
+
 </details>
 
 ## Errors
