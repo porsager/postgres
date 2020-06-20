@@ -402,6 +402,15 @@ let params = sql.paramify('select ' + danger + ' from users where id = $id', {no
 let params = sql.paramify('select ' + danger + ' from users where id = $id', {id: dragons}, true)
 await sql.unsafe(...params)
 ```
+
+```js
+let params = sql.paramify('update users set first_name = $fname where id = $id', {id: 5}, false)
+await sql.unsafe(...params)
+// This will updated the first_name to `null`
+// This is the default behavior for sql.unsafe when using named parameters.
+await sql.unsafe('update users set first_name = $fname where id = $id', {id: 5})
+```
+
 </details>
 
 ## Errors
