@@ -540,21 +540,32 @@ If you know what you're doing, you can use `unsafe` to pass any string you'd lik
 
 ```js
 
-sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
+await sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 
 ```
 
 Indexed parameters will be escaped by postgres.
 ```js
 
-sql.unsafe('select ' + danger + ' from users where id = $1', [dragons])
+await sql.unsafe('select ' + danger + ' from users where id = $1', [dragons])
 
 ```
 
-Named parameters may contain letters, numbers, and underscores, however they must start with a letter.  Named parameters get converted to indexed parameters, which will be escaped by postgres.
+Named parameters may contain letters, numbers, and underscores, however they must start with a letter.  Named parameters get converted to indexed parameters, which will be escaped by postgres.  If the parameters object does not contain all expected keys, null values will be used.
 ```js
 // $var_1 is valid, but $1_var is invalid
-sql.unsafe('select ' + danger + ' from users where id = $id', {id: dragons})
+await sql.unsafe('select ' + danger + ' from users where id = $id', {id: dragons})
+```
+
+You may also call `sql.paramify(query, [args], strict = false)` directly if you want to enforce strict parameter naming.  With `strict` enabled, `postgres` will throw an error if the object does not contain all the expected keys.  This can help prevent naming errors.
+```js
+let params = sql.paramify('select ' + danger + ' from users where id = $id', {no: dragons}, true)
+// Error: Missing Parameters: id
+```
+
+```js
+let params = sql.paramify('select ' + danger + ' from users where id = $id', {id: dragons}, true)
+await sql.unsafe(...params)
 ```
 
 </details>
