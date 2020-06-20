@@ -503,6 +503,17 @@ t('unsafe simple', async() => {
   return [1, (await sql.unsafe('select 1 as x'))[0].x]
 })
 
+t('unsafe named params', async() => {
+  await sql`create table test (x int)`
+  return [1, (await sql.unsafe('insert into test values ($val) returning *', {val: 1}))[0].x]
+}, () => sql`drop table test`)
+
+t('unsafe paramify strict', async() => {
+  await sql`create table test (x int)`
+  let params = sql.parmify('insert into test values ($val) returning *', {val: 1}, true)
+  return [1, (await sql.unsafe(...params))[0].x]
+}, () => sql`drop table test`)
+
 t('listen and notify', async() => {
   const sql = postgres(options)
       , channel = 'hello'
