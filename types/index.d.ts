@@ -252,15 +252,9 @@ declare namespace postgres {
 
   type TransformRow<T> = T extends Serializable
     ? { '?column?': T; }
-    : T extends MaybeRow
-    ? T
-    : Row;
+    : T;
 
-  type AsRowList<T> = T extends any[]
-    ? readonly any[] extends T
-    ? TransformRow<T[number]>[]
-    : T
-    : TransformRow<T | undefined>[];
+    type AsRowList<T extends any[]> = { [k in keyof T]: TransformRow<T[k]> };
 
   interface Column<T extends string> {
     name: T;
@@ -287,7 +281,7 @@ declare namespace postgres {
   }
 
   type ExecutionResult<T> = [] & ResultQueryMeta<number, T>;
-  type RowList<T extends MaybeRow[]> = T & ResultQueryMeta<T extends { length: infer R } ? R extends number ? R : number : number, keyof T[number]>;
+  type RowList<T extends MaybeRow[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
 
   interface PendingQuery<TRow extends MaybeRow[]> extends Promise<RowList<TRow>> {
     stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<NonNullable<TRow[number]>>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
@@ -311,7 +305,7 @@ declare namespace postgres {
      * @param args Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T = Row[]>(template: TemplateStringsArray, ...args: SerializableParameter[]): PendingQuery<AsRowList<T>>;
+    <T extends any[] = Row[]>(template: TemplateStringsArray, ...args: SerializableParameter[]): PendingQuery<AsRowList<T>>;
 
     /**
      * Escape column names
@@ -336,8 +330,8 @@ declare namespace postgres {
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     end(options?: { timeout?: number }): Promise<void>;
-    file<T = Row[]>(path: string, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
-    file<T = Row[]>(path: string, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
+    file<T extends any[] = Row[]>(path: string, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
+    file<T extends any[] = Row[]>(path: string, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
     json(value: any): Parameter;
     listen(channel: string, cb: (value?: string) => void): PendingRequest;
     notify(channel: string, payload: string): PendingRequest;
@@ -348,7 +342,7 @@ declare namespace postgres {
       ? (...args: Parameters<TTypes[name]>) => postgres.Parameter<ReturnType<TTypes[name]>>
       : (...args: any) => postgres.Parameter<any>;
     };
-    unsafe<T = Row[]>(query: string, parameters?: SerializableParameter[]): PendingQuery<AsRowList<T>>;
+    unsafe<T extends any[] = Row[]>(query: string, parameters?: SerializableParameter[]): PendingQuery<AsRowList<T>>;
   }
 
   interface TransactionSql<TTypes extends JSToPostgresTypeMap> extends Sql<TTypes> {
