@@ -881,7 +881,7 @@ t('Transform value', async() => {
 t('Unix socket', async() => {
   const sql = postgres({
     ...options,
-    host: '/tmp'
+    host: process.env.PGSOCKET || '/tmp'
   })
 
   return [1, (await sql`select 1 as x`)[0].x]
