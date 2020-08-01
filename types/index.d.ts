@@ -321,6 +321,8 @@ declare namespace postgres {
     file<T extends Row | Row[] = Row>(path: string, options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
     file<T extends Row | Row[] = Row>(path: string, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<T extends Row[] ? T : T[]>;
     json(value: any): Parameter;
+    partial(template: TemplateStringsArray, ...args: SerializableParameter[]): Parameter;
+    skip(): Parameter;
     listen(channel: string, cb: (value?: string) => void): PendingRequest;
     notify(channel: string, payload: string): PendingRequest;
     options: ParsedOptions<TTypes>;
