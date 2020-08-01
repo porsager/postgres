@@ -367,6 +367,15 @@ const [{ json }] = await sql`
 // json = { hello: 'postgres' }
 ```
 
+#### Partial ``` sql.partial`` ``` and  Skip ``` sql.skip() ```
+With  ``` sql.partial`` ``` you can pass partial query into ``` sql`` ``` that can use for dynamic query building. And use ``` sql.skip() ``` if there is no partial query needed.
+
+```js
+
+await sql`select * as user from users ${id ? sql.partial`where id = ${id}` : sql.skip() }`
+
+```
+
 ## File query `sql.file(path, [args], [options]) -> Promise`
 
 Using an `.sql` file for a query. The contents will be cached in memory so that the file is only read once.
