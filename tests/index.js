@@ -1101,3 +1101,33 @@ t('Catches query format errors', async() => [
   'wat',
   await sql.unsafe({ toString: () => { throw new Error('wat') } }).catch((e) => e.message)
 ])
+
+t('Describe a statement', async() => {
+  await sql`create table tester (name text, age int)`
+  const r = await sql.describe('select name, age from tester where name like $1 and age > $2')
+  return [
+    '25,23/name:25,age:23',
+    `${r.params.join(',')}/${r.columns.map(c => `${c.name}:${c.type}`).join(',')}`,
+    await sql`drop table tester`
+  ]
+})
+
+t('Describe a statement without parameters', async() => {
+  await sql`create table tester (name text, age int)`
+  const r = await sql.describe('select name, age from tester')
+  return [
+    '0,2',
+    `${r.params.length},${r.columns.length}`,
+    await sql`drop table tester`
+  ]
+})
+
+t('Describe a statement without columns', async () => {
+  await sql`create table tester (name text, age int)`
+  const r = await sql.describe('insert into tester (name, age) values ($1, $2)')
+  return [
+    '2,0',
+    `${r.params.length},${r.columns.length}`,
+    await sql`drop table tester`
+  ]
+})

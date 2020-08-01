@@ -392,6 +392,20 @@ sql.file(path.join(__dirname, 'query.sql'), [], {
 
 ```
 
+## Describe `sql.describe(stmt) -> Promise`
+
+Describe the parameters and output columns of the given SQL statement.
+
+```js
+
+const { params, columns } = await sql.describe('select * from users where id = $1 and name like $2')
+
+```
+
+The resulting `params` is an array of Postgres data type ids (OIDs) for parameters in order `$1`, `$2`,
+etc. `columns` is an array of objects `{ name, type, parser }`, where `name` is the column name, `type`
+is the type OID, and `parser` is a function used to parse the value to JavaScript.
+
 ## Transactions
 
 
