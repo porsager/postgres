@@ -54,6 +54,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   max             : 10,         // Max number of connections
   idle_timeout    : 0,          // Idle connection timeout in seconds
   connect_timeout : 30,         // Connect timeout in seconds
+  no_prepare      : false,      // No automatic creation of prepared statements
   types           : [],         // Array of custom types, see more below
   onnotice        : fn          // Defaults to console.log
   onparameter     : fn          // (key, value) when server param change
@@ -531,6 +532,10 @@ This means that we get a much simpler story for error handling and reconnections
 Any query which was already sent over the wire will be rejected if the connection is lost. It'll automatically defer to the error handling you have for that query, and since connections are lazy it'll automatically try to reconnect the next time a query is made. The benefit of this is no weird generic "onerror" handler that tries to get things back to normal, and also simpler application code since you don't have to handle errors out of context.
 
 There are no guarantees about queries executing in order unless using a transaction with `sql.begin()` or setting `max: 1`. Of course doing a series of queries, one awaiting the other will work as expected, but that's just due to the nature of js async/promise handling, so it's not necessary for this library to be concerned with ordering.
+
+## Prepared statements
+
+Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `no_prepare` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93).
 
 <details><summary><code>sql.unsafe</code> - Advanced unsafe use cases</summary>
 

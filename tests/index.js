@@ -1048,3 +1048,15 @@ t('Insert array in sql()', async() => {
     await sql`drop table tester`
   ]
 })
+
+t('Automatically creates prepared statements', async() => {
+  const sql = postgres({ no_prepare: false })
+  const result = await sql`select * from pg_prepared_statements`
+  return [result[0].statement, 'select * from pg_prepared_statements']
+})
+
+t('no_prepare: true disables prepared transactions', async() => {
+  const sql = postgres({ no_prepare: true })
+  const result = await sql`select * from pg_prepared_statements`
+  return [0, result.count]
+})
