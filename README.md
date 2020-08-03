@@ -4,6 +4,7 @@
 - 🚯 1250 LOC - 0 dependencies
 - 🏷 ES6 Tagged Template Strings at the core
 - 🏄‍♀️ Simple surface API
+- 💬 Chat on [Gitter](https://badges.gitter.im/porsager/postgres.svg)
 
 <br>
 
