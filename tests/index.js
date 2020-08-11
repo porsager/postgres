@@ -978,6 +978,21 @@ t('Query and parameters are enumerable if debug is set', async() => {
   ]
 })
 
+t('connect_timeout works', async() => {
+  const connect_timeout = 0.2
+  const server = net.createServer()
+  server.listen()
+  const sql = postgres({ port: server.address().port, connect_timeout })
+  const start = Date.now()
+  let end
+  await sql`select 1`.catch((e) => {
+    if (e.code !== 'CONNECT_TIMEOUT')
+      throw e
+    end = Date.now()
+  })
+  return [connect_timeout, Math.floor((end - start) / 100) / 10]
+})
+
 t('connect_timeout throws proper error', async() => [
   'CONNECT_TIMEOUT',
   await postgres({
