@@ -440,7 +440,7 @@ sql.begin(async sql => {
 
   return [user, account]
 })
-.then(([user, account])) => {
+.then(([user, account]) => {
   // great success - COMMIT succeeded
 })
 .catch(() => {
