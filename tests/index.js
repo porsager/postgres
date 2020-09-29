@@ -1084,3 +1084,8 @@ o('Catches connection config errors', async() => {
     await sql`select 1`.catch((e) => e.message)
   ]
 })
+
+o('Catches query format errors', async() => [
+  'wat',
+  await sql.unsafe({ toString: () => { throw new Error('wat') } }).catch((e) => e.message)
+])
