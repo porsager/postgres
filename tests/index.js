@@ -1075,3 +1075,12 @@ t('no_prepare: true disables prepared transactions', async() => {
   const result = await sql`select * from pg_prepared_statements`
   return [0, result.count]
 })
+
+o('Catches connection config errors', async() => {
+  const sql = postgres({ user: { toString: () => { throw new Error('wat') } }, database: 'prut' })
+
+  return [
+    'wat',
+    await sql`select 1`.catch((e) => e.message)
+  ]
+})
