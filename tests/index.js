@@ -1077,7 +1077,7 @@ t('no_prepare: true disables prepared transactions', async() => {
 })
 
 t('Catches connection config errors', async() => {
-  const sql = postgres({ user: { toString: () => { throw new Error('wat') } }, database: 'prut' })
+  const sql = postgres({ ...options, user: { toString: () => { throw new Error('wat') } }, database: 'prut' })
 
   return [
     'wat',
