@@ -980,7 +980,7 @@ t('Query and parameters are enumerable if debug is set', async() => {
 
 t('connect_timeout works', async() => {
   const connect_timeout = 0.2
-  const server = net.createServer()
+  const server = require('net').createServer()
   server.listen()
   const sql = postgres({ port: server.address().port, connect_timeout })
   const start = Date.now()
@@ -1076,7 +1076,7 @@ t('no_prepare: true disables prepared transactions', async() => {
   return [0, result.count]
 })
 
-o('Catches connection config errors', async() => {
+t('Catches connection config errors', async() => {
   const sql = postgres({ user: { toString: () => { throw new Error('wat') } }, database: 'prut' })
 
   return [
@@ -1085,7 +1085,7 @@ o('Catches connection config errors', async() => {
   ]
 })
 
-o('Catches query format errors', async() => [
+t('Catches query format errors', async() => [
   'wat',
   await sql.unsafe({ toString: () => { throw new Error('wat') } }).catch((e) => e.message)
 ])
