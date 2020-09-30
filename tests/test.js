@@ -64,7 +64,5 @@ function exit() {
   })
 
   ignored && console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's', '\n'))
-  !only && success && !ignored
-    ? console.log('All good')
-    : process.exit(1) // eslint-disable-line
+  console.log(!only && success && !ignored ? 'All good' : 'Not good')
 }
