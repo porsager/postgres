@@ -63,6 +63,13 @@ function exit() {
     }
   })
 
-  ignored && console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's', '\n'))
-  console.log(!only && success && !ignored ? 'All good' : 'Not good')
+  only
+    ? console.error('⚠️', 'Not all tests were run')
+    : ignored
+      ? console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's', '\n'))
+      : success
+        ? console.log('All good')
+        : console.error('⚠️', 'Not good')
+
+  !process.exitCode && (!success || only || ignored) && (process.exitCode = 1)
 }
