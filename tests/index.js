@@ -48,7 +48,7 @@ t('Connects with no options', async() => {
   const sql = postgres()
 
   const result = (await sql`select 1 as x`)[0].x
-  sql.end()
+  await sql.end()
 
   return [1, result]
 })
