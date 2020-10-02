@@ -1087,6 +1087,16 @@ t('Catches connection config errors', async() => {
   ]
 })
 
+t('Catches connection config errors with end', async() => {
+  const sql = postgres({ ...options, user: { toString: () => { throw new Error('wat') } }, database: 'prut' })
+
+  return [
+    'wat',
+    await sql`select 1`.catch((e) => e.message),
+    await sql.end()
+  ]
+})
+
 t('Catches query format errors', async() => [
   'wat',
   await sql.unsafe({ toString: () => { throw new Error('wat') } }).catch((e) => e.message)
