@@ -33,10 +33,10 @@ module.exports = sql
 // other.js
 const sql = require('./db.js')
 
-await sql`
+const users = await sql`
   select name, age from users
 `
-// > [{ name: 'Murray', age: 68 }, { name: 'Walter', age 78 }]
+// users: [{ name: 'Murray', age: 68 }, { name: 'Walter', age: 78 }]
 ```
 
 ## Connection options `postgres([url], [options])`
