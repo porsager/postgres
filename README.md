@@ -487,7 +487,7 @@ const [custom] = sql`
 
 ## Teardown / Cleanup
 
-To ensure proper teardown and cleanup on server restarts use `sql.end({ timeout: null })` before `process.exit()`.
+To ensure proper teardown and cleanup on server restarts use `sql.end({ timeout: 0 })` before `process.exit()`.
 
 Calling `sql.end()` will reject new queries and return a Promise which resolves when all queries are finished and the underlying connections are closed. If a timeout is provided any pending queries will be rejected once the timeout is reached and the connections will be destroyed.
 
