@@ -487,12 +487,12 @@ const [custom] = sql`
     rect
   ) values (
     'wat',
-    ${ sql.types.rect({ x: 13, y: 37: width: 42, height: 80 }) }
+    ${ sql.types.rect({ x: 13, y: 37, width: 42, height: 80 }) }
   )
   returning *
 `
 
-// custom = { name: 'wat', rect: { x: 13, y: 37: width: 42, height: 80 } }
+// custom = { name: 'wat', rect: { x: 13, y: 37, width: 42, height: 80 } }
 
 ```
 
