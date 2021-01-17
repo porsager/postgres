@@ -338,7 +338,7 @@ declare namespace postgres {
     unsafe<T extends Row | Row[] = any[]>(query: string, parameters?: SerializableParameter[]): PendingQuery<T extends Row[] ? T : T[]>;
   }
 
-  interface TransactionSql<TTypes extends JSToPostgresTypeMap> extends Sql<TTypes> {
+  interface TransactionSql<TTypes extends JSToPostgresTypeMap> extends Omit<Sql<TTypes>, 'begin'> {
     savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
   }
