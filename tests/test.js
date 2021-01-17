@@ -63,8 +63,13 @@ function exit() {
     }
   })
 
-  ignored && console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's', '\n'))
-  !only && success && !ignored
-    ? console.log('All good')
-    : process.exit(1) // eslint-disable-line
+  only
+    ? console.error('⚠️', 'Not all tests were run')
+    : ignored
+      ? console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's', '\n'))
+      : success
+        ? console.log('All good')
+        : console.error('⚠️', 'Not good')
+
+  !process.exitCode && (!success || only || ignored) && (process.exitCode = 1)
 }

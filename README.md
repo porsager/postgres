@@ -1,9 +1,10 @@
 <img align="left" width="440" height="140" alt="Fastest full PostgreSQL nodejs client" src="https://raw.githubusercontent.com/porsager/postgres/master/postgresjs.svg?sanitize=true" />
 
-- [🚀 Fastest full featured PostgreSQL client for Node.js](https://github.com/porsager/postgres-benchmarks#results)
+- [🚀 Fastest full featured PostgreSQL node client](https://github.com/porsager/postgres-benchmarks#results)
 - 🚯 1250 LOC - 0 dependencies
 - 🏷 ES6 Tagged Template Strings at the core
 - 🏄‍♀️ Simple surface API
+- 💬 Chat on [Gitter](https://gitter.im/porsager/postgres)
 
 <br>
 
@@ -32,10 +33,10 @@ module.exports = sql
 // other.js
 const sql = require('./db.js')
 
-await sql`
+const users = await sql`
   select name, age from users
 `
-// > [{ name: 'Murray', age: 68 }, { name: 'Walter', age 78 }]
+// users: [{ name: 'Murray', age: 68 }, { name: 'Walter', age: 78 }]
 ```
 
 ## Connection options `postgres([url], [options])`
@@ -54,6 +55,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   max             : 10,         // Max number of connections
   idle_timeout    : 0,          // Idle connection timeout in seconds
   connect_timeout : 30,         // Connect timeout in seconds
+  no_prepare      : false,      // No automatic creation of prepared statements
   types           : [],         // Array of custom types, see more below
   onnotice        : fn          // Defaults to console.log
   onparameter     : fn          // (key, value) when server param change
@@ -70,7 +72,18 @@ const sql = postgres('postgres://username:password@host:port/database', {
 })
 ```
 
-More info for the `ssl` option can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options)
+Although it is [vulnerable to MITM attacks](https://security.stackexchange.com/a/229297/174913), a common configuration for the `ssl` option for some cloud providers like Heroku is to set `rejectUnauthorized` to `false` (if `NODE_ENV` is `production`):
+
+```js
+const sql =
+  process.env.NODE_ENV === 'production'
+    ? // "Unless you're using a Private or Shield Heroku Postgres database, Heroku Postgres does not currently support verifiable certificates"
+      // https://help.heroku.com/3DELT3RK/why-can-t-my-third-party-utility-connect-to-heroku-postgres-with-ssl
+      postgres({ ssl: { rejectUnauthorized: false } })
+    : postgres();
+```
+
+More info for the `ssl` option can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options).
 
 ### Environment Variables for Options
 
@@ -447,7 +460,7 @@ sql.begin(async sql => {
 
   return [user, account]
 })
-.then(([user, account])) => {
+.then(([user, account]) => {
   // great success - COMMIT succeeded
 })
 .catch(() => {
@@ -494,7 +507,7 @@ const [custom] = sql`
 
 ## Teardown / Cleanup
 
-To ensure proper teardown and cleanup on server restarts use `sql.end({ timeout: null })` before `process.exit()`.
+To ensure proper teardown and cleanup on server restarts use `sql.end({ timeout: 0 })` before `process.exit()`.
 
 Calling `sql.end()` will reject new queries and return a Promise which resolves when all queries are finished and the underlying connections are closed. If a timeout is provided any pending queries will be rejected once the timeout is reached and the connections will be destroyed.
 
@@ -540,6 +553,10 @@ This means that we get a much simpler story for error handling and reconnections
 Any query which was already sent over the wire will be rejected if the connection is lost. It'll automatically defer to the error handling you have for that query, and since connections are lazy it'll automatically try to reconnect the next time a query is made. The benefit of this is no weird generic "onerror" handler that tries to get things back to normal, and also simpler application code since you don't have to handle errors out of context.
 
 There are no guarantees about queries executing in order unless using a transaction with `sql.begin()` or setting `max: 1`. Of course doing a series of queries, one awaiting the other will work as expected, but that's just due to the nature of js async/promise handling, so it's not necessary for this library to be concerned with ordering.
+
+## Prepared statements
+
+Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `no_prepare` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93).
 
 <details><summary><code>sql.unsafe</code> - Advanced unsafe use cases</summary>
 
