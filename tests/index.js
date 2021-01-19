@@ -53,6 +53,15 @@ t('Connects with no options', async() => {
   return [1, result]
 })
 
+not('Insert array of int', async() => {
+  await sql`create table test (x int[])`
+
+  return [
+    (await sql`insert into test (x) values (${ sql.array([1, 2, 3]) }) returning x`)[0].x.join(''),
+    '123'
+  ]
+})
+
 t('Uses default database without slash', async() =>
   ['postgres', postgres('postgres://localhost').options.database]
 )
@@ -1112,3 +1121,24 @@ t('Catches query format errors', async() => [
   'wat',
   await sql.unsafe({ toString: () => { throw new Error('wat') } }).catch((e) => e.message)
 ])
+
+t('Multiple hosts', {
+  timeout: 10000
+}, async() => {
+  const sql = postgres('postgres://localhost:5432,localhost:5433')
+
+  const a = (await sql`show data_directory`)[0].data_directory
+
+  cp.execSync('pg_ctl stop -D "' + a + '"')
+
+  const b = (await sql`show data_directory`)[0].data_directory
+
+  cp.execSync('pg_ctl start -D "' + a + '" -w -l "' + a + '/postgresql.log"')
+  cp.execSync('pg_ctl stop -D "' + b + '"')
+
+  await sql`select 1 as x`
+
+  cp.execSync('pg_ctl start -o "-p 5433" -D "' + b + '" -w -l "' + b + '/postgresql.log"')
+
+  return [1, 1]
+})
