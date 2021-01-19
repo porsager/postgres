@@ -9,10 +9,13 @@ let promise = Promise.resolve()
 const tests = {}
 
 module.exports.not = () => ignored++
-module.exports.t = (...rest) => test(false, ...rest)
 module.exports.ot = (...rest) => (only = true, test(true, ...rest))
 
-async function test(o, name, fn) {
+const t = module.exports.t = (...rest) => test(false, ...rest)
+t.timeout = 500
+
+async function test(o, name, options, fn) {
+  typeof options !== 'object' && (fn = options, options = {})
   const line = new Error().stack.split('\n')[3].split(':')[1]
   await 1
 
@@ -21,7 +24,7 @@ async function test(o, name, fn) {
 
   tests[line] = { fn, line, name }
   promise = promise.then(() => Promise.race([
-    new Promise((resolve, reject) => fn.timer = setTimeout(() => reject('Timed out'), 500)),
+    new Promise((resolve, reject) => fn.timer = setTimeout(() => reject('Timed out'), options.timeout || t.timeout)),
     fn()
   ]))
     .then((x) => {
