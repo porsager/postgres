@@ -53,13 +53,15 @@ t('Connects with no options', async() => {
   return [1, result]
 })
 
-t('Uses default database without slash', async() =>
-  ['postgres', postgres('postgres://localhost').options.database]
-)
+t('Uses default database without slash', async() => {
+  const sql = postgres('postgres://localhost')
+  return [sql.options.user, sql.options.database]
+})
 
-t('Uses default database with slash', async() =>
-  ['postgres', postgres('postgres://localhost/').options.database]
-)
+t('Uses default database with slash', async() => {
+  const sql = postgres('postgres://localhost/')
+  return [sql.options.user, sql.options.database]
+})
 
 t('Result is array', async() =>
   [true, Array.isArray(await sql`select 1`)]
