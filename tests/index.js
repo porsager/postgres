@@ -613,6 +613,22 @@ t('listen after unlisten', async() => {
   return ['ac', xs.join('')]
 })
 
+t('multiple listeners and unlisten one', async() => {
+  const listener = postgres(options)
+      , xs = []
+
+  await listener.listen('test', x => xs.push(x))
+  const s2 = await listener.listen('test', x => xs.push(x))
+  await listener.notify('test', 'a')
+  await delay(50)
+  await s2.unlisten()
+  await listener.notify('test', 'b')
+  await delay(50)
+  listener.end();
+
+  return ['aab', xs.join('')]
+})
+
 t('responds with server parameters (application_name)', async() =>
   ['postgres.js', await new Promise((resolve, reject) => postgres({
     ...options,
