@@ -295,8 +295,8 @@ declare namespace postgres {
 
   interface PendingRequest extends Promise<[] & ResultMeta<null>> { }
 
-  interface ListenRequest extends Promise<[] & ListenMeta> { }
-  interface ListenMeta extends ResultMeta<null>{
+  interface ListenRequest extends Promise<ListenMeta> { }
+  interface ListenMeta extends ResultMeta<null> {
     unlisten(): Promise<void>
   }
 

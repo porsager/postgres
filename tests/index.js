@@ -617,8 +617,8 @@ t('multiple listeners and unlisten one', async() => {
   const listener = postgres(options)
       , xs = []
 
-  await listener.listen('test', x => xs.push(x))
-  const s2 = await listener.listen('test', x => xs.push(x))
+  await listener.listen('test', x => xs.push('1', x))
+  const s2 = await listener.listen('test', x => xs.push('2', x))
   await listener.notify('test', 'a')
   await delay(50)
   await s2.unlisten()
@@ -626,7 +626,7 @@ t('multiple listeners and unlisten one', async() => {
   await delay(50)
   listener.end();
 
-  return ['aab', xs.join('')]
+  return ['1a2a1b', xs.join('')]
 })
 
 t('responds with server parameters (application_name)', async() =>
