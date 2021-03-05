@@ -1128,19 +1128,19 @@ t('Multiple hosts', {
   timeout: 10000
 }, async() => {
   const sql = postgres('postgres://localhost:5432,localhost:5433')
+      , result = []
 
   const a = (await sql`show data_directory`)[0].data_directory
-
+  result.push((await sql`select setting as x from pg_settings where name = 'port'`)[0].x)
   cp.execSync('pg_ctl stop -D "' + a + '"')
 
   const b = (await sql`show data_directory`)[0].data_directory
-
+  result.push((await sql`select setting as x from pg_settings where name = 'port'`)[0].x)
   cp.execSync('pg_ctl start -D "' + a + '" -w -l "' + a + '/postgresql.log"')
   cp.execSync('pg_ctl stop -D "' + b + '"')
 
-  await sql`select 1 as x`
-
+  result.push((await sql`select setting as x from pg_settings where name = 'port'`)[0].x)
   cp.execSync('pg_ctl start -o "-p 5433" -D "' + b + '" -w -l "' + b + '/postgresql.log"')
 
-  return [1, 1]
+  return ['5432,5433,5432', result.join(',')]
 })
