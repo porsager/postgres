@@ -1,6 +1,6 @@
 {
   "name": "postgres",
-  "version": "2.0.0-beta.3",
+  "version": "2.0.0-beta.4",
   "description": "Fastest full featured PostgreSQL client for Node.js",
   "main": "lib/index.js",
   "types": "types/index.d.ts",
