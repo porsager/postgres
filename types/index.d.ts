@@ -295,6 +295,11 @@ declare namespace postgres {
 
   interface PendingRequest extends Promise<[] & ResultMeta<null>> { }
 
+  interface ListenRequest extends Promise<ListenMeta> { }
+  interface ListenMeta extends ResultMeta<null> {
+    unlisten(): Promise<void>
+  }
+
   interface Helper<T, U extends any[] = T[]> {
     first: T;
     rest: U;
@@ -336,7 +341,7 @@ declare namespace postgres {
     file<T extends any[] = Row[]>(path: string, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
     file<T extends any[] = Row[]>(path: string, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
     json(value: any): Parameter;
-    listen(channel: string, cb: (value?: string) => void): PendingRequest;
+    listen(channel: string, cb: (value?: string) => void): ListenRequest;
     notify(channel: string, payload: string): PendingRequest;
     options: ParsedOptions<TTypes>;
     parameters: ConnectionParameters;

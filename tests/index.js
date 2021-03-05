@@ -580,6 +580,55 @@ t('listen reconnects', async() => {
   return ['ab', xs.join('')]
 })
 
+t('unlisten removes subscription', async() => {
+  const listener = postgres(options)
+      , xs = []
+
+  const { unlisten } = await listener.listen('test', x => xs.push(x))
+  await listener.notify('test', 'a')
+  await delay(50)
+  await unlisten()
+  await listener.notify('test', 'b')
+  await delay(50)
+  listener.end()
+
+  return ['a', xs.join('')]
+})
+
+t('listen after unlisten', async() => {
+  const listener = postgres(options)
+      , xs = []
+
+  const { unlisten } = await listener.listen('test', x => xs.push(x))
+  await listener.notify('test', 'a')
+  await delay(50)
+  await unlisten()
+  await listener.notify('test', 'b')
+  await delay(50)
+  await listener.listen('test', x => xs.push(x))
+  await listener.notify('test', 'c')
+  await delay(50)
+  listener.end();
+
+  return ['ac', xs.join('')]
+})
+
+t('multiple listeners and unlisten one', async() => {
+  const listener = postgres(options)
+      , xs = []
+
+  await listener.listen('test', x => xs.push('1', x))
+  const s2 = await listener.listen('test', x => xs.push('2', x))
+  await listener.notify('test', 'a')
+  await delay(50)
+  await s2.unlisten()
+  await listener.notify('test', 'b')
+  await delay(50)
+  listener.end();
+
+  return ['1a2a1b', xs.join('')]
+})
+
 t('responds with server parameters (application_name)', async() =>
   ['postgres.js', await new Promise((resolve, reject) => postgres({
     ...options,
