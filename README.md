@@ -45,8 +45,8 @@ You can use either a `postgres://` url connection string or the options to defin
 
 ```js
 const sql = postgres('postgres://username:password@host:port/database', {
-  host            : '',         // Postgres ip address or domain name
-  port            : 5432,       // Postgres server port
+  host            : '',         // Postgres ip address[s] or domain name[s]
+  port            : 5432,       // Postgres server port[s]
   path            : '',         // unix socket path (usually '/tmp')
   database        : '',         // Name of database to connect to
   username        : '',         // Username of database user
@@ -68,9 +68,14 @@ const sql = postgres('postgres://username:password@host:port/database', {
   connection      : {
     application_name  : 'postgres.js', // Default application_name
     ...                                // Other connection parameters
-  }
+  },
+  target_session_attrs : null   // Use 'read-write' with multiple hosts to 
+                                // ensure only connecting to primary
 })
 ```
+
+### SSL
+More info for the `ssl` option can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options).
 
 Although it is [vulnerable to MITM attacks](https://security.stackexchange.com/a/229297/174913), a common configuration for the `ssl` option for some cloud providers like Heroku is to set `rejectUnauthorized` to `false` (if `NODE_ENV` is `production`):
 
@@ -83,23 +88,31 @@ const sql =
     : postgres();
 ```
 
-More info for the `ssl` option can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options).
+### Multi host connections - High Availability (HA)
+
+Connection uri strings with multiple hosts works like in [`psql multiple host uris`](https://www.postgresql.org/docs/13/libpq-connect.html#LIBPQ-MULTIPLE-HOSTS)
+
+Connecting to the specified hosts/ports will be tried in order, and on a successfull connection retries will be reset. This ensures that hosts can come up and down seamless to your application.
+
+If you specify `target_session_attrs: 'read-write'` or `PGTARGETSESSIONATTRS=read-write` Postgres.js will only connect to a writeable host allowing for zero down time failovers.
 
 ### Environment Variables for Options
 
-It is also possible to connect to the database without a connection string or options, which will read the options from the environment variables in the table below:
+It is also possible to connect to the database without a connection string or any options. Postgres.js will fall back to the common environment variables used by `psql` as in the table below:
 
 ```js
 const sql = postgres()
 ```
 
-| Option     | Environment Variables    |
-| ---------- | ------------------------ |
-| `host`     | `PGHOST`                 |
-| `port`     | `PGPORT`                 |
-| `database` | `PGDATABASE`             |
-| `username` | `PGUSERNAME` or `PGUSER` |
-| `password` | `PGPASSWORD`             |
+| Option            | Environment Variables    |
+| ----------------- | ------------------------ |
+| `host`            | `PGHOST`                 |
+| `port`            | `PGPORT`                 |
+| `database`        | `PGDATABASE`             |
+| `username`        | `PGUSERNAME` or `PGUSER` |
+| `password`        | `PGPASSWORD`             |
+| `idle_timeout`    | `PGIDLE_TIMEOUT`         |
+' `connect_timeout` | `PGCONNECT_TIMEOUT`      |
 
 ## Query ```sql` ` -> Promise```
 
