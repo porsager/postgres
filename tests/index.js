@@ -53,15 +53,6 @@ t('Connects with no options', async() => {
   return [1, result]
 })
 
-not('Insert array of int', async() => {
-  await sql`create table test (x int[])`
-
-  return [
-    (await sql`insert into test (x) values (${ sql.array([1, 2, 3]) }) returning x`)[0].x.join(''),
-    '123'
-  ]
-})
-
 t('Uses default database without slash', async() => {
   const sql = postgres('postgres://localhost')
   return [sql.options.user, sql.options.database]
