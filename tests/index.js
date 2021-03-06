@@ -608,7 +608,7 @@ t('listen after unlisten', async() => {
   await listener.listen('test', x => xs.push(x))
   await listener.notify('test', 'c')
   await delay(50)
-  listener.end();
+  listener.end()
 
   return ['ac', xs.join('')]
 })
@@ -624,7 +624,7 @@ t('multiple listeners and unlisten one', async() => {
   await s2.unlisten()
   await listener.notify('test', 'b')
   await delay(50)
-  listener.end();
+  listener.end()
 
   return ['1a2a1b', xs.join('')]
 })
