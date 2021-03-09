@@ -1,5 +1,7 @@
 /* eslint no-console: 0 */
 
+require('./bootstrap.js')
+
 const { t, not, ot } = require('./test.js') // eslint-disable-line
 const cp = require('child_process')
 const path = require('path')
@@ -11,11 +13,6 @@ const delay = ms => new Promise(r => setTimeout(r, ms))
 
 const login = {
   user: 'postgres_js_test'
-}
-
-const login_clear = {
-  user: 'postgres_js_test_clear',
-  pass: 'postgres_js_test_clear'
 }
 
 const login_md5 = {
@@ -36,11 +33,6 @@ const options = {
   debug: false,
   max: 1
 }
-
-cp.execSync('dropdb ' + options.db + ';createdb ' + options.db)
-;[login, login_clear, login_md5, login_scram].forEach(x =>
-  cp.execSync('psql -c "grant all on database ' + options.db + ' to ' + x.user + '"')
-)
 
 const sql = postgres(options)
 
@@ -303,12 +295,33 @@ t('Connect using SSL', async() =>
   }))]
 )
 
-t('Login without password', async() => {
-  return [true, (await postgres({ ...options, ...login })`select true as x`)[0].x]
+t('Connect using SSL require', async() =>
+  [true, (await new Promise((resolve, reject) => {
+    postgres({
+      ssl: 'require',
+      idle_timeout: options.idle_timeout
+    })`select 1`.then(() => resolve(true), reject)
+  }))]
+)
+
+t('Connect using SSL prefer', async() => {
+  cp.execSync('psql -c "alter system set ssl=off"')
+  cp.execSync('psql -c "select pg_reload_conf()"')
+
+  const sql = postgres({
+    ssl: 'prefer',
+    idle_timeout: options.idle_timeout
+  })
+
+  return [
+    1, (await sql`select 1 as x`)[0].x,
+    cp.execSync('psql -c "alter system set ssl=on"'),
+    cp.execSync('psql -c "select pg_reload_conf()"')
+  ]
 })
 
-t('Login using cleartext', async() => {
-  return [true, (await postgres({ ...options, ...login_clear })`select true as x`)[0].x]
+t('Login without password', async() => {
+  return [true, (await postgres({ ...options, ...login })`select true as x`)[0].x]
 })
 
 t('Login using MD5', async() => {
@@ -608,7 +621,7 @@ t('listen after unlisten', async() => {
   await listener.listen('test', x => xs.push(x))
   await listener.notify('test', 'c')
   await delay(50)
-  listener.end();
+  listener.end()
 
   return ['ac', xs.join('')]
 })
@@ -624,7 +637,7 @@ t('multiple listeners and unlisten one', async() => {
   await s2.unlisten()
   await listener.notify('test', 'b')
   await delay(50)
-  listener.end();
+  listener.end()
 
   return ['1a2a1b', xs.join('')]
 })
