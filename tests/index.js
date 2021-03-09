@@ -3,6 +3,7 @@
 require('./bootstrap.js')
 
 const { t, not, ot } = require('./test.js') // eslint-disable-line
+const cp = require('child_process')
 const path = require('path')
 const net = require('net')
 
@@ -293,6 +294,31 @@ t('Connect using SSL', async() =>
     })`select 1`.then(() => resolve(true), reject)
   }))]
 )
+
+t('Connect using SSL require', async() =>
+  [true, (await new Promise((resolve, reject) => {
+    postgres({
+      ssl: 'require',
+      idle_timeout: options.idle_timeout
+    })`select 1`.then(() => resolve(true), reject)
+  }))]
+)
+
+t('Connect using SSL prefer', async() => {
+  cp.execSync('psql -c "alter system set ssl=off"')
+  cp.execSync('psql -c "select pg_reload_conf()"')
+
+  const sql = postgres({
+    ssl: 'prefer',
+    idle_timeout: options.idle_timeout
+  })
+
+  return [
+    1, (await sql`select 1 as x`)[0].x,
+    cp.execSync('psql -c "alter system set ssl=on"'),
+    cp.execSync('psql -c "select pg_reload_conf()"')
+  ]
+})
 
 t('Login without password', async() => {
   return [true, (await postgres({ ...options, ...login })`select true as x`)[0].x]

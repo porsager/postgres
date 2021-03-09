@@ -51,7 +51,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   database        : '',         // Name of database to connect to
   username        : '',         // Username of database user
   password        : '',         // Password of database user
-  ssl             : false,      // True, or options for tls.connect
+  ssl             : false,      // true, prefer, require, tls.connect options
   max             : 10,         // Max number of connections
   idle_timeout    : 0,          // Idle connection timeout in seconds
   connect_timeout : 30,         // Connect timeout in seconds
