@@ -1,7 +1,8 @@
 /* eslint no-console: 0 */
 
+require('./bootstrap.js')
+
 const { t, not, ot } = require('./test.js') // eslint-disable-line
-const cp = require('child_process')
 const path = require('path')
 const net = require('net')
 
@@ -31,11 +32,6 @@ const options = {
   debug: false,
   max: 1
 }
-
-cp.execSync('dropdb ' + options.db + ';createdb ' + options.db)
-;[login, login_clear, login_md5, login_scram].forEach(x =>
-  cp.execSync('psql -c "grant all on database ' + options.db + ' to ' + x.user + '"')
-)
 
 const sql = postgres(options)
 
