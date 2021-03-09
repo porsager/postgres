@@ -593,6 +593,20 @@ t('listen reconnects', async() => {
   return ['ab', xs.join('')]
 })
 
+t('listen result reports correct connection state after reconnection', async() => {
+  const listener = postgres(options)
+      , xs = []
+
+  const result = await listener.listen('test', x => xs.push(x))
+  const initialPid = result.state.pid
+  await sql.notify('test', 'a')
+  await sql`select pg_terminate_backend(${ initialPid }::int)`
+  await delay(50)
+  listener.end()
+
+  return [result.state.pid, initialPid]
+})
+
 t('unlisten removes subscription', async() => {
   const listener = postgres(options)
       , xs = []
