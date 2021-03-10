@@ -604,7 +604,7 @@ t('listen result reports correct connection state after reconnection', async() =
   await delay(50)
   listener.end()
 
-  return [result.state.pid, initialPid]
+  return [result.state.pid !== initialPid, true]
 })
 
 t('unlisten removes subscription', async() => {
