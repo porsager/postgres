@@ -17,15 +17,15 @@ declare function postgres<T extends JSToPostgresTypeMap>(url: string, options?: 
  */
 interface BaseOptions<T extends JSToPostgresTypeMap> {
   /** Postgres ip address or domain name */
-  host: string;
+  host: string | string[];
   /** Postgres server port */
-  port: number;
+  port: number | number[];
   /** Name of database to connect to */
   database: string;
   /** Username of database user */
-  username: string;
+  user: string;
   /** True; or options for tls.connect */
-  ssl: boolean | object;
+  ssl: 'require' | 'prefer' | boolean | object;
   /** Max number of connections */
   max: number;
   /** Idle connection timeout in seconds */
@@ -34,6 +34,8 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
   connect_timeout: number;
   /** Array of custom types; see more below */
   types: PostgresTypeList<T>;
+  /** Disable prepared mode */
+  no_prepare: boolean;
   /** Defaults to console.log */
   onnotice: (notice: postgres.Notice) => void;
   /** (key; value) when server param change */
@@ -117,7 +119,7 @@ declare namespace postgres {
    */
   function toKebab(str: string): string;
 
-  const BigInt: PostgresType<(number: BigInt) => string>;
+  const BigInt: PostgresType<(number: bigint) => string>;
 
   interface ConnectionParameters {
     /** Default application_name */
@@ -127,6 +129,10 @@ declare namespace postgres {
   }
 
   interface Options<T extends JSToPostgresTypeMap> extends Partial<BaseOptions<T>> {
+    /** @inheritdoc */
+    host?: string;
+    /** @inheritdoc */
+    port?: number;
     /** unix socket path (usually '/tmp') */
     path?: string | (() => string);
     /** Password of database user (an alias for `password`) */
@@ -136,12 +142,16 @@ declare namespace postgres {
     /** Name of database to connect to (an alias for `database`) */
     db?: Options<T>['database'];
     /** Username of database user (an alias for `username`) */
-    user?: Options<T>['username'];
+    username?: Options<T>['user'];
     /** Postgres ip address or domain name (an alias for `host`) */
     hostname?: Options<T>['host'];
   }
 
   interface ParsedOptions<T extends JSToPostgresTypeMap> extends BaseOptions<T> {
+    /** @inheritdoc */
+    host: string[];
+    /** @inheritdoc */
+    port: number[];
     /** @inheritdoc */
     pass: null;
     serializers: { [oid: number]: T[keyof T] };
