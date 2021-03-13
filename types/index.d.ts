@@ -233,7 +233,7 @@ declare namespace postgres {
     | number
     | string
     | Date
-    | Buffer;
+    | Uint8Array;
 
   type SerializableParameter = Serializable
     | Helper<any>
@@ -242,6 +242,14 @@ declare namespace postgres {
     | SerializableParameter[];
 
   type HelperSerializable = { [index: string]: SerializableParameter } | { [index: string]: SerializableParameter }[];
+
+  type SerializableKeys<T> = (keyof T) extends infer R
+    ? R extends keyof T
+    ? T[R] extends SerializableParameter
+    ? R
+    : never
+    : keyof T
+    : keyof T;
 
   interface Row {
     [column: string]: any;
@@ -257,7 +265,7 @@ declare namespace postgres {
     ? { '?column?': T; }
     : T;
 
-    type AsRowList<T extends any[]> = { [k in keyof T]: TransformRow<T[k]> };
+  type AsRowList<T extends readonly any[]> = { [k in keyof T]: TransformRow<T[k]> };
 
   interface Column<T extends string> {
     name: T;
@@ -283,14 +291,14 @@ declare namespace postgres {
     columns: ColumnList<U>;
   }
 
-  type ExecutionResult<T> = [] & ResultQueryMeta<number, T>;
+  type ExecutionResult<T> = [] & ResultQueryMeta<number, keyof NonNullable<T>>;
   type RowList<T extends MaybeRow[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
 
   interface PendingQuery<TRow extends MaybeRow[]> extends Promise<RowList<TRow>> {
-    stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<NonNullable<TRow[number]>>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
-    cursor(cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
-    cursor(size: 1, cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
-    cursor(size: number, cb: (rows: NonNullable<TRow[number]>[]) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
+    stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(size: 1, cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(size: number, cb: (rows: NonNullable<TRow[number]>[]) => void): Promise<ExecutionResult<TRow[number]>>;
   }
 
   interface PendingRequest extends Promise<[] & ResultMeta<null>> { }
@@ -329,7 +337,7 @@ declare namespace postgres {
      * @param keys Keys to extract from the object or from objets inside the array
      * @returns A formated representation of the parameter
      */
-    <T extends HelperSerializable, U extends (keyof (T extends any[] ? T[number] : T))[]>(objOrArray: T, ...keys: U): Helper<T, U>;
+    <T extends object | readonly object[], U extends SerializableKeys<T extends readonly object[] ? T[number] : T>>(objOrArray: T, ...keys: U[]): Helper<T, U[]>;
 
     END: {}; // FIXME unique symbol ?
     PostgresError: typeof PostgresError;
