@@ -283,6 +283,11 @@ declare namespace postgres {
     columns: ColumnList<U>;
   }
 
+  interface DescribeResult {
+    params: number[]
+    columns: ColumnList<string>
+  }
+
   type ExecutionResult<T> = [] & ResultQueryMeta<number, T>;
   type RowList<T extends MaybeRow[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
 
@@ -335,6 +340,7 @@ declare namespace postgres {
     PostgresError: typeof PostgresError;
 
     array<T extends SerializableParameter[] = SerializableParameter[]>(value: T): ArrayParameter<T>;
+    describe(stmt: string): Promise<DescribeResult>
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     end(options?: { timeout?: number }): Promise<void>;
