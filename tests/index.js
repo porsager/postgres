@@ -578,6 +578,13 @@ t('listen and notify with weird name', async() => {
   )]
 })
 
+t('listen and notify with upper case', async() =>
+  ['works', await new Promise(async resolve => {
+    await sql.listen('withUpperChar', resolve)
+    sql.notify('withUpperChar', 'works')
+  })]
+)
+
 t('listen reconnects', async() => {
   const listener = postgres(options)
       , xs = []
@@ -729,6 +736,18 @@ t('sql().finally throws not tagged error', async() => {
     error = e.code
   }
   return ['NOT_TAGGED_CALL', error]
+})
+
+t('little bobby tables', async() => {
+  const name = 'Robert\'); DROP TABLE students;--'
+
+  await sql`create table students (name text, age int)`
+  await sql`insert into students (name) values (${ name })`
+
+  return [
+    name, (await sql`select name from students`)[0].name,
+    await sql`drop table students`
+  ]
 })
 
 t('dynamic column name', async() => {
