@@ -585,6 +585,10 @@ Any query which was already sent over the wire will be rejected if the connectio
 
 There are no guarantees about queries executing in order unless using a transaction with `sql.begin()` or setting `max: 1`. Of course doing a series of queries, one awaiting the other will work as expected, but that's just due to the nature of js async/promise handling, so it's not necessary for this library to be concerned with ordering.
 
+### Idle timeout
+
+Connections will by default not close until `.end()` is called, but often it is useful to have them close when there is no activity or if using Postgres.js in eg. Lamdas. This can be done using the `idle_timeout` option to specify the amount of seconds to wait before automatically closing an idle connection.
+
 ## Prepared statements
 
 Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `no_prepare` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93).
