@@ -17,15 +17,15 @@ declare function postgres<T extends JSToPostgresTypeMap>(url: string, options?: 
  */
 interface BaseOptions<T extends JSToPostgresTypeMap> {
   /** Postgres ip address or domain name */
-  host: string;
+  host: string | string[];
   /** Postgres server port */
-  port: number;
+  port: number | number[];
   /** Name of database to connect to */
   database: string;
   /** Username of database user */
-  username: string;
+  user: string;
   /** True; or options for tls.connect */
-  ssl: boolean | object;
+  ssl: 'require' | 'prefer' | boolean | object;
   /** Max number of connections */
   max: number;
   /** Idle connection timeout in seconds */
@@ -34,6 +34,8 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
   connect_timeout: number;
   /** Array of custom types; see more below */
   types: PostgresTypeList<T>;
+  /** Disable prepared mode */
+  no_prepare: boolean;
   /** Defaults to console.log */
   onnotice: (notice: postgres.Notice) => void;
   /** (key; value) when server param change */
@@ -117,7 +119,7 @@ declare namespace postgres {
    */
   function toKebab(str: string): string;
 
-  const BigInt: PostgresType<(number: BigInt) => string>;
+  const BigInt: PostgresType<(number: bigint) => string>;
 
   interface ConnectionParameters {
     /** Default application_name */
@@ -127,6 +129,10 @@ declare namespace postgres {
   }
 
   interface Options<T extends JSToPostgresTypeMap> extends Partial<BaseOptions<T>> {
+    /** @inheritdoc */
+    host?: string;
+    /** @inheritdoc */
+    port?: number;
     /** unix socket path (usually '/tmp') */
     path?: string | (() => string);
     /** Password of database user (an alias for `password`) */
@@ -136,12 +142,16 @@ declare namespace postgres {
     /** Name of database to connect to (an alias for `database`) */
     db?: Options<T>['database'];
     /** Username of database user (an alias for `username`) */
-    user?: Options<T>['username'];
+    username?: Options<T>['user'];
     /** Postgres ip address or domain name (an alias for `host`) */
     hostname?: Options<T>['host'];
   }
 
   interface ParsedOptions<T extends JSToPostgresTypeMap> extends BaseOptions<T> {
+    /** @inheritdoc */
+    host: string[];
+    /** @inheritdoc */
+    port: number[];
     /** @inheritdoc */
     pass: null;
     serializers: { [oid: number]: T[keyof T] };
@@ -233,7 +243,7 @@ declare namespace postgres {
     | number
     | string
     | Date
-    | Buffer;
+    | Uint8Array;
 
   type SerializableParameter = Serializable
     | Helper<any>
@@ -242,6 +252,14 @@ declare namespace postgres {
     | SerializableParameter[];
 
   type HelperSerializable = { [index: string]: SerializableParameter } | { [index: string]: SerializableParameter }[];
+
+  type SerializableKeys<T> = (keyof T) extends infer R
+    ? R extends keyof T
+    ? T[R] extends SerializableParameter
+    ? R
+    : never
+    : keyof T
+    : keyof T;
 
   interface Row {
     [column: string]: any;
@@ -257,7 +275,7 @@ declare namespace postgres {
     ? { '?column?': T; }
     : T;
 
-    type AsRowList<T extends any[]> = { [k in keyof T]: TransformRow<T[k]> };
+  type AsRowList<T extends readonly any[]> = { [k in keyof T]: TransformRow<T[k]> };
 
   interface Column<T extends string> {
     name: T;
@@ -283,14 +301,14 @@ declare namespace postgres {
     columns: ColumnList<U>;
   }
 
-  type ExecutionResult<T> = [] & ResultQueryMeta<number, T>;
+  type ExecutionResult<T> = [] & ResultQueryMeta<number, keyof NonNullable<T>>;
   type RowList<T extends MaybeRow[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
 
   interface PendingQuery<TRow extends MaybeRow[]> extends Promise<RowList<TRow>> {
-    stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<NonNullable<TRow[number]>>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
-    cursor(cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
-    cursor(size: 1, cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
-    cursor(size: number, cb: (rows: NonNullable<TRow[number]>[]) => void): Promise<ExecutionResult<keyof NonNullable<TRow[number]>>>;
+    stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(size: 1, cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(size: number, cb: (rows: NonNullable<TRow[number]>[]) => void): Promise<ExecutionResult<TRow[number]>>;
   }
 
   interface PendingRequest extends Promise<[] & ResultMeta<null>> { }
@@ -329,7 +347,7 @@ declare namespace postgres {
      * @param keys Keys to extract from the object or from objets inside the array
      * @returns A formated representation of the parameter
      */
-    <T extends HelperSerializable, U extends (keyof (T extends any[] ? T[number] : T))[]>(objOrArray: T, ...keys: U): Helper<T, U>;
+    <T extends object | readonly object[], U extends SerializableKeys<T extends readonly object[] ? T[number] : T>>(objOrArray: T, ...keys: U[]): Helper<T, U[]>;
 
     END: {}; // FIXME unique symbol ?
     PostgresError: typeof PostgresError;
