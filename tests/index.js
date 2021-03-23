@@ -1421,6 +1421,7 @@ t('Copy from works in transaction', async() => {
 })
 
 t('Copy from abort works', async() => {
+  const sql = postgres(options)
   const controller = new AbortController()
   const readable = fs.createReadStream('copy.csv')
 
@@ -1438,5 +1439,32 @@ t('Copy from abort works', async() => {
   controller.abort()
   await sql.end()
 
-  return [aborted, true]
+  return [
+    aborted,
+    true,
+    await postgres(options)`drop table test`
+  ]
+})
+
+t('Recreate prepared statements on transformAssignedExpr error', async() => {
+  const insert = () => sql`insert into test (name) values (${ '1' }) returning name`
+  await sql`create table test (name text)`
+  await insert()
+  await sql`alter table test alter column name type int using name::integer`
+  return [
+    1, (await insert())[0].name,
+    await sql`drop table test`
+  ]
+})
+
+t('Recreate prepared statements on RevalidateCachedQuery error', async() => {
+  const select = () => sql`select name from test`
+  await sql`create table test (name text)`
+  await sql`insert into test values ('1')`
+  await select()
+  await sql`alter table test alter column name type int using name::integer`
+  return [
+    1, (await select())[0].name,
+    await sql`drop table test`
+  ]
 })
