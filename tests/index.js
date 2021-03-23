@@ -1232,7 +1232,7 @@ t('Catches query format errors', async() => [
 t('Multiple hosts', {
   timeout: 10000
 }, async() => {
-  const sql = postgres('postgres://localhost:5432,localhost:5433')
+  const sql = postgres('postgres://localhost:5432,localhost:5433', { idle_timeout: options.idle_timeout })
       , result = []
 
   const a = (await sql`show data_directory`)[0].data_directory
