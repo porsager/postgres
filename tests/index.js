@@ -10,11 +10,6 @@ const login = {
   user: 'postgres_js_test'
 }
 
-const login_clear = {
-  user: 'postgres_js_test_clear',
-  pass: 'postgres_js_test_clear'
-}
-
 const login_md5 = {
   user: 'postgres_js_test_md5',
   pass: 'postgres_js_test_md5'
@@ -34,7 +29,7 @@ const options = {
 }
 
 cp.execSync('dropdb ' + options.db + ';createdb ' + options.db)
-;[login, login_clear, login_md5, login_scram].forEach(x =>
+;[login, login_md5, login_scram].forEach(x =>
   cp.execSync('psql -c "grant all on database ' + options.db + ' to ' + x.user + '"')
 )
 
@@ -289,10 +284,6 @@ t('Connect using SSL', async() =>
 
 t('Login without password', async() => {
   return [true, (await postgres({ ...options, ...login })`select true as x`)[0].x]
-})
-
-t('Login using cleartext', async() => {
-  return [true, (await postgres({ ...options, ...login_clear })`select true as x`)[0].x]
 })
 
 t('Login using MD5', async() => {
