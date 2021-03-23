@@ -750,6 +750,25 @@ t('little bobby tables', async() => {
   ]
 })
 
+t('Connection errors are caught using begin()', {
+  timeout: 20000
+}, async() => {
+  let error
+  try {
+    const sql = postgres({ host: 'wat' })
+
+    await sql.begin(async(sql) => {
+      await sql`insert into test (label, value) values (${1}, ${2})`
+    })
+
+    await sql.end()
+  } catch (err) {
+    error = err
+  }
+
+  return ['ENOTFOUND', error.code]
+})
+
 t('dynamic column name', async() => {
   return ['!not_valid', Object.keys((await sql`select 1 as ${ sql('!not_valid') }`)[0])[0]]
 })
