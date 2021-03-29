@@ -1075,9 +1075,14 @@ t('Error contains query string', async() => [
   (await sql`selec 1`.catch(err => err.query))
 ])
 
-t('Error contains query parameters', async() => [
+t('Error contains query serialized parameters', async() => [
   '1',
   (await sql`selec ${ 1 }`.catch(err => err.parameters[0].value))
+])
+
+t('Error contains query raw parameters', async() => [
+  1,
+  (await sql`selec ${ 1 }`.catch(err => err.parameters[0].raw))
 ])
 
 t('Query string is not enumerable', async() => {
