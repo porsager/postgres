@@ -606,7 +606,7 @@ For example, to close idle connections after 2 seconds:
 
 ```js
 const sql = postgres({
-  timeout: 2
+  idle_timeout: 2
 })
 ```
 
