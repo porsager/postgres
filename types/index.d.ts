@@ -177,11 +177,11 @@ declare namespace postgres {
     /**
      * Serialized value
      */
-    value: string;
+    value: string | null;
     /**
      * Raw value to serialize
      */
-    raw: T;
+    raw: T | null;
   }
 
   interface ArrayParameter<T extends SerializableParameter[] = SerializableParameter[]> extends Parameter<T | T[]> {
