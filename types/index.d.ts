@@ -34,8 +34,16 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
   connect_timeout: number;
   /** Array of custom types; see more below */
   types: PostgresTypeList<T>;
-  /** Disable prepared mode */
+  /**
+   * Disable prepared mode
+   * @deprecated use "prepare" option instead
+   */
   no_prepare: boolean;
+  /**
+   * Enables prepare mode.
+   * @default true
+   */
+  prepare: boolean;
   /** Defaults to console.log */
   onnotice: (notice: postgres.Notice) => void;
   /** (key; value) when server param change */
@@ -372,7 +380,7 @@ declare namespace postgres {
       ? (...args: Parameters<TTypes[name]>) => postgres.Parameter<ReturnType<TTypes[name]>>
       : (...args: any) => postgres.Parameter<any>;
     };
-    unsafe<T extends any[] = Row[]>(query: string, parameters?: SerializableParameter[]): PendingQuery<AsRowList<T>>;
+    unsafe<T extends any[] = Row[]>(query: string, parameters?: SerializableParameter[], queryOptions?: UnsafeQueryOptions): PendingQuery<AsRowList<T>>;
   }
 
   interface TransactionSql<TTypes extends JSToPostgresTypeMap> extends Sql<TTypes> {
@@ -380,6 +388,14 @@ declare namespace postgres {
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
   }
 
+}
+
+interface UnsafeQueryOptions {
+  /**
+   * When executes query as prepared statement.
+   * @default false
+   */
+  prepare?: boolean;
 }
 
 export = postgres;
