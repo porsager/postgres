@@ -1204,9 +1204,33 @@ t('Automatically creates prepared statements', async() => {
   return [result[0].statement, 'select * from pg_prepared_statements']
 })
 
-t('no_prepare: true disables prepared transactions', async() => {
+t('no_prepare: true disables prepared transactions (deprecated)', async() => {
   const sql = postgres({ ...options, no_prepare: true })
   const result = await sql`select * from pg_prepared_statements`
+  return [0, result.count]
+})
+
+t('prepare: false disables prepared transactions', async() => {
+  const sql = postgres({ ...options, prepare: false })
+  const result = await sql`select * from pg_prepared_statements`
+  return [0, result.count]
+})
+
+t('prepare: true enables prepared transactions', async() => {
+  const sql = postgres({ ...options, prepare: true })
+  const result = await sql`select * from pg_prepared_statements`
+  return [result[0].statement, 'select * from pg_prepared_statements']
+})
+
+t('prepares unsafe query when "prepare" option is true', async() => {
+  const sql = postgres({ ...options, prepare: true })
+  const result = await sql.unsafe('select * from pg_prepared_statements where name <> $1', ["bla"], { prepare: true })
+  return [result[0].statement, 'select * from pg_prepared_statements where name <> $1']
+})
+
+t('does not prepare unsafe query by default', async() => {
+  const sql = postgres({ ...options, prepare: true });
+  const result = await sql.unsafe('select * from pg_prepared_statements where name <> $1', ["bla"])
   return [0, result.count]
 })
 
