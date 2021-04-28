@@ -600,7 +600,13 @@ There are no guarantees about queries executing in order unless using a transact
 
 ### Idle timeout
 
-Connections will by default not close until `.end()` is called, but often it is useful to have them close when there is no activity or if using Postgres.js in eg. Lamdas / Serverless environments. This can be done using the `idle_timeout` option to specify the amount of seconds to wait before automatically closing an idle connection.
+By default, connections will not close until `.end()` is called. However, it may be useful to have them close automatically when:
+
+- there is no activity for some period of time
+- if using Postgres.js in Lamdas / Serverless environments
+- if using Postgres.js with a database service that automatically closes the connection after some time (see [`ECONNRESET` issue](https://github.com/porsager/postgres/issues/179))
+
+This can be done using the `idle_timeout` option to specify the amount of seconds to wait before automatically closing an idle connection.
 
 For example, to close idle connections after 2 seconds:
 
