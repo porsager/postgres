@@ -112,7 +112,7 @@ const sql = postgres()
 | `username`        | `PGUSERNAME` or `PGUSER` |
 | `password`        | `PGPASSWORD`             |
 | `idle_timeout`    | `PGIDLE_TIMEOUT`         |
-' `connect_timeout` | `PGCONNECT_TIMEOUT`      |
+| `connect_timeout` | `PGCONNECT_TIMEOUT`      |
 
 ## Query ```sql` ` -> Promise```
 
