@@ -956,6 +956,22 @@ t('Cursor custom n works', async() => {
   return ['10,10', order.join(',')]
 })
 
+ot('Cursor custom with rest n works', async() => {
+  const order = []
+  await sql`select * from generate_series(1,20)`.cursor(11, async(x) => {
+    order.push(x.length)
+  })
+  return ['11,9', order.join(',')]
+})
+
+ot('Cursor custom with less results than batch size works', async() => {
+  const order = []
+  await sql`select * from generate_series(1,20)`.cursor(21, async(x) => {
+    order.push(x.length)
+  })
+  return ['11,9', order.join(',')]
+})
+
 t('Cursor cancel works', async() => {
   let result
   await sql`select * from generate_series(1,10) as x`.cursor(async({ x }) => {
