@@ -1278,3 +1278,15 @@ t('Multiple hosts', {
 
   return ['5432,5433,5432', result.join(',')]
 })
+
+t('Escaping supports schemas and tables', async() => {
+  await sql`create schema a`
+  await sql`create table a.b (c int)`
+  await sql`insert into a.b (c) values (1)`
+  return [
+    1,
+    (await sql`select ${ sql('a.b.c') } from a.b`)[0].c,
+    await sql`drop table a.b`,
+    await sql`drop schema a`
+  ]
+})
