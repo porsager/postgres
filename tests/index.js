@@ -969,7 +969,7 @@ t('Cursor custom with less results than batch size works', async() => {
   await sql`select * from generate_series(1,20)`.cursor(21, async(x) => {
     order.push(x.length)
   })
-  return ['20', p(order.join(','))]
+  return ['20', order.join(',')]
 })
 
 t('Cursor cancel works', async() => {
