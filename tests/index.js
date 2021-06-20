@@ -991,6 +991,11 @@ t('Cursor throw works', async() => {
   return ['1aerr', order.join('')]
 })
 
+t('Cursor throw works', async() => [
+  'err',
+  await sql`wat`.cursor(() => { /* noop */ }).catch(() => 'err')
+])
+
 t('Transform row', async() => {
   const sql = postgres({
     ...options,
@@ -1240,13 +1245,13 @@ t('prepare: true enables prepared transactions', async() => {
 
 t('prepares unsafe query when "prepare" option is true', async() => {
   const sql = postgres({ ...options, prepare: true })
-  const result = await sql.unsafe('select * from pg_prepared_statements where name <> $1', ["bla"], { prepare: true })
+  const result = await sql.unsafe('select * from pg_prepared_statements where name <> $1', ['bla'], { prepare: true })
   return [result[0].statement, 'select * from pg_prepared_statements where name <> $1']
 })
 
 t('does not prepare unsafe query by default', async() => {
-  const sql = postgres({ ...options, prepare: true });
-  const result = await sql.unsafe('select * from pg_prepared_statements where name <> $1', ["bla"])
+  const sql = postgres({ ...options, prepare: true })
+  const result = await sql.unsafe('select * from pg_prepared_statements where name <> $1', ['bla'])
   return [0, result.count]
 })
 
