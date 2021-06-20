@@ -948,6 +948,16 @@ t('Cursor works', async() => {
   return ['1a1b2a2b', order.join('')]
 })
 
+t('Unsafe cursor works', async() => {
+  const order = []
+  await sql.unsafe('select 1 as x union select 2 as x').cursor(async(x) => {
+    order.push(x.x + 'a')
+    await delay(100)
+    order.push(x.x + 'b')
+  })
+  return ['1a1b2a2b', order.join('')]
+})
+
 t('Cursor custom n works', async() => {
   const order = []
   await sql`select * from generate_series(1,20)`.cursor(10, async(x) => {
