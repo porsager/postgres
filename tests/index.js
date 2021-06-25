@@ -1371,6 +1371,23 @@ t('Copy write works', async() => {
   ]
 })
 
+t('Copy write as first works', async() => {
+  await sql`create table test (x int)`
+  const first = postgres(options)
+  const writable = first`COPY test FROM STDIN WITH(FORMAT csv, HEADER false, DELIMITER ',')`.writable();
+  writable.write('1\n')
+  writable.write('1\n')
+  writable.end()
+
+  await new Promise(r => writable.on('finish', r))
+
+  return [
+    (await sql`select 1 from test`).length,
+    2,
+    await sql`drop table test`
+  ]
+})
+
 
 t('Copy from file works', async() => {
   await sql`create table test (x int, y int, z int)`
