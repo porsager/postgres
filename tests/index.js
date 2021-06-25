@@ -472,11 +472,6 @@ t('Connection destroyed with query before', async() => {
   return ['CONNECTION_DESTROYED', await error]
 })
 
-t('Message not supported', async() => {
-  await sql`create table test (x int)`
-  return ['MESSAGE_NOT_SUPPORTED', await sql`copy test to stdout`.catch(x => x.code), await sql`drop table test`]
-})
-
 t('transform column', async() => {
   const sql = postgres({
     ...options,
@@ -925,7 +920,11 @@ t('bytea serializes and parses', async() => {
   await sql`create table test (x bytea)`
   await sql`insert into test values (${ buf })`
 
-  return [0, Buffer.compare(buf, (await sql`select x from test`)[0].x)]
+  return [
+    0,
+    Buffer.compare(buf, (await sql`select x from test`)[0].x),
+    await sql`drop table test`
+  ]
 })
 
 t('Stream works', async() => {
@@ -1335,5 +1334,68 @@ t('Raw method returns values unparsed as Buffer', async() => {
   return [
     x instanceof Buffer,
     true
+  ]
+})
+
+t('Copy read works', async() => {
+  const result = []
+
+  await sql`create table test (x int)`
+  await sql`insert into test select * from generate_series(1,10)`
+  const readable = sql`copy test to stdout`.readable()
+  readable.on('data', x => result.push(x))
+  readable.on('error', x => p('error', x))
+  await new Promise(r => readable.on('end', r))
+
+  return [
+    result.length,
+    10,
+    await sql`drop table test`
+  ]
+})
+
+t('Copy write works', async() => {
+  await sql`create table test (x int)`
+  const writable = sql`copy test from stdin`.writable()
+
+  writable.write('1\n')
+  writable.write('1\n')
+  writable.end()
+
+  await new Promise(r => writable.on('finish', r))
+
+  return [
+    (await sql`select 1 from test`).length,
+    2,
+    await sql`drop table test`
+  ]
+})
+
+
+t('Copy from file works', async() => {
+  await sql`create table test (x int, y int, z int)`
+  await new Promise(r => require('fs')
+    .createReadStream('copy.csv')
+    .pipe(sql`copy test from stdin`.writable())
+    .on('finish', r)
+  )
+
+  return [
+    JSON.stringify(await sql`select * from test`),
+    '[{"x":1,"y":2,"z":3},{"x":4,"y":5,"z":6}]',
+    await sql`drop table test`
+  ]
+})
+
+t('Copy from works in transaction', async() => {
+  await sql`create table test(x int)`
+  const xs = await sql.begin(async sql => {
+    sql`copy test from stdin`.writable().end('1\n2')
+    return sql`select 1 from test`
+  })
+
+  return [
+    xs.length,
+    2
   ]
 })
