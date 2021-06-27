@@ -6,6 +6,7 @@ const { t, not, ot } = require('./test.js') // eslint-disable-line
 const cp = require('child_process')
 const path = require('path')
 const net = require('net')
+const fs = require('fs')
 
 /** @type {import('../types')} */
 const postgres = require('../lib')
@@ -1391,7 +1392,7 @@ t('Copy write as first works', async() => {
 
 t('Copy from file works', async() => {
   await sql`create table test (x int, y int, z int)`
-  await new Promise(r => require('fs')
+  await new Promise(r => fs
     .createReadStream('copy.csv')
     .pipe(sql`copy test from stdin`.writable())
     .on('finish', r)
