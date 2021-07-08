@@ -1321,3 +1321,19 @@ t('Escaping supports schemas and tables', async() => {
     await sql`drop schema a`
   ]
 })
+
+t('Raw method returns rows as arrays', async() => {
+  const [x] = await sql`select 1`.raw()
+  return [
+    Array.isArray(x),
+    true
+  ]
+})
+
+t('Raw method returns values unparsed as Buffer', async() => {
+  const [[x]] = await sql`select 1`.raw()
+  return [
+    x instanceof Buffer,
+    true
+  ]
+})
