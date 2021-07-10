@@ -1,0 +1,41 @@
+name: Test
+
+on: push
+
+#  push:
+#    branches: [ master ]
+#  pull_request:
+#    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [14.x, 15.x]
+    
+    services:
+      postgres:
+        image: docker.pkg.github.com/akheron/packages-test/postgres-for-test:latest
+        credentials:
+          username: akheron
+          password: ${{github.token}}
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: 
+          - "5432:5432"
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Run tests
+      env:
+        PGHOST: localhost
+        PGUSER: postgres
+      run: npm test    
