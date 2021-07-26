@@ -116,7 +116,7 @@ const sql = postgres()
 
 ## Query ```sql` ` -> Promise```
 
-A query will always return a `Promise` which resolves to a results array `[...]{ rows, command }`. Destructuring is great to immediately access the first element.
+A query will always return a `Promise` which resolves to a results array `[...]{ count, command }`. Destructuring is great to immediately access the first element.
 
 ```js
 
