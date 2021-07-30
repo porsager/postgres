@@ -71,6 +71,8 @@ const sql = postgres('postgres://username:password@host:port/database', {
   },
   target_session_attrs : null   // Use 'read-write' with multiple hosts to 
                                 // ensure only connecting to primary
+  fetch_array_types    : true   // Disable automatically fetching array types
+                                // on initial connection.
 })
 ```
 
@@ -95,6 +97,14 @@ Connection uri strings with multiple hosts works like in [`psql multiple host ur
 Connecting to the specified hosts/ports will be tried in order, and on a successfull connection retries will be reset. This ensures that hosts can come up and down seamless to your application.
 
 If you specify `target_session_attrs: 'read-write'` or `PGTARGETSESSIONATTRS=read-write` Postgres.js will only connect to a writeable host allowing for zero down time failovers.
+
+### Auto fetching of array types
+
+When Postgres.js first connects to the database it automatically fetches array type information.  
+
+If you have revoked access to `pg_catalog` this feature will no longer work and will need to be disabled.  
+
+You can disable fetching array types by setting `fetch_array_types` to `false` when creating an instance.
 
 ### Environment Variables for Options
 
