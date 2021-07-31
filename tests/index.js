@@ -1326,26 +1326,26 @@ t('Connection with no lifetime', async() => {
   const sql = postgres(options)
 
   let result = await sql`select 1`
-  let startPid = result.state.pid;
+  let startPid = result.state.pid
 
   await delay(100);
 
   result = await sql`select 1`
-  let pid = result.state.pid;
+  let pid = result.state.pid
 
   return [true, pid == startPid]
 })
 
 t('Connection lifetime', async() => {
-  const sql = postgres({...options, lifetime: 0.100})
+  const sql = postgres({...options, lifetime: 0.050})
 
   let result = await sql`select 1`
-  let startPid = result.state.pid;
+  let startPid = result.state.pid
 
   await delay(100);
 
   result = await sql`select 1`
-  let pid = result.state.pid;
+  let pid = result.state.pid
 
   return [true, pid != startPid]
 })

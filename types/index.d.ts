@@ -28,6 +28,8 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
   ssl: 'require' | 'prefer' | boolean | object;
   /** Max number of connections */
   max: number;
+  /** Connection lifetime in seconds */
+  lifetime: number | undefined;
   /** Idle connection timeout in seconds */
   idle_timeout: number | undefined;
   /** Connect timeout in seconds */
