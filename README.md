@@ -126,7 +126,7 @@ const sql = postgres()
 
 ## Query ```sql` ` -> Promise```
 
-A query will always return a `Promise` which resolves to a results array `[...]{ count, command }`. Destructuring is great to immediately access the first element.
+A query will always return a `Promise` which resolves to a results array `[...]{ count, command, columns }`. Destructuring is great to immediately access the first element.
 
 ```js
 
@@ -277,6 +277,12 @@ await sql`
 })
 
 ```
+
+## Raw ```sql``.raw()```
+
+Using `.raw()` will return rows as an array with `Buffer` values for each column, instead of objects.
+
+This can be useful to receive identical named columns, or for specific performance / transformation reasons. The column definitions are still included on the result array with access to parsers for each column.
 
 ## Listen and notify
 
