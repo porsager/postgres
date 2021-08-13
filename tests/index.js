@@ -7,6 +7,7 @@ const cp = require('child_process')
 const path = require('path')
 const net = require('net')
 const fs = require('fs')
+const stream = require('stream')
 
 /** @type {import('../types')} */
 const postgres = require('../lib')
@@ -1414,6 +1415,28 @@ t('Copy from works in transaction', async() => {
 
   return [
     xs.length,
-    2
+    2,
+    await sql`drop table test`
   ]
+})
+
+t('Copy from abort works', async() => {
+  const controller = new AbortController()
+  const readable = fs.createReadStream('copy.csv')
+
+  await sql`create table test (x int, y int, z int)`
+  await sql`TRUNCATE TABLE test`
+
+  const writable = sql`COPY test FROM STDIN`.writable()
+
+  let aborted
+
+  readable
+    .pipe(stream.addAbortSignal(controller.signal, writable))
+    .on('error', () => aborted = true)
+
+  controller.abort()
+  await sql.end()
+
+  return [aborted, true]
 })
