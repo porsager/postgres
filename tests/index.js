@@ -1345,7 +1345,6 @@ t('Copy read works', async() => {
   await sql`insert into test select * from generate_series(1,10)`
   const readable = sql`copy test to stdout`.readable()
   readable.on('data', x => result.push(x))
-  readable.on('error', x => p('error', x))
   await new Promise(r => readable.on('end', r))
 
   return [
@@ -1375,7 +1374,7 @@ t('Copy write works', async() => {
 t('Copy write as first works', async() => {
   await sql`create table test (x int)`
   const first = postgres(options)
-  const writable = first`COPY test FROM STDIN WITH(FORMAT csv, HEADER false, DELIMITER ',')`.writable();
+  const writable = first`COPY test FROM STDIN WITH(FORMAT csv, HEADER false, DELIMITER ',')`.writable()
   writable.write('1\n')
   writable.write('1\n')
   writable.end()
