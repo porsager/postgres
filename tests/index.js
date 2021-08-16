@@ -1393,7 +1393,7 @@ t('Copy write as first works', async() => {
 t('Copy from file works', async() => {
   await sql`create table test (x int, y int, z int)`
   await new Promise(r => fs
-    .createReadStream('copy.csv')
+    .createReadStream(path.join(__dirname, 'copy.csv'))
     .pipe(sql`copy test from stdin`.writable())
     .on('finish', r)
   )
@@ -1421,7 +1421,7 @@ t('Copy from works in transaction', async() => {
 
 t('Copy from abort works', async() => {
   const sql = postgres(options)
-  const readable = fs.createReadStream('copy.csv')
+  const readable = fs.createReadStream(path.join(__dirname, 'copy.csv'))
 
   await sql`create table test (x int, y int, z int)`
   await sql`TRUNCATE TABLE test`
@@ -1450,7 +1450,8 @@ t('Recreate prepared statements on transformAssignedExpr error', async() => {
   await insert()
   await sql`alter table test alter column name type int using name::integer`
   return [
-    1, (await insert())[0].name,
+    1,
+    (await insert())[0].name,
     await sql`drop table test`
   ]
 })
@@ -1462,7 +1463,8 @@ t('Recreate prepared statements on RevalidateCachedQuery error', async() => {
   await select()
   await sql`alter table test alter column name type int using name::integer`
   return [
-    1, (await select())[0].name,
+    1,
+    (await select())[0].name,
     await sql`drop table test`
   ]
 })
