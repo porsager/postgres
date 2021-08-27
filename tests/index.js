@@ -1467,3 +1467,18 @@ t('Recreate prepared statements on RevalidateCachedQuery error', async() => {
     await sql`drop table test`
   ]
 })
+
+t('multiple queries before connect', async() => {
+  const sql = postgres({ ...options, max: 2 })
+  const xs = await Promise.all([
+    sql`select 1 as x`,
+    sql`select 2 as x`,
+    sql`select 3 as x`,
+    sql`select 4 as x`
+  ])
+
+  return [
+    '1,2,3,4',
+    xs.map(x => x[0].x).join()
+  ]
+})
