@@ -463,6 +463,12 @@ sql.file(path.join(__dirname, 'query.sql'), [], {
 
 ```
 
+## Realtime insert, update, delete `subscribe(pattern, fn)`
+
+Postgres.js implements the logical replication protocol of PostgreSQL to support subscription to realtime information about `insert`, `update` and `delete` operations.
+
+
+
 ## Transactions
 
 
@@ -532,6 +538,7 @@ sql.begin(async sql => {
 ```
 
 Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
+
 
 ## Custom Types
 
