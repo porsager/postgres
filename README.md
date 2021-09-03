@@ -187,6 +187,8 @@ All the public API is typed. Also, TypeScript support is still in beta. Feel fre
 
 Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessary, simply use JS tagged template literals as usual.
 
+Be careful with quotation marks here. Because Postgres infers the types, you don't need to wrap your interpolated parameters in quotes like `'${name}'`. In fact, this will cause an error because the tagged template replaces `${name}` with `$1` in the query string, leaving Postgres to do the interpolation. If you wrap that in a string, Postgres will see `'$1'` and interpret it as a string as opposed to a parameter.
+
 ```js
 
 let search = 'Mur'
