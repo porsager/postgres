@@ -533,20 +533,32 @@ sql.begin(async sql => {
 
 Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
 
-## Types
+## Custom Types
 
-You can add ergonomic support for custom types, or simply pass an object with a `{ type, value }` signature that contains the Postgres `oid` for the type and the correctly serialized value.
+You can add ergonomic support for custom types, or simply pass an object with a `{ type, value }` signature that contains the Postgres `oid` for the type and the correctly serialized value. _(`oid` values for types can be found in the `pg_catalog.pg_types` table.)_
 
 Adding Query helpers is the recommended approach which can be done like this:
 
 ```js
 
-const sql = sql({
+const sql = postgres({
   types: {
     rect: {
+      /**
+       * The pg_types oid to pass to the db along with the serialized value.
+       */
       to        : 1337,
+      /**
+       * An array of pg_types oids to handle when parsing values coming from the db.
+       */
       from      : [1337],
+      /**
+       * Function that transform values before sending them to the db.
+       */
       serialize : ({ x, y, width, height }) => [x, y, width, height],
+      /**
+       * Function that transforms values coming from the db.
+       */
       parse     : ([x, y, width, height]) => { x, y, width, height }
     }
   }
