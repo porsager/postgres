@@ -1522,3 +1522,21 @@ t('Connection lifetime', async() => {
 
   return [true, pid != startPid]
 })
+
+t('Connection lifetime transaction', async() => {
+  const sql = postgres({...options, lifetime: 0.050})
+
+  let success
+
+  await sql.begin(async (sql) => {
+    await delay(100);
+    try {
+      await sql`select 1`
+      success = true
+    } catch (err) {
+      success = false
+    }
+  })
+
+  return [true, success]
+})
