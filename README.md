@@ -72,6 +72,8 @@ const sql = postgres('postgres://username:password@host:port/database', {
   },
   target_session_attrs : null   // Use 'read-write' with multiple hosts to 
                                 // ensure only connecting to primary
+  fetch_array_types    : true   // Disable automatically fetching array types
+                                // on initial connection.
 })
 ```
 
@@ -97,6 +99,14 @@ Connecting to the specified hosts/ports will be tried in order, and on a success
 
 If you specify `target_session_attrs: 'read-write'` or `PGTARGETSESSIONATTRS=read-write` Postgres.js will only connect to a writeable host allowing for zero down time failovers.
 
+### Auto fetching of array types
+
+When Postgres.js first connects to the database it automatically fetches array type information.  
+
+If you have revoked access to `pg_catalog` this feature will no longer work and will need to be disabled.  
+
+You can disable fetching array types by setting `fetch_array_types` to `false` when creating an instance.
+
 ### Environment Variables for Options
 
 It is also possible to connect to the database without a connection string or any options. Postgres.js will fall back to the common environment variables used by `psql` as in the table below:
@@ -117,7 +127,7 @@ const sql = postgres()
 
 ## Query ```sql` ` -> Promise```
 
-A query will always return a `Promise` which resolves to a results array `[...]{ count, command }`. Destructuring is great to immediately access the first element.
+A query will always return a `Promise` which resolves to a results array `[...]{ count, command, columns }`. Destructuring is great to immediately access the first element.
 
 ```js
 
@@ -268,6 +278,12 @@ await sql`
 })
 
 ```
+
+## Raw ```sql``.raw()```
+
+Using `.raw()` will return rows as an array with `Buffer` values for each column, instead of objects.
+
+This can be useful to receive identical named columns, or for specific performance / transformation reasons. The column definitions are still included on the result array with access to parsers for each column.
 
 ## Listen and notify
 

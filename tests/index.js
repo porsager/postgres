@@ -6,6 +6,7 @@ const { t, not, ot } = require('./test.js') // eslint-disable-line
 const cp = require('child_process')
 const path = require('path')
 const net = require('net')
+const fs = require('fs')
 
 /** @type {import('../types')} */
 const postgres = require('../lib')
@@ -472,11 +473,6 @@ t('Connection destroyed with query before', async() => {
   return ['CONNECTION_DESTROYED', await error]
 })
 
-t('Message not supported', async() => {
-  await sql`create table test (x int)`
-  return ['MESSAGE_NOT_SUPPORTED', await sql`copy test to stdout`.catch(x => x.code), await sql`drop table test`]
-})
-
 t('transform column', async() => {
   const sql = postgres({
     ...options,
@@ -925,7 +921,11 @@ t('bytea serializes and parses', async() => {
   await sql`create table test (x bytea)`
   await sql`insert into test values (${ buf })`
 
-  return [0, Buffer.compare(buf, (await sql`select x from test`)[0].x)]
+  return [
+    0,
+    Buffer.compare(buf, (await sql`select x from test`)[0].x),
+    await sql`drop table test`
+  ]
 })
 
 t('Stream works', async() => {
@@ -1034,6 +1034,18 @@ t('Transform value', async() => {
   })
 
   return [1, (await sql`select 'wat' as x`)[0].x]
+})
+
+t('Transform columns from', async() => {
+  const sql = postgres({ ...options, transform: { column: { to: postgres.fromCamel, from: postgres.toCamel } } })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
+  await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
+  return [
+    2,
+    (await sql`select ${ sql('aTest', 'bTest') } from test`)[0].aTest,
+    await sql`drop table test`
+  ]
 })
 
 t('Unix socket', async() => {
@@ -1319,6 +1331,167 @@ t('Escaping supports schemas and tables', async() => {
     (await sql`select ${ sql('a.b.c') } from a.b`)[0].c,
     await sql`drop table a.b`,
     await sql`drop schema a`
+  ]
+})
+
+t('Raw method returns rows as arrays', async() => {
+  const [x] = await sql`select 1`.raw()
+  return [
+    Array.isArray(x),
+    true
+  ]
+})
+
+t('Raw method returns values unparsed as Buffer', async() => {
+  const [[x]] = await sql`select 1`.raw()
+  return [
+    x instanceof Buffer,
+    true
+  ]
+})
+
+t('Copy read works', async() => {
+  const result = []
+
+  await sql`create table test (x int)`
+  await sql`insert into test select * from generate_series(1,10)`
+  const readable = sql`copy test to stdout`.readable()
+  readable.on('data', x => result.push(x))
+  await new Promise(r => readable.on('end', r))
+
+  return [
+    result.length,
+    10,
+    await sql`drop table test`
+  ]
+})
+
+t('Copy write works', async() => {
+  await sql`create table test (x int)`
+  const writable = sql`copy test from stdin`.writable()
+
+  writable.write('1\n')
+  writable.write('1\n')
+  writable.end()
+
+  await new Promise(r => writable.on('finish', r))
+
+  return [
+    (await sql`select 1 from test`).length,
+    2,
+    await sql`drop table test`
+  ]
+})
+
+t('Copy write as first works', async() => {
+  await sql`create table test (x int)`
+  const first = postgres(options)
+  const writable = first`COPY test FROM STDIN WITH(FORMAT csv, HEADER false, DELIMITER ',')`.writable()
+  writable.write('1\n')
+  writable.write('1\n')
+  writable.end()
+
+  await new Promise(r => writable.on('finish', r))
+
+  return [
+    (await sql`select 1 from test`).length,
+    2,
+    await sql`drop table test`
+  ]
+})
+
+
+t('Copy from file works', async() => {
+  await sql`create table test (x int, y int, z int)`
+  await new Promise(r => fs
+    .createReadStream(path.join(__dirname, 'copy.csv'))
+    .pipe(sql`copy test from stdin`.writable())
+    .on('finish', r)
+  )
+
+  return [
+    JSON.stringify(await sql`select * from test`),
+    '[{"x":1,"y":2,"z":3},{"x":4,"y":5,"z":6}]',
+    await sql`drop table test`
+  ]
+})
+
+t('Copy from works in transaction', async() => {
+  await sql`create table test(x int)`
+  const xs = await sql.begin(async sql => {
+    sql`copy test from stdin`.writable().end('1\n2')
+    return sql`select 1 from test`
+  })
+
+  return [
+    xs.length,
+    2,
+    await sql`drop table test`
+  ]
+})
+
+t('Copy from abort works', async() => {
+  const sql = postgres(options)
+  const readable = fs.createReadStream(path.join(__dirname, 'copy.csv'))
+
+  await sql`create table test (x int, y int, z int)`
+  await sql`TRUNCATE TABLE test`
+
+  const writable = sql`COPY test FROM STDIN`.writable()
+
+  let aborted
+
+  readable
+    .pipe(writable)
+    .on('error', () => aborted = true)
+
+  writable.destroy(new Error('abort'))
+  await sql.end()
+
+  return [
+    aborted,
+    true,
+    await postgres(options)`drop table test`
+  ]
+})
+
+t('Recreate prepared statements on transformAssignedExpr error', async() => {
+  const insert = () => sql`insert into test (name) values (${ '1' }) returning name`
+  await sql`create table test (name text)`
+  await insert()
+  await sql`alter table test alter column name type int using name::integer`
+  return [
+    1,
+    (await insert())[0].name,
+    await sql`drop table test`
+  ]
+})
+
+t('Recreate prepared statements on RevalidateCachedQuery error', async() => {
+  const select = () => sql`select name from test`
+  await sql`create table test (name text)`
+  await sql`insert into test values ('1')`
+  await select()
+  await sql`alter table test alter column name type int using name::integer`
+  return [
+    1,
+    (await select())[0].name,
+    await sql`drop table test`
+  ]
+})
+
+t('multiple queries before connect', async() => {
+  const sql = postgres({ ...options, max: 2 })
+  const xs = await Promise.all([
+    sql`select 1 as x`,
+    sql`select 2 as x`,
+    sql`select 3 as x`,
+    sql`select 4 as x`
+  ])
+
+  return [
+    '1,2,3,4',
+    xs.map(x => x[0].x).join()
   ]
 })
 
