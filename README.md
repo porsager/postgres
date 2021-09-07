@@ -143,8 +143,44 @@ const [new_user] = await sql`
 // new_user = { user_id: 1, name: 'Murray', age: 68 }
 ```
 
+#### Query parameters
 
-#### TypeScript support
+Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessary, simply use JS tagged template literals as usual.
+
+```js
+
+let search = 'Mur'
+
+const users = await sql`
+  select
+    name,
+    age
+  from users
+  where
+    name like ${ search + '%' }
+`
+
+// users = [{ name: 'Murray', age: 68 }]
+
+```
+
+> Be careful with quotation marks here. Because Postgres infers the types, you don't need to wrap your interpolated parameters in quotes like `'${name}'`. In fact, this will cause an error because the tagged template replaces `${name}` with `$1` in the query string, leaving Postgres to do the interpolation. If you wrap that in a string, Postgres will see `'$1'` and interpret it as a string as opposed to a parameter.
+
+#### Arrays
+Arrays will be handled by replacement parameters too, so `where in` queries are also simple.
+
+```js
+
+const users = await sql`
+  select
+    *
+  from users
+  where age in (${ [68, 75, 23] })
+`
+
+```
+
+### TypeScript support
 
 `postgres` has TypeScript support. You can pass a row list type for your queries in this way:
 ```ts
@@ -182,42 +218,6 @@ const [first, second] = await sql<[User?]>`SELECT * FROM users WHERE id = ${id}`
 ```
 
 All the public API is typed. Also, TypeScript support is still in beta. Feel free to open an issue if you have trouble with types.
-
-#### Query parameters
-
-Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessary, simply use JS tagged template literals as usual.
-
-Be careful with quotation marks here. Because Postgres infers the types, you don't need to wrap your interpolated parameters in quotes like `'${name}'`. In fact, this will cause an error because the tagged template replaces `${name}` with `$1` in the query string, leaving Postgres to do the interpolation. If you wrap that in a string, Postgres will see `'$1'` and interpret it as a string as opposed to a parameter.
-
-```js
-
-let search = 'Mur'
-
-const users = await sql`
-  select 
-    name, 
-    age 
-  from users
-  where 
-    name like ${ search + '%' }
-`
-
-// users = [{ name: 'Murray', age: 68 }]
-
-```
-
-Arrays will be handled by replacement parameters too, so `where in` queries are also simple.
-
-```js
-
-const users = await sql`
-  select 
-    * 
-  from users
-  where age in (${ [68, 75, 23] })
-`
-
-```
 
 ## Stream ```sql` `.stream(fn) -> Promise```
 
@@ -544,26 +544,22 @@ Adding Query helpers is the recommended approach which can be done like this:
 const sql = postgres({
   types: {
     rect: {
-      /**
-       * The pg_types oid to pass to the db along with the serialized value.
-       */
+      // The pg_types oid to pass to the db along with the serialized value.
       to        : 1337,
-      /**
-       * An array of pg_types oids to handle when parsing values coming from the db.
-       */
+
+      // An array of pg_types oids to handle when parsing values coming from the db.
       from      : [1337],
-      /**
-       * Function that transform values before sending them to the db.
-       */
+
+      //Function that transform values before sending them to the db.
       serialize : ({ x, y, width, height }) => [x, y, width, height],
-      /**
-       * Function that transforms values coming from the db.
-       */
+
+      // Function that transforms values coming from the db.
       parse     : ([x, y, width, height]) => { x, y, width, height }
     }
   }
 })
 
+// Now you can use sql.types.rect() as specified above
 const [custom] = sql`
   insert into rectangles (
     name,
