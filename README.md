@@ -45,34 +45,34 @@ You can use either a `postgres://` url connection string or the options to defin
 
 ```js
 const sql = postgres('postgres://username:password@host:port/database', {
-  host            : '',         // Postgres ip address[s] or domain name[s]
-  port            : 5432,       // Postgres server port[s]
-  path            : '',         // unix socket path (usually '/tmp')
-  database        : '',         // Name of database to connect to
-  username        : '',         // Username of database user
-  password        : '',         // Password of database user
-  ssl             : false,      // true, prefer, require, tls.connect options
-  max             : 10,         // Max number of connections
-  idle_timeout    : 0,          // Idle connection timeout in seconds
-  connect_timeout : 30,         // Connect timeout in seconds
-  no_prepare      : false,      // No automatic creation of prepared statements
-  types           : [],         // Array of custom types, see more below
-  onnotice        : fn          // Defaults to console.log
-  onparameter     : fn          // (key, value) when server param change
-  debug           : fn          // Is called with (connection, query, params)
-  transform       : {
-    column            : fn, // Transforms incoming column names
-    value             : fn, // Transforms incoming row values
-    row               : fn  // Transforms entire rows
+  host                 : '',            // Postgres ip address[s] or domain name[s]
+  port                 : 5432,          // Postgres server port[s]
+  path                 : '',            // unix socket path (usually '/tmp')
+  database             : '',            // Name of database to connect to
+  username             : '',            // Username of database user
+  password             : '',            // Password of database user
+  ssl                  : false,         // true, prefer, require, tls.connect options
+  max                  : 10,            // Max number of connections
+  idle_timeout         : 0,             // Idle connection timeout in seconds
+  connect_timeout      : 30,            // Connect timeout in seconds
+  no_prepare           : false,         // No automatic creation of prepared statements
+  types                : [],            // Array of custom types, see more below
+  onnotice             : fn,            // Defaults to console.log
+  onparameter          : fn,            // (key, value) when server param change
+  debug                : fn,            // Is called with (connection, query, params)
+  transform            : {
+    column             : fn,            // Transforms incoming column names
+    value              : fn,            // Transforms incoming row values
+    row                : fn             // Transforms entire rows
   },
-  connection      : {
-    application_name  : 'postgres.js', // Default application_name
-    ...                                // Other connection parameters
+  connection           : {
+    application_name   : 'postgres.js', // Default application_name
+    ...                                 // Other connection parameters
   },
-  target_session_attrs : null   // Use 'read-write' with multiple hosts to 
-                                // ensure only connecting to primary
-  fetch_array_types    : true   // Disable automatically fetching array types
-                                // on initial connection.
+  target_session_attrs : null,          // Use 'read-write' with multiple hosts to 
+                                        // ensure only connecting to primary
+  fetch_array_types    : true,          // Disable automatically fetching array types
+                                        // on initial connection.
 })
 ```
 
