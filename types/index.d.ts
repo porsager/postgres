@@ -103,10 +103,10 @@ type UnwrapPromiseArray<T> = T extends any[] ? {
   [k in keyof T]: T[k] extends Promise<infer R> ? R : T[k]
 } : T;
 
-type PostgresErrorType = PostgresError
+type PostgresErrorType = typeof PostgresError
 
 declare namespace postgres {
-  type PostgresError = PostgresErrorType
+  export const PostgresError: PostgresErrorType;
 
   /**
    * Convert a string to Pascal case.
