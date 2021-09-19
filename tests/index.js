@@ -1494,3 +1494,36 @@ t('multiple queries before connect', async() => {
     xs.map(x => x[0].x).join()
   ]
 })
+
+t('subscribe', async() => {
+  const sql = postgres({
+    database: 'postgres_js_test',
+    publications: 'alltables'
+  })
+
+  await sql.unsafe('create publication alltables for all tables')
+
+  const result = []
+
+  await sql.subscribe('*', (row, info) =>
+    result.push(info.command, row.name || row.id)
+  )
+
+  await sql`
+    create table test (
+      id serial primary key,
+      name text
+    )
+  `
+  await sql`insert into test (name) values ('Murray')`
+  await sql`update test set name = 'Rothbard'`
+  await sql`delete from test`
+  await delay(100)
+  return [
+    'insert,Murray,update,Rothbard,delete,1',
+    result.join(','),
+    await sql`drop table test`,
+    await sql`drop publication alltables`,
+    await sql.end()
+  ]
+})
