@@ -15,7 +15,8 @@
     "build": "node transpile.cjs",
     "test": "pushd tests && node index.js && popd && npm run build && pushd cjs/tests && node index.js",
     "lint": "eslint lib && eslint tests",
-    "prepublishOnly": "npm run lint && npm test"
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run lint"
   },
   "files": [
     "/cjs",
