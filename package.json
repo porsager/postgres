@@ -2,17 +2,30 @@
   "name": "postgres",
   "version": "2.0.0-beta.11",
   "description": "Fastest full featured PostgreSQL client for Node.js",
-  "main": "lib/index.js",
+  "type": "module",
+  "module": "src/index.js",
+  "main": "cjs/src/index.js",
+  "exports": {
+    "import": "./src/index.js",
+    "default": "./cjs/src/index.js"
+  },
   "types": "types/index.d.ts",
   "typings": "types/index.d.ts",
-  "type": "commonjs",
   "scripts": {
-    "test": "node tests/index.js",
-    "lint": "eslint lib && eslint tests",
-    "prepublishOnly": "npm run lint && npm test"
+    "build": "npm run build:cjs && npm run build:deno",
+    "build:cjs": "node transpile.cjs",
+    "build:deno": "node transpile.deno.js",
+    "test:cjs": "npm run build:cjs && pushd cjs/tests && node index.js && popd",
+    "test:cjs": "npm run build:cjs && pushd cjs/tests && node index.js && popd",
+    "test:deno": "npm run build:deno && pushd deno/tests && deno run --unstable --allow-all --unsafely-ignore-certificate-errors index.js && popd",
+    "test": "node tests/index.js && npm run test:cjs && npm run test:deno",
+    "lint": "eslint src && eslint tests",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run lint"
   },
   "files": [
-    "/lib",
+    "/cjs",
+    "/src",
     "/types"
   ],
   "author": "Rasmus Porsager <rasmus@porsager.com>",

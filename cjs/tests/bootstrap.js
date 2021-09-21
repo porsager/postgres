@@ -1,4 +1,4 @@
-import { spawnSync } from 'child_process'
+const { spawnSync } = require('child_process')
 
 exec('psql', ['-c', 'alter system set ssl=on'])
 exec('psql', ['-c', 'create user postgres_js_test'])
@@ -13,7 +13,7 @@ exec('dropdb', ['postgres_js_test'])
 exec('createdb', ['postgres_js_test'])
 exec('psql', ['-c', 'grant all on database postgres_js_test to postgres_js_test'])
 
-export function exec(cmd, args) {
+module.exports.exec = exec;function exec(cmd, args) {
   const { stderr } = spawnSync(cmd, args, { stdio: 'pipe', encoding: 'utf8' })
   if (stderr && !stderr.includes('already exists') && !stderr.includes('does not exist'))
     throw stderr

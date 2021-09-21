@@ -1,7 +1,7 @@
 const size = 256
 let buffer = Buffer.allocUnsafe(size)
 
-const messages = ['B', 'C', 'Q', 'P', 'F', 'p', 'D', 'E', 'H', 'S', 'd', 'c', 'f'].reduce((acc, x) => {
+const messages = 'BCcDdEFfHPpQSX'.split('').reduce((acc, x) => {
   const v = x.charCodeAt(0)
   acc[x] = () => {
     buffer[0] = v
@@ -11,7 +11,8 @@ const messages = ['B', 'C', 'Q', 'P', 'F', 'p', 'D', 'E', 'H', 'S', 'd', 'c', 'f
   return acc
 }, {})
 
-const b = Object.assign(messages, {
+const b = Object.assign(reset, messages, {
+  N: String.fromCharCode(0),
   i: 0,
   inc(x) {
     b.i += x
@@ -69,4 +70,9 @@ function fit(x) {
     buffer = Buffer.allocUnsafe(length + (length >> 1) + x)
     prev.copy(buffer)
   }
+}
+
+function reset() {
+  b.i = 0
+  return b
 }

@@ -1,6 +1,6 @@
 /* eslint no-console: 0 */
 
-import util from 'util'
+const util = require('util')
 
 let done = 0
 let only = false
@@ -10,9 +10,9 @@ let promise = Promise.resolve()
 const tests = {}
     , ignore = {}
 
-export const nt = () => ignored++
-export const ot = (...rest) => (only = true, test(true, ...rest))
-export const t = (...rest) => test(false, ...rest)
+const nt = module.exports.nt = () => ignored++
+const ot = module.exports.ot = (...rest) => (only = true, test(true, ...rest))
+const t = module.exports.t = (...rest) => test(false, ...rest)
 t.timeout = 0.5
 
 async function test(o, name, options, fn) {

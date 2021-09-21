@@ -1,19 +1,19 @@
 /* eslint no-console: 0 */
 
-import { exec } from './bootstrap.js'
+const { exec } = require('./bootstrap.js')
 
-import { t, nt, ot } from './test.js' // eslint-disable-line
-import cp from 'child_process'
-import path from 'path'
-import net from 'net'
-import fs from 'fs'
-import crypto from 'crypto'
+const { t, nt, ot } = require('./test.js') // eslint-disable-line
+const cp = require('child_process')
+const path = require('path')
+const net = require('net')
+const fs = require('fs')
+const crypto = require('crypto')
 
 /** @type {import('../types')} */
-import postgres from '../src/index.js'
+const postgres = require('../src/index.js')
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
-const rel = x => new URL(x, import.meta.url)
+const rel = x => path.join(__dirname, x)
 const idle_timeout = 1
 
 const login = {

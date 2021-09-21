@@ -1,15 +1,20 @@
 module.exports = Queue
 
-function Queue() {
-  let xs = []
+function Queue(initial = []) {
+  let xs = initial.slice()
   let index = 0
 
   return {
     get length() {
       return xs.length - index
     },
-    push: (x) => xs.push(x),
-    peek: () => xs[index],
+    remove: (x) => {
+      const index = xs.indexOf(x)
+      return index === -1
+        ? null
+        : (xs.splice(index, 1), x)
+    },
+    push: (x) => (xs.push(x), x),
     shift: () => {
       const out = xs[index++]
 

@@ -1,6 +1,7 @@
+import process from 'https://deno.land/std@0.120.0/node/process.ts'
 /* eslint no-console: 0 */
 
-import util from 'util'
+import util from 'https://deno.land/std@0.120.0/node/util.ts'
 
 let done = 0
 let only = false

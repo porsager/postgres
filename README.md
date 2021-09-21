@@ -1,7 +1,7 @@
 <img align="left" width="440" height="140" alt="Fastest full PostgreSQL nodejs client" src="https://raw.githubusercontent.com/porsager/postgres/master/postgresjs.svg?sanitize=true" />
 
 - [🚀 Fastest full featured PostgreSQL node client](https://github.com/porsager/postgres-benchmarks#results)
-- 🚯 1250 LOC - 0 dependencies
+- 🚯 1850 LOC - 0 dependencies
 - 🏷 ES6 Tagged Template Strings at the core
 - 🏄‍♀️ Simple surface API
 - 💬 Chat on [Gitter](https://gitter.im/porsager/postgres)
@@ -71,7 +71,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   },
   target_session_attrs : null,          // Use 'read-write' with multiple hosts to 
                                         // ensure only connecting to primary
-  fetch_array_types    : true,          // Disable automatically fetching array types
+  fetch_types           : true,         // Automatically fetches types on connect
                                         // on initial connection.
 })
 ```
@@ -96,7 +96,7 @@ Connection uri strings with multiple hosts works like in [`psql multiple host ur
 
 Connecting to the specified hosts/ports will be tried in order, and on a successfull connection retries will be reset. This ensures that hosts can come up and down seamless to your application.
 
-If you specify `target_session_attrs: 'read-write'` or `PGTARGETSESSIONATTRS=read-write` Postgres.js will only connect to a writeable host allowing for zero down time failovers.
+If you specify `target_session_attrs: 'primary'` or `PGTARGETSESSIONATTRS=primary` Postgres.js will only connect to a the primary host allowing for zero down time failovers.
 
 ### Auto fetching of array types
 
@@ -104,7 +104,7 @@ When Postgres.js first connects to the database it automatically fetches array t
 
 If you have revoked access to `pg_catalog` this feature will no longer work and will need to be disabled.  
 
-You can disable fetching array types by setting `fetch_array_types` to `false` when creating an instance.
+You can disable fetching array types by setting `fetch_types` to `false` when creating an instance.
 
 ### Environment Variables for Options
 
@@ -219,14 +219,14 @@ const [first, second] = await sql<[User?]>`SELECT * FROM users WHERE id = ${id}`
 
 All the public API is typed. Also, TypeScript support is still in beta. Feel free to open an issue if you have trouble with types.
 
-## Stream ```sql` `.stream(fn) -> Promise```
+## forEach ```sql` `.forEach(fn) -> Promise```
 
-If you want to handle rows returned by a query one by one, you can use `.stream` which returns a promise that resolves once there are no more rows.
+If you want to handle rows returned by a query one by one, you can use `.forEach` which returns a promise that resolves once there are no more rows.
 ```js
 
 await sql`
   select created_at, name from events
-`.stream(row => {
+`.forEach(row => {
   // row = { created_at: '2019-11-22T14:22:00Z', name: 'connected' }
 })
 
@@ -242,7 +242,7 @@ Use cursors if you need to throttle the amount of rows being returned from a que
 
 await sql`
   select * from generate_series(1,4) as x
-`.cursor(async row => {
+`.cursor(async ([row]) => {
   // row = { x: 1 }
   await http.request('https://example.com/wat', { row })
 })
@@ -306,7 +306,7 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 
 ```
 
-## Tagged template function ``` sql`` ``` 
+## Tagged template function ``` sql`` ```
 [Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) are not just ordinary template literal strings. They allow the function to handle any parameters within before interpolation. This means that they can be used to enforce a safe way of writing queries, which is what Postgres.js does. Any generic value will be serialized according to an inferred type, and replaced by a PostgreSQL protocol placeholders `$1, $2, ...` and then sent to the database as a parameter to let it handle any need for escaping / casting.
 
 This also means you cannot write dynamic queries or concat queries together by simple string manipulation. To enable dynamic queries in a safe way, the `sql` function doubles as a regular function which escapes any value properly. It also includes overloads for common cases of inserting, selecting, updating and querying.
@@ -331,7 +331,7 @@ sql`
 `
 
 // Is translated into this query:
-insert into users (name, age) values ($1, $2)
+insert into users ("name", "age") values ($1, $2)
 
 ```
 
@@ -356,6 +356,9 @@ sql`
     sql(users, 'name', 'age')
   }
 `
+
+// Is translated into this query:
+insert into users ("name", "age") values ($1, $2), ($3, $4)
 ```
 
 #### Update
@@ -376,7 +379,7 @@ sql`
 `
 
 // Is translated into this query:
-update users set name = $1 where id = $2
+update users set "name" = $1 where id = $2
 ```
 
 #### Select
@@ -392,7 +395,7 @@ sql`
 `
 
 // Is translated into this query:
-select name, age from users
+select "name", "age" from users
 ```
 
 #### Dynamic table name
@@ -402,11 +405,11 @@ select name, age from users
 const table = 'users'
 
 sql`
-  select id from ${sql(table)}
+  select id from ${ sql(table) }
 `
 
 // Is translated into this query:
-select id from users
+select id from "users"
 ```
 
 #### Arrays `sql.array(Array)`
@@ -770,6 +773,7 @@ This error is thrown if the startup phase of the connection (tcp, protocol negot
 
 Postgres.js doesn't come with any migration solution since it's way out of scope, but here are some modules that supports Postgres.js for migrations:
 
+- https://github.com/porsager/postgres-shift
 - https://github.com/lukeed/ley
 
 ## Thank you

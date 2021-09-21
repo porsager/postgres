@@ -93,6 +93,7 @@
           "Property": true,
           "VariableDeclarator": true,
           "ImportDeclaration": true,
+          "TernaryExpressions": true,
           "Comments": true
         }
       }
@@ -221,7 +222,7 @@
     ],
     "max-params": [
       2,
-      4
+      5
     ],
     "max-statements-per-line": 0,
     "new-cap": [
