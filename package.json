@@ -2,16 +2,23 @@
   "name": "postgres",
   "version": "2.0.0-beta.9",
   "description": "Fastest full featured PostgreSQL client for Node.js",
-  "main": "lib/index.js",
+  "type": "module",
+  "module": "lib/index.js",
+  "main": "cjs/index.js",
+  "exports": {
+    "import": "./lib/index.js",
+    "default": "./cjs/index.js"
+  },
   "types": "types/index.d.ts",
   "typings": "types/index.d.ts",
-  "type": "commonjs",
   "scripts": {
-    "test": "node tests/index.js",
+    "build": "node transpile.cjs",
+    "test": "pushd tests && node index.js && popd && npm run build && pushd cjs/tests && node index.js",
     "lint": "eslint lib && eslint tests",
     "prepublishOnly": "npm run lint && npm test"
   },
   "files": [
+    "/cjs",
     "/lib",
     "/types"
   ],

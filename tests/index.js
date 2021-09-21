@@ -1,15 +1,15 @@
 /* eslint no-console: 0 */
 
-require('./bootstrap.js')
+import './bootstrap.js'
 
-const { t, not, ot } = require('./test.js') // eslint-disable-line
-const cp = require('child_process')
-const path = require('path')
-const net = require('net')
-const fs = require('fs')
+import { t, not, ot } from './test.js' // eslint-disable-line
+import cp from 'child_process'
+import path from 'path'
+import net from 'net'
+import fs from 'fs'
 
 /** @type {import('../types')} */
-const postgres = require('../lib')
+import postgres from '../lib/index.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
 const login = {
@@ -397,13 +397,13 @@ t('Point type array', async() => {
 })
 
 t('sql file', async() =>
-  [1, (await sql.file(path.join(__dirname, 'select.sql')))[0].x]
+  [1, (await sql.file(path.join('select.sql')))[0].x]
 )
 
 t('sql file can stream', async() => {
   let result
   await sql
-    .file(path.join(__dirname, 'select.sql'), { cache: false })
+    .file(path.join('select.sql'), { cache: false })
     .stream(({ x }) => result = x)
 
   return [1, result]
@@ -414,15 +414,15 @@ t('sql file throws', async() =>
 )
 
 t('sql file cached', async() => {
-  await sql.file(path.join(__dirname, 'select.sql'))
+  await sql.file(path.join('select.sql'))
   await delay(20)
 
-  return [1, (await sql.file(path.join(__dirname, 'select.sql')))[0].x]
+  return [1, (await sql.file(path.join('select.sql')))[0].x]
 })
 
 t('Parameters in file', async() => {
   const result = await sql.file(
-    path.join(__dirname, 'select-param.sql'),
+    path.join('select-param.sql'),
     ['hello']
   )
   return ['hello', result[0].x]
@@ -1091,8 +1091,8 @@ t('numeric is returned as string', async() => [
 t('Async stack trace', async() => {
   const sql = postgres({ ...options, debug: false })
   return [
-    parseInt(new Error().stack.split('\n')[1].split(':')[1]) + 1,
-    parseInt(await sql`select.sql`.catch(x => x.stack.split('\n').pop().split(':')[1]))
+    parseInt(new Error().stack.split('\n')[1].match(':([0-9]+):')[1]) + 1,
+    parseInt(await sql`select.sql`.catch(x => x.stack.split('\n').pop().match(':([0-9]+):')[1]))
   ]
 })
 
@@ -1404,7 +1404,7 @@ t('Copy write as first works', async() => {
 t('Copy from file works', async() => {
   await sql`create table test (x int, y int, z int)`
   await new Promise(r => fs
-    .createReadStream(path.join(__dirname, 'copy.csv'))
+    .createReadStream(path.join('copy.csv'))
     .pipe(sql`copy test from stdin`.writable())
     .on('finish', r)
   )
@@ -1432,7 +1432,7 @@ t('Copy from works in transaction', async() => {
 
 t('Copy from abort works', async() => {
   const sql = postgres(options)
-  const readable = fs.createReadStream(path.join(__dirname, 'copy.csv'))
+  const readable = fs.createReadStream(path.join('copy.csv'))
 
   await sql`create table test (x int, y int, z int)`
   await sql`TRUNCATE TABLE test`

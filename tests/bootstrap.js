@@ -1,4 +1,4 @@
-const cp = require('child_process')
+import cp from 'child_process'
 
 exec('psql -c "create user postgres_js_test"')
 exec('psql -c "alter system set password_encryption=md5"')

@@ -1,6 +1,6 @@
 /* eslint no-console: 0 */
 
-const util = require('util')
+import util from 'util'
 
 let done = 0
 let only = false
@@ -8,15 +8,15 @@ let ignored = 0
 let promise = Promise.resolve()
 const tests = {}
 
-module.exports.not = () => ignored++
-module.exports.ot = (...rest) => (only = true, test(true, ...rest))
+export const not = () => ignored++
+export const ot = (...rest) => (only = true, test(true, ...rest))
 
-const t = module.exports.t = (...rest) => test(false, ...rest)
+export const t = (...rest) => test(false, ...rest)
 t.timeout = 500
 
 async function test(o, name, options, fn) {
   typeof options !== 'object' && (fn = options, options = {})
-  const line = new Error().stack.split('\n')[3].split(':')[1]
+  const line = new Error().stack.split('\n')[3].match(':([0-9]+):')[1]
   await 1
 
   if (only && !o)
