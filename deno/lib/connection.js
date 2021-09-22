@@ -1,5 +1,8 @@
-import net from 'net'
-import tls from 'tls'
+import { Buffer } from 'https://deno.land/std@0.107.0/node/buffer.ts'
+import process from 'https://deno.land/std@0.107.0/node/process.ts'
+import { setImmediate, clearImmediate } from '../polyfills.js'
+import { net } from '../polyfills.js'
+import { tls } from '../polyfills.js'
 import frontend from './frontend.js'
 import Backend from './backend.js'
 import Queue from './queue.js'
@@ -170,7 +173,7 @@ function Connection(options = {}) {
   function connect() {
     connect_timeout && (
       clearTimeout(connect_timer),
-      connect_timer = setTimeout(connectTimedOut, connect_timeout * 1000).unref()
+      connect_timer = setTimeout(connectTimedOut, connect_timeout * 1000)
     )
     socket.connect()
   }
@@ -376,7 +379,7 @@ function postgresSocket(options, {
       : net.connect(
         x.port = options.port[i],
         x.host = options.host[i++]
-      ).setKeepAlive(true, 1000 * 60)
+      )
 
     if (!options.ssl)
       return attach(socket)

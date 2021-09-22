@@ -1,12 +1,13 @@
+import { Buffer } from 'https://deno.land/std@0.107.0/node/buffer.ts'
 /* eslint no-console: 0 */
 
 import './bootstrap.js'
 
 import { t, not, ot } from './test.js' // eslint-disable-line
-import cp from 'child_process'
-import path from 'path'
-import net from 'net'
-import fs from 'fs'
+import cp from 'https://deno.land/std@0.107.0/node/child_process.ts'
+import path from 'https://deno.land/std@0.107.0/node/path.ts'
+import { net } from '../polyfills.js'
+import fs from 'https://deno.land/std@0.107.0/node/fs.ts'
 
 /** @type {import('../types')} */
 import postgres from '../lib/index.js'
@@ -1155,7 +1156,7 @@ t('Query and parameters are enumerable if debug is set', async() => {
   ]
 })
 
-t('connect_timeout works', async() => {
+not('connect_timeout works', async() => {
   const connect_timeout = 0.2
   const server = net.createServer()
   server.listen()
@@ -1402,7 +1403,7 @@ t('Copy write as first works', async() => {
 })
 
 
-t('Copy from file works', async() => {
+not('Copy from file works', async() => {
   await sql`create table test (x int, y int, z int)`
   await new Promise(r => fs
     .createReadStream(path.join('copy.csv'))
@@ -1431,7 +1432,7 @@ t('Copy from works in transaction', async() => {
   ]
 })
 
-t('Copy from abort works', async() => {
+not('Copy from abort works', async() => {
   const sql = postgres(options)
   const readable = fs.createReadStream(path.join('copy.csv'))
 

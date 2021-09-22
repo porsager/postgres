@@ -12,8 +12,13 @@
   "types": "types/index.d.ts",
   "typings": "types/index.d.ts",
   "scripts": {
-    "build": "node transpile.cjs",
-    "test": "pushd tests && node index.js && popd && npm run build && pushd cjs/tests && node index.js",
+    "build": "npm run build:cjs && npm run build:deno",
+    "build:cjs": "node transpile.cjs",
+    "build:deno": "node transpile.deno.js",
+    "test:esm": "pushd tests && node index.js && popd",
+    "test:cjs": "npm run build:cjs && pushd cjs/tests && node index.js && popd",
+    "test:deno": "npm run build:deno && pushd deno/tests && deno run --unstable --allow-all --unsafely-ignore-certificate-errors index.js && popd",
+    "test": "npm run test:esm && npm run test:cjs && npm run test:deno",
     "lint": "eslint lib && eslint tests",
     "prepare": "npm run build",
     "prepublishOnly": "npm run lint"

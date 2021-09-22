@@ -1,3 +1,4 @@
+import { Buffer } from 'https://deno.land/std@0.107.0/node/buffer.ts'
 const size = 256
 let buffer = Buffer.allocUnsafe(size)
 

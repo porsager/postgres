@@ -1,4 +1,6 @@
-import crypto from 'crypto'
+import { HmacSha256 } from 'https://deno.land/std@0.107.0/hash/sha256.ts'
+import { Buffer } from 'https://deno.land/std@0.107.0/node/buffer.ts'
+import crypto from 'https://deno.land/std@0.107.0/node/crypto.ts'
 import bytes from './bytes.js'
 import { entries } from './types.js'
 import { errors } from './errors.js'
@@ -238,7 +240,7 @@ function md5(x) {
 }
 
 function hmac(key, x) {
-  return crypto.createHmac('sha256', key).update(x).digest()
+  return Buffer.from(new HmacSha256(key).update(x).digest())
 }
 
 function sha256(x) {

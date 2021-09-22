@@ -1,6 +1,7 @@
-import fs from 'fs'
-import os from 'os'
-import Stream from 'stream'
+import process from 'https://deno.land/std@0.107.0/node/process.ts'
+import fs from 'https://deno.land/std@0.107.0/node/fs.ts'
+import os from 'https://deno.land/std@0.107.0/node/os.ts'
+import Stream from 'https://deno.land/std@0.107.0/node/stream.ts'
 import Connection from './connection.js'
 import Queue from './queue.js'
 import Subscribe from './subscribe.js'
@@ -397,7 +398,7 @@ function Postgres(a, b) {
       write(chunk, encoding, callback) {
         error
           ? callback(error)
-          : query.writable.push({ chunk, callback })
+          : (query.writable.push({ chunk }), callback())
       },
       destroy(error, callback) {
         callback(error)

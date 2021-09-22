@@ -1,6 +1,7 @@
+import process from 'https://deno.land/std@0.107.0/node/process.ts'
 /* eslint no-console: 0 */
 
-import util from 'util'
+import util from 'https://deno.land/std@0.107.0/node/util.ts'
 
 let done = 0
 let only = false
@@ -25,7 +26,7 @@ async function test(o, name, options, fn) {
   tests[line] = { fn, line, name }
   promise = promise.then(() => Promise.race([
     new Promise((resolve, reject) =>
-      fn.timer = setTimeout(() => reject('Timed out'), options.timeout || t.timeout).unref()
+      fn.timer = setTimeout(() => reject('Timed out'), options.timeout || t.timeout)
     ),
     fn()
   ]))
