@@ -52,12 +52,12 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
   debug: boolean | ((connection: number, query: string, parameters: any[]) => void);
   /** Transform hooks */
   transform: {
-    /** Transforms incoming column names */
-    column?: (column: string) => string;
-    /** Transforms incoming row values */
-    value?: (value: any) => any;
-    /** Transforms entire rows */
-    row?: (row: postgres.Row) => any;
+    /** Transforms incoming and outgoing column names. */
+    column?: ((column: string) => string) | { from?: (column: string) => string, to?: (column: string) => string };
+    /** Transforms incoming and outgoing row values. */
+    value?: ((value: any) => any) | { from?: (value: any) => any, to?: (value: any) => any };
+    /** Transforms entire incoming and outgoing rows. */
+    row?: ((row: postgres.Row) => any) | { from?: (row: postgres.Row) => any, to?: (row: any) => any };
   };
   /** Connection parameters */
   connection: Partial<postgres.ConnectionParameters>;
@@ -109,21 +109,40 @@ declare namespace postgres {
   export const PostgresError: PostgresErrorType;
 
   /**
-   * Convert a string to Pascal case.
-   * @param str THe string to convert
-   * @returns The new string in Pascal case
+   * Convert a string from PascalCase to snake_case.
+   * @param str The PascalCase string to convert.
+   * @returns The new string in snake_case.
+   */
+  function fromPascal(str: string): string;
+  /**
+   * Convert a camelCase string to snake_case.
+   * @param str The camelCase string to convert.
+   * @returns The new string in snake_case.
+   */
+  function fromCamel(str: string): string;
+  /**
+   * Convert a kebab-case string to snake_case.
+   * @param str The kebab-case string to convert.
+   * @returns The new string in snake_case.
+   */
+  function fromKebab(str: string): string;
+
+  /**
+   * Convert a snake_case string to PascalCase.
+   * @param str The snake_case string to convert.
+   * @returns The new string in PascalCase.
    */
   function toPascal(str: string): string;
   /**
-   * Convert a string to Camel case.
-   * @param str THe string to convert
-   * @returns The new string in Camel case
+   * Convert a snake_case string to camelCase.
+   * @param str The snake_case string to convert.
+   * @returns The new string in camelCase.
    */
   function toCamel(str: string): string;
   /**
-   * Convert a string to Kebab case.
-   * @param str THe string to convert
-   * @returns The new string in Kebab case
+   * Convert a snake_case string to kebab-case.
+   * @param str The snake_case string to convert.
+   * @returns The new string in kebab-case.
    */
   function toKebab(str: string): string;
 
