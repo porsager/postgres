@@ -73,40 +73,36 @@ interface JSToPostgresTypeMap {
   [name: string]: unknown;
 }
 
-declare class PostgresError extends Error {
-  name: 'PostgresError';
-  severity_local: string;
-  severity: string;
-  code: string;
-  position: string;
-  file: string;
-  line: string;
-  routine: string;
-
-  detail?: string;
-  hint?: string;
-  internal_position?: string;
-  internal_query?: string;
-  where?: string;
-  schema_name?: string;
-  table_name?: string;
-  column_name?: string;
-  data?: string;
-  type_name?: string;
-  constraint_name?: string;
-
-  // Disable user-side creation of PostgresError
-  private constructor();
-}
-
 type UnwrapPromiseArray<T> = T extends any[] ? {
   [k in keyof T]: T[k] extends Promise<infer R> ? R : T[k]
 } : T;
 
-type PostgresErrorType = typeof PostgresError
-
 declare namespace postgres {
-  export const PostgresError: PostgresErrorType;
+  export class PostgresError extends Error {
+    name: 'PostgresError';
+    severity_local: string;
+    severity: string;
+    code: string;
+    position: string;
+    file: string;
+    line: string;
+    routine: string;
+  
+    detail?: string;
+    hint?: string;
+    internal_position?: string;
+    internal_query?: string;
+    where?: string;
+    schema_name?: string;
+    table_name?: string;
+    column_name?: string;
+    data?: string;
+    type_name?: string;
+    constraint_name?: string;
+  
+    // Disable user-side creation of PostgresError
+    private constructor();
+  }
 
   /**
    * Convert a string to Pascal case.
