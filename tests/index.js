@@ -1495,7 +1495,7 @@ t('multiple queries before connect', async() => {
   ]
 })
 
-t('subscribe', async() => {
+t('subscribe', { timeout: 1000 }, async() => {
   const sql = postgres({
     database: 'postgres_js_test',
     publications: 'alltables'
