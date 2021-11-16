@@ -574,12 +574,19 @@ t('listen and notify with weird name', async() => {
   )]
 })
 
-t('listen and notify with upper case', async() =>
-  ['works', await new Promise(async resolve => {
-    await sql.listen('withUpperChar', resolve)
-    sql.notify('withUpperChar', 'works')
-  })]
-)
+t('listen and notify with upper case', async() => {
+  let result
+
+  const { unlisten } = await sql.listen('withUpperChar', x => result = x)
+  sql.notify('withUpperChar', 'works')
+  await delay(50)
+
+  return [
+    'works',
+    result,
+    unlisten()
+  ]
+})
 
 t('listen reconnects', async() => {
   const listener = postgres(options)
@@ -592,6 +599,29 @@ t('listen reconnects', async() => {
   await sql.notify('test', 'b')
   await delay(50)
   listener.end()
+
+  return ['ab', xs.join('')]
+})
+
+
+t('listen reconnects after connection error', { timeout: 2000 }, async() => {
+  const sql = postgres()
+      , xs = []
+
+  const a = (await sql`show data_directory`)[0].data_directory
+
+  const { state: { pid } } = await sql.listen('test', x => xs.push(x))
+  await sql.notify('test', 'a')
+  await sql`select pg_terminate_backend(${ pid }::int)`
+
+  cp.execSync('pg_ctl stop -D "' + a + '"')
+  await delay(50)
+  cp.execSync('pg_ctl start -D "' + a + '" -w -l "' + a + '/postgresql.log"')
+  await delay(50)
+
+  await sql.notify('test', 'b')
+  await delay(50)
+  sql.end()
 
   return ['ab', xs.join('')]
 })
