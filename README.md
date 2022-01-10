@@ -213,11 +213,10 @@ return user // => User
 
 // NOTE:
 const [first, second]: [User?] = await sql`SELECT * FROM users WHERE id = ${id}` // fails: `second` does not exist on `[User?]`
-// vs
-const [first, second] = await sql<[User?]>`SELECT * FROM users WHERE id = ${id}` // ok but should fail
+const [first, second] = await sql<[User?]>`SELECT * FROM users WHERE id = ${id}` // don't fail : `second: User | undefined`
 ```
 
-All the public API is typed. Also, TypeScript support is still in beta. Feel free to open an issue if you have trouble with types.
+We do our best to type all the public API, however types are not always updated when features are added ou changed. Feel free to open an issue if you have trouble with types.
 
 ## forEach ```sql` `.forEach(fn) -> Promise```
 
