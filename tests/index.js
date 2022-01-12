@@ -9,8 +9,7 @@ import net from 'net'
 import fs from 'fs'
 import crypto from 'crypto'
 
-/** @type {import('../types')} */
-import postgres from '../src/index.js'
+import postgres from '..'
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
 const rel = x => new URL(x, import.meta.url)
