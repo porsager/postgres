@@ -70,29 +70,22 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
   debug: boolean | ((connection: number, query: string, parameters: any[]) => void);
   /** Transform hooks */
   transform: {
-    /** Transforms incoming column names */
-    column?: (column: string) => string;
-    /** Transforms incoming row values */
-    value?: (value: any) => any;
-    /** Transforms entire rows */
-    row?: (row: postgres.Row) => any;
-  } | {
-    /** Transforms incoming column names */
-    column?: {
+    /** Transforms incoming and outgoing column names */
+    column?: ((column: string) => string) | {
       /** SQL to JS */
       from?: (column: string) => string;
       /** JS to SQL */
       to?: (column: string) => string;
     };
-    /** Transforms incoming row values */
-    value?: {
+    /** Transforms incoming and outgoing row values */
+    value?: ((value: any) => any) | {
       /** SQL to JS */
       from?: (value: unknown) => any;
       // /** JS to SQL */
       // to?: (value: unknown) => any; // unused
     };
     /** Transforms entire rows */
-    row?: {
+    row?: ((row: postgres.Row) => any) | {
       /** SQL to JS */
       from?: (row: postgres.Row) => any;
       // /** JS to SQL */
@@ -105,9 +98,12 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
    * Use 'read-write' with multiple hosts to ensure only connecting to primary
    * @default process.env['PGTARGETSESSIONATTRS']
    */
-  target_session_attrs: undefined | 'read-write';
-  /** Disable automatically fetching array types on initial connection. */
-  fetch_types: true;
+  target_session_attrs: undefined | 'read-write' | 'read-only' | 'primary' | 'standby' | 'prefer-standby';
+  /**
+   * Automatically fetches types on connect
+   * @default true
+   */
+  fetch_types: boolean;
   /**
    * Publications to subscribe to (only relevant when calling `sql.subscribe()`)
    * @default 'alltables'
@@ -125,78 +121,96 @@ interface JSToPostgresTypeMap {
   [name: string]: unknown;
 }
 
-declare class PostgresError extends Error {
-  name: 'PostgresError';
-  severity_local: string;
-  severity: string;
-  code: string;
-  position: string;
-  file: string;
-  line: string;
-  routine: string;
+declare const PRIVATE: unique symbol;
 
-  detail?: string;
-  hint?: string;
-  internal_position?: string;
-  internal_query?: string;
-  where?: string;
-  schema_name?: string;
-  table_name?: string;
-  column_name?: string;
-  data?: string;
-  type_name?: string;
-  constraint_name?: string;
+declare class NotAPromise {
+  private [PRIVATE]: never; // prevent user-side interface implementation
 
-  /** Only set when debug is enabled */
-  query: string;
-  /** Only set when debug is enabled */
-  parameters: any[];
-
-  // Disable user-side creation of PostgresError
-  private constructor();
+  /**
+   * @deprecated This object isn't an SQL query, and therefore not a Promise; use the tagged template string syntax instead: ```await sql\`...\`;```
+   * @throws NOT_TAGGED_CALL
+   */
+  private then(): never;
+  /**
+   * @deprecated This object isn't an SQL query, and therefore not a Promise; use the tagged template string syntax instead: ```await sql\`...\`;```
+   * @throws NOT_TAGGED_CALL
+   */
+  private catch(): never;
+  /**
+   * @deprecated This object isn't an SQL query, and therefore not a Promise; use the tagged template string syntax instead: ```await sql\`...\`;```
+   * @throws NOT_TAGGED_CALL
+   */
+  private finally(): never;
 }
 
 type UnwrapPromiseArray<T> = T extends any[] ? {
   [k in keyof T]: T[k] extends Promise<infer R> ? R : T[k]
 } : T;
 
-type PostgresErrorType = typeof PostgresError
-
 declare namespace postgres {
-  export const PostgresError: PostgresErrorType;
+  class PostgresError extends Error {
+    name: 'PostgresError';
+    severity_local: string;
+    severity: string;
+    code: string;
+    position: string;
+    file: string;
+    line: string;
+    routine: string;
+
+    detail?: string;
+    hint?: string;
+    internal_position?: string;
+    internal_query?: string;
+    where?: string;
+    schema_name?: string;
+    table_name?: string;
+    column_name?: string;
+    data?: string;
+    type_name?: string;
+    constraint_name?: string;
+
+    /** Only set when debug is enabled */
+    query: string;
+    /** Only set when debug is enabled */
+    parameters: any[];
+
+    // Disable user-side creation of PostgresError
+    private constructor();
+  }
 
   /**
-   * Convert a string from snake_case to PascalCase.
+   * Convert a snake_case string to PascalCase.
    * @param str The string from snake_case to convert
    * @returns The new string in PascalCase
    */
   function toPascal(str: string): string;
   /**
-   * Convert a string from PascalCase to snake_case.
+   * Convert a PascalCase string to snake_case.
    * @param str The string from snake_case to convert
    * @returns The new string in snake_case
    */
   function fromPascal(str: string): string;
   /**
-   * Convert a string from snake_case to camelCase.
+   * Convert a snake_case string to camelCase.
    * @param str The string from snake_case to convert
    * @returns The new string in camelCase
    */
   function toCamel(str: string): string;
   /**
-   * Convert a string from camelCase to snake_case.
+   * Convert a camelCase string to snake_case.
    * @param str The string from snake_case to convert
    * @returns The new string in snake_case
    */
   function fromCamel(str: string): string;
   /**
-   * Convert a string from snake_case to kebab-case.
+   * Convert a snake_case string to kebab-case.
    * @param str The string from snake_case to convert
    * @returns The new string in kebab-case
    */
   function toKebab(str: string): string;
   /**
-   * Convert a string from kebab-case to snake_case.
+   * Convert a kebab-case string to snake_case.
    * @param str The string from snake_case to convert
    * @returns The new string in snake_case
    */
@@ -208,7 +222,7 @@ declare namespace postgres {
     to: number;
     from: number[];
     serialize: T;
-    parse: (raw: postgres.SerializableParameter extends ReturnType<T> ? any : ReturnType<T>) => unknown;
+    parse: (raw: string) => unknown;
   }
 
   interface ConnectionParameters {
@@ -288,7 +302,7 @@ declare namespace postgres {
     [field: string]: string;
   }
 
-  interface Parameter<T = SerializableParameter> {
+  interface Parameter<T = SerializableParameter> extends NotAPromise {
     /**
      * PostgreSQL OID of the type
      */
@@ -325,6 +339,7 @@ declare namespace postgres {
 
   interface GenericError extends globalThis.Error {
     code:
+    | '57014' // canceling statement due to user request
     | 'NOT_TAGGED_CALL'
     | 'UNDEFINED_VALUE'
     | 'MAX_PARAMETERS_EXCEEDED'
@@ -369,6 +384,26 @@ declare namespace postgres {
     unsubscribe(): void;
   }
 
+  interface LargeObject {
+    writable(options?: {
+      highWaterMark?: number,
+      start?: number
+    }): Promise<import('node:stream').Writable>;
+    readable(options?: {
+      highWaterMark?: number,
+      start?: number,
+      end?: number
+    }): Promise<import('node:stream').Readable>;
+
+    close(): Promise<void>;
+    tell(): Promise<void>;
+    read(size: number): Promise<void>;
+    write(buffer: Uint8Array): Promise<[{ data: Uint8Array }]>;
+    truncate(size: number): Promise<void>;
+    seek(offset: number, whence?: number): Promise<void>;
+    size(): Promise<[{ position: bigint, size: bigint }]>;
+  }
+
   type Serializable = null
     | boolean
     | number
@@ -380,6 +415,7 @@ declare namespace postgres {
     | Helper<any>
     | Parameter<any>
     | ArrayParameter
+    | Record<string, any> // implicit JSON
     | readonly SerializableParameter[];
 
   type HelperSerializable = { [index: string]: SerializableParameter } | { [index: string]: SerializableParameter }[];
@@ -418,9 +454,20 @@ declare namespace postgres {
     secret: number;
   }
 
+  interface Statement {
+    /** statement unique name */
+    name: string;
+    /** sql query */
+    string: string;
+    /** parameters types */
+    types: number[];
+    columns: ColumnList<string>;
+  }
+
   interface ResultMeta<T extends number | null> {
     count: T; // For tuples
     command: string;
+    statement: Statement;
     state: State;
   }
 
@@ -436,18 +483,30 @@ declare namespace postgres {
     readable(): import('node:stream').Readable;
     writable(): import('node:stream').Writable;
 
-    stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
+    execute(): this;
+    cancel(): void;
 
-    cursor(cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
-    cursor(size: 1, cb: (row: NonNullable<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
-    cursor(size: number, cb: (rows: NonNullable<TRow[number]>[]) => void): Promise<ExecutionResult<TRow[number]>>;
+    /**
+     * @deprecated `.stream` has been renamed to `.forEach`
+     * @throws
+     */
+    stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<TRow[number]>) => void): never;
+    forEach(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<TRow[number]>) => void): Promise<ExecutionResult<TRow[number]>>;
+
+    cursor(rows?: number): AsyncIterable<NonNullable<TRow[number]>[]>;
+    cursor(cb: (row: [NonNullable<TRow[number]>]) => void): Promise<ExecutionResult<TRow[number]>>;
+    cursor(rows: number, cb: (rows: NonNullable<TRow[number]>[]) => void): Promise<ExecutionResult<TRow[number]>>;
   }
 
-  interface RawPendingQuery<TRow extends readonly MaybeRow[]> extends Promise<RawRowList<TRow>>, PendingQueryModifiers<Buffer[][]> {
+  interface PendingDescribeQuery extends Promise<Statement> {
+  }
+
+  interface PendingRawQuery<TRow extends readonly MaybeRow[]> extends Promise<RawRowList<TRow>>, PendingQueryModifiers<Buffer[][]> {
   }
 
   interface PendingQuery<TRow extends readonly MaybeRow[]> extends Promise<RowList<TRow>>, PendingQueryModifiers<TRow> {
-    raw(): RawPendingQuery<TRow>;
+    describe(): PendingDescribeQuery;
+    raw(): PendingRawQuery<TRow>;
   }
 
   interface PendingRequest extends Promise<[] & ResultMeta<null>> { }
@@ -457,7 +516,7 @@ declare namespace postgres {
     unlisten(): Promise<void>
   }
 
-  interface Helper<T, U extends any[] = T[]> {
+  interface Helper<T, U extends any[] = T[]> extends NotAPromise {
     first: T;
     rest: U;
   }
@@ -488,7 +547,8 @@ declare namespace postgres {
      */
     <T extends object | readonly object[], U extends SerializableKeys<T extends readonly object[] ? T[number] : T>>(objOrArray: T, ...keys: U[]): Helper<T, U[]>;
 
-    END: {}; // FIXME unique symbol ?
+    CLOSE: {};
+    END: this['CLOSE'];
     PostgresError: typeof PostgresError;
 
     options: ParsedOptions<TTypes>;
@@ -507,12 +567,14 @@ declare namespace postgres {
 
     subscribe(event: string, cb: (row: Row | null, info: ReplicationEvent) => void): Promise<SubscriptionHandle>;
 
+    largeObject(oid?: number, /** @default 0x00020000 | 0x00040000 */ mode?: number): Promise<LargeObject>;
+
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 
-    array<T extends SerializableParameter[] = SerializableParameter[]>(value: T): ArrayParameter<T>;
-    file<T extends readonly any[] = Row[]>(path: string, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
-    file<T extends readonly any[] = Row[]>(path: string, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
+    array<T extends SerializableParameter[] = SerializableParameter[]>(value: T, type?: number): ArrayParameter<T>;
+    file<T extends readonly any[] = Row[]>(path: import('node:fs').PathOrFileDescriptor, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
+    file<T extends readonly any[] = Row[]>(path: import('node:fs').PathOrFileDescriptor, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
     json(value: any): Parameter;
   }
 
