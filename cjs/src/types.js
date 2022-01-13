@@ -216,6 +216,9 @@ function arrayEscape(x) {
 }
 
 const arraySerializer = module.exports.arraySerializer = function arraySerializer(xs, serializer) {
+  if (Array.isArray(xs) === false)
+    return xs
+
   if (!xs.length)
     return '{}'
 

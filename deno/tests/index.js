@@ -125,6 +125,10 @@ t('Empty array', async() =>
   [true, Array.isArray((await sql`select ${ sql.array([], 1009) } as x`)[0].x)]
 )
 
+t('String array', async() =>
+  ['123', (await sql`select ${ '{1,2,3}' }::int[] as x`)[0].x.join('')]
+)
+
 t('Array of Integer', async() =>
   ['3', (await sql`select ${ sql.array([1, 2, 3]) } as x`)[0].x[2]]
 )
