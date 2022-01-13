@@ -224,12 +224,23 @@ t('Savepoint returns Result', async() => {
   return [1, result[0].x]
 })
 
-t('Transaction requests are executed implicitly', async() => [
-  'testing',
-  (await sql.begin(async sql => {
-    sql`select set_config('postgres_js.test', 'testing', true)`
-    return await sql`select current_setting('postgres_js.test') as x`
-  }))[0].x
+t('Transaction requests are executed implicitly', async() => {
+  const sql = postgres({ debug: true, idle_timeout: 1, fetch_types: false })
+  return [
+    'testing',
+    (await sql.begin(async sql => {
+      sql`select set_config('postgres_js.test', 'testing', true)`
+      return await sql`select current_setting('postgres_js.test') as x`
+    }))[0].x
+  ]
+})
+
+t('Uncaught transaction request errors bubbles to transaction', async() => [
+  '42703',
+  (await sql.begin(sql => (
+    sql`select wat`,
+    sql`select current_setting('postgres_js.test') as x, ${ 1 } as a`
+  )).catch(e => e.code))
 ])
 
 t('Parallel transactions', async() => {

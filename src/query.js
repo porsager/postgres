@@ -104,8 +104,8 @@ export default class Query extends Promise {
     return this
   }
 
-  handle() {
-    !this.executed && this.handler((this.executed = true, this))
+  async handle() {
+    !this.executed && (this.executed = true) && await 1 && this.handler(this)
   }
 
   execute() {
