@@ -636,11 +636,12 @@ t('listen and notify with upper case', async() => {
   ]
 })
 
-t('listen reconnects', { timeout: 4 }, async() => {
+t('listen reconnects', { timeout: 2 }, async() => {
   const sql = postgres(options)
       , xs = []
 
   const { state: { pid } } = await sql.listen('test', x => xs.push(x))
+  await delay(200)
   await sql.notify('test', 'a')
   await sql`select pg_terminate_backend(${ pid }::int)`
   await delay(200)
@@ -1296,13 +1297,13 @@ t('requests works after single connect_timeout', async() => {
   const sql = postgres({
     ...options,
     ...login_scram,
-    connect_timeout: { valueOf() { return first ? (first = false, 0.01) : 1 } }
+    connect_timeout: { valueOf() { return first ? (first = false, 0.001) : 1 } }
   })
 
   return [
     'CONNECT_TIMEOUT,,1',
     [
-      await sql`select 1 as x`.catch(x => x.code),
+      await sql`select 1 as x`.then(() => 'success', x => x.code),
       await delay(10),
       (await sql`select 1 as x`)[0].x
     ].join(',')
@@ -1706,7 +1707,7 @@ t('Describe a statement', async() => {
     `${ r.types.join(',') }/${ r.columns.map(c => `${c.name}:${c.type}`).join(',') }`,
     await sql`drop table tester`
   ]
- })
+})
 
 t('Describe a statement without parameters', async() => {
   await sql`create table tester (name text, age int)`
@@ -1716,9 +1717,9 @@ t('Describe a statement without parameters', async() => {
     `${ r.types.length },${ r.columns.length }`,
     await sql`drop table tester`
   ]
- })
+})
 
-t('Describe a statement without columns', async () => {
+t('Describe a statement without columns', async() => {
   await sql`create table tester (name text, age int)`
   const r = await sql`insert into tester (name, age) values ($1, $2)`.describe()
   return [
@@ -1726,7 +1727,7 @@ t('Describe a statement without columns', async () => {
     `${ r.types.length },${ r.columns.length }`,
     await sql`drop table tester`
   ]
- })
+})
 
 t('Large object', async() => {
   const file = rel('index.js')

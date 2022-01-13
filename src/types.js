@@ -53,7 +53,7 @@ export class Identifier extends NotTagged {
     super()
     this.value = escapeIdentifier(value)
   }
-};
+}; // eslint-disable-line
 
 export class Parameter extends NotTagged {
   constructor(value, type, array) {
@@ -62,7 +62,7 @@ export class Parameter extends NotTagged {
     this.type = type
     this.array = array
   }
-};
+}; // eslint-disable-line
 
 export class Builder extends NotTagged {
   constructor(first, rest) {
@@ -78,7 +78,7 @@ export class Builder extends NotTagged {
 
     return keyword.fn(this.first, this.rest, parameters, types, transform)
   }
-};
+}; // eslint-disable-line
 
 export function handleValue(x, parameters, types) {
   if (Array.isArray(x))

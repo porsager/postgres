@@ -94,7 +94,7 @@ function Postgres(a, b) {
         : typeof strings === 'string' && !args.length
           ? new Identifier(options.transform.column.to ? options.transform.column.to(strings) : strings)
           : new Builder(strings, args)
-      instant && query instanceof Query && Promise.resolve().then(() => { !query.fragment && query.execute() })
+      instant && query instanceof Query && query.execute()
       return query
     }
 
@@ -105,7 +105,7 @@ function Postgres(a, b) {
         ...options,
         simple: 'simple' in options ? options.simple : args.length === 0
       })
-      instant && Promise.resolve().then(() => { !query.fragment && query.execute() })
+      instant && query.execute()
       return query
     }
 
@@ -123,7 +123,7 @@ function Postgres(a, b) {
         ...options,
         simple: 'simple' in options ? options.simple : args.length === 0
       })
-      instant && Promise.resolve().then(() => { !query.fragment && query.execute() })
+      instant && query.execute()
       return query
     }
   }
@@ -179,65 +179,66 @@ function Postgres(a, b) {
 
   async function begin(options, fn) {
     !fn && (fn = options, options = '')
-    return new Promise(async(resolve, reject) => {
-      await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).catch(reject)
+    const queries = Queue()
+    let savepoints = 0
+      , connection
 
-      function onexecute(c) {
-        const queries = Queue()
-        let savepoints = 0
-
-        queues[c.state].remove(c)
-        c.state = 'reserved'
-        c.reserved = () => queries.length && handler(queries.shift())
-        reserved.push(c)
-
-        const sql = Sql(handler, true)
-        sql.savepoint = savepoint
-
-        start()
-
-        return false
-
-        async function start() {
-          try {
-            const xs = fn(sql)
-            const result = await (Array.isArray(xs) ? Promise.all(xs) : xs)
-            await sql`commit`
-            resolve(result)
-          } catch (error) {
-            await sql`rollback`.catch(reject)
-            reject(error)
-          }
-          c.reserved = null
-          onopen(c)
-        }
-
-        async function savepoint(name, fn) {
-          if (name && Array.isArray(name.raw))
-            return savepoint(sql => sql.apply(sql, arguments))
-
-          try {
-            arguments.length === 1 && (fn = name, name = null)
-            name = 's' + savepoints++ + (name ? '_' + name : '')
-            await sql`savepoint ${ sql(name) }`
-          } catch (err) {
-            reject(err)
-          }
-          try {
-            return await Promise.resolve(fn(sql))
-          } catch (err) {
-            await sql`rollback to ${ sql(name) }`
-            throw err
-          }
-        }
-
-        function handler(query) {
-          c.state === 'full'
-            ? queries.push(query)
-            : c.execute(query)
-        }
+    try {
+      await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute })
+      return await scope(connection, fn)
+    } catch (error) {
+      throw error
+    } finally {
+      if (connection) {
+        connection.reserved = null
+        onopen(connection)
       }
-    })
+    }
+
+    async function scope(c, fn, name) {
+      const sql = Sql(handler, true)
+      sql.savepoint = savepoint
+      let errored
+      name && await sql`savepoint ${ sql(name) }`
+      try {
+        const result = await new Promise((resolve, reject) => {
+          errored = reject
+          const x = fn(sql)
+          Promise.resolve(Array.isArray(x) ? Promise.all(x) : x).then(resolve, reject)
+        })
+        !name && await sql`commit`
+        return result
+      } catch (e) {
+        await (name
+          ? sql`rollback to ${ sql(name) }`
+          : sql`rollback`
+        )
+        throw e
+      }
+
+      function savepoint(name, fn) {
+        if (name && Array.isArray(name.raw))
+          return savepoint(sql => sql.apply(sql, arguments))
+
+        arguments.length === 1 && (fn = name, name = null)
+        return scope(c, fn, 's' + savepoints++ + (name ? '_' + name : ''))
+      }
+
+      function handler(q) {
+        errored && q.catch(errored)
+        c.state === 'full'
+          ? queries.push(q)
+          : c.execute(q) || (c.state = 'full', full.push(c))
+      }
+    }
+
+    function onexecute(c) {
+      queues[c.state].remove(c)
+      c.state = 'reserved'
+      c.reserved = () => queries.length && c.execute(queries.shift())
+      reserved.push(c)
+      connection = c
+    }
   }
 
   function largeObject(oid, mode = 0x00020000 | 0x00040000) {
@@ -357,10 +358,11 @@ function Postgres(a, b) {
     })
   }
 
-  function end({ timeout = null } = {}) {
+  async function end({ timeout = null } = {}) {
     if (ending)
       return ending
 
+    await 1
     let timer
     return ending = Promise.race([
       new Promise(r => timeout !== null && (timer = setTimeout(destroy, timeout * 1000, r))),

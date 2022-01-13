@@ -839,7 +839,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   /* c8 ignore next 3 */
   function EmptyQueryResponse() {
-
+    /* noop */
   }
 
   /* c8 ignore next 3 */
@@ -854,12 +854,12 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   /* c8 ignore next 3 */
   function UnknownMessage(x) {
-    console.error('Unknown message', x)
+    console.error('Postgres.js : Unknown Message:', x[0]) // eslint-disable-line
   }
 
   /* c8 ignore next 3 */
   function UnknownAuth(x, type) {
-    console.error('Unknown auth', type)
+    console.error('Postgres.js : Unknown Auth:', type) // eslint-disable-line
   }
 
   /* Messages */

@@ -226,12 +226,23 @@ t('Savepoint returns Result', async() => {
   return [1, result[0].x]
 })
 
-t('Transaction requests are executed implicitly', async() => [
-  'testing',
-  (await sql.begin(async sql => {
-    sql`select set_config('postgres_js.test', 'testing', true)`
-    return await sql`select current_setting('postgres_js.test') as x`
-  }))[0].x
+t('Transaction requests are executed implicitly', async() => {
+  const sql = postgres({ debug: true, idle_timeout: 1, fetch_types: false })
+  return [
+    'testing',
+    (await sql.begin(async sql => {
+      sql`select set_config('postgres_js.test', 'testing', true)`
+      return await sql`select current_setting('postgres_js.test') as x`
+    }))[0].x
+  ]
+})
+
+t('Uncaught transaction request errors bubbles to transaction', async() => [
+  '42703',
+  (await sql.begin(sql => (
+    sql`select wat`,
+    sql`select current_setting('postgres_js.test') as x, ${ 1 } as a`
+  )).catch(e => e.code))
 ])
 
 t('Parallel transactions', async() => {
@@ -627,11 +638,12 @@ t('listen and notify with upper case', async() => {
   ]
 })
 
-t('listen reconnects', { timeout: 4 }, async() => {
+t('listen reconnects', { timeout: 2 }, async() => {
   const sql = postgres(options)
       , xs = []
 
   const { state: { pid } } = await sql.listen('test', x => xs.push(x))
+  await delay(200)
   await sql.notify('test', 'a')
   await sql`select pg_terminate_backend(${ pid }::int)`
   await delay(200)
@@ -1287,13 +1299,13 @@ t('requests works after single connect_timeout', async() => {
   const sql = postgres({
     ...options,
     ...login_scram,
-    connect_timeout: { valueOf() { return first ? (first = false, 0.01) : 1 } }
+    connect_timeout: { valueOf() { return first ? (first = false, 0.001) : 1 } }
   })
 
   return [
     'CONNECT_TIMEOUT,,1',
     [
-      await sql`select 1 as x`.catch(x => x.code),
+      await sql`select 1 as x`.then(() => 'success', x => x.code),
       await delay(10),
       (await sql`select 1 as x`)[0].x
     ].join(',')
@@ -1697,7 +1709,7 @@ t('Describe a statement', async() => {
     `${ r.types.join(',') }/${ r.columns.map(c => `${c.name}:${c.type}`).join(',') }`,
     await sql`drop table tester`
   ]
- })
+})
 
 t('Describe a statement without parameters', async() => {
   await sql`create table tester (name text, age int)`
@@ -1707,9 +1719,9 @@ t('Describe a statement without parameters', async() => {
     `${ r.types.length },${ r.columns.length }`,
     await sql`drop table tester`
   ]
- })
+})
 
-t('Describe a statement without columns', async () => {
+t('Describe a statement without columns', async() => {
   await sql`create table tester (name text, age int)`
   const r = await sql`insert into tester (name, age) values ($1, $2)`.describe()
   return [
@@ -1717,7 +1729,7 @@ t('Describe a statement without columns', async () => {
     `${ r.types.length },${ r.columns.length }`,
     await sql`drop table tester`
   ]
- })
+})
 
 nt('Large object', async() => {
   const file = rel('index.js')
