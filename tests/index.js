@@ -9,7 +9,7 @@ import net from 'net'
 import fs from 'fs'
 import crypto from 'crypto'
 
-import postgres from '..'
+import postgres from '../src/index.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
 const rel = x => new URL(x, import.meta.url)
@@ -1744,5 +1744,87 @@ t('Large object', async() => {
     md5,
     out.digest('hex'),
     await lo.close()
+  ]
+})
+
+t('Catches type serialize errors', async() => {
+  const sql = postgres({
+    idle_timeout,
+    types: {
+      text: {
+        from: 25,
+        to: 25,
+        parse: x => x,
+        serialize: () => { throw new Error('watSerialize') }
+      }
+    }
+  })
+
+  return [
+    'watSerialize',
+    (await sql`select ${ 'wat' }`.catch(e => e.message))
+  ]
+})
+
+t('Catches type parse errors', async() => {
+  const sql = postgres({
+    idle_timeout,
+    types: {
+      text: {
+        from: 25,
+        to: 25,
+        parse: () => { throw new Error('watParse') },
+        serialize: x => x
+      }
+    }
+  })
+
+  return [
+    'watParse',
+    (await sql`select 'wat'`.catch(e => e.message))
+  ]
+})
+
+t('Catches type serialize errors in transactions', async() => {
+  const sql = postgres({
+    idle_timeout,
+    types: {
+      text: {
+        from: 25,
+        to: 25,
+        parse: x => x,
+        serialize: () => { throw new Error('watSerialize') }
+      }
+    }
+  })
+
+  return [
+    'watSerialize',
+    (await sql.begin(sql => (
+      sql`select 1`,
+      sql`select ${ 'wat' }`
+    )).catch(e => e.message))
+  ]
+})
+
+t('Catches type parse errors in transactions', async() => {
+  const sql = postgres({
+    idle_timeout,
+    types: {
+      text: {
+        from: 25,
+        to: 25,
+        parse: () => { throw new Error('watParse') },
+        serialize: x => x
+      }
+    }
+  })
+
+  return [
+    'watParse',
+    (await sql.begin(sql => (
+      sql`select 1`,
+      sql`select 'wat'`
+    )).catch(e => e.message))
   ]
 })

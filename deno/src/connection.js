@@ -315,7 +315,12 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
         break
       }
 
-      handle(incoming.slice(0, length + 1))
+      try {
+        handle(incoming.slice(0, length + 1))
+      } catch (e) {
+        query && (query.cursorFn || query.describeFirst) && write(Sync)
+        errored(e)
+      }
       incoming = incoming.slice(length + 1)
       remaining = 0
       incomings = null
@@ -368,9 +373,6 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   }
 
   function queryError(query, err) {
-    if (err.query)
-      return
-
     err.stack += query.origin.replace(/.*\n/, '\n')
     Object.defineProperties(err, {
       query: { value: query.string, enumerable: options.debug },
@@ -402,6 +404,9 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   }
 
   function closed(hadError) {
+    incoming = Buffer.alloc(0)
+    remaining = 0
+    incomings = null
     clearImmediate(nextWriteTimer)
     socket.removeListener('data', data)
     socket.removeListener('connect', connected)
@@ -842,7 +847,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   /* c8 ignore next 3 */
   function EmptyQueryResponse() {
-
+    /* noop */
   }
 
   /* c8 ignore next 3 */
@@ -857,12 +862,12 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   /* c8 ignore next 3 */
   function UnknownMessage(x) {
-    console.error('Unknown message', x)
+    console.error('Postgres.js : Unknown Message:', x[0]) // eslint-disable-line
   }
 
   /* c8 ignore next 3 */
   function UnknownAuth(x, type) {
-    console.error('Unknown auth', type)
+    console.error('Postgres.js : Unknown Auth:', type) // eslint-disable-line
   }
 
   /* Messages */

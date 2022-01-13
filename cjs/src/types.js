@@ -53,7 +53,7 @@ class Identifier extends NotTagged {
     super()
     this.value = escapeIdentifier(value)
   }
-};module.exports.Identifier = Identifier
+};module.exports.Identifier = Identifier // eslint-disable-line
 
 class Parameter extends NotTagged {
   constructor(value, type, array) {
@@ -62,7 +62,7 @@ class Parameter extends NotTagged {
     this.type = type
     this.array = array
   }
-};module.exports.Parameter = Parameter
+};module.exports.Parameter = Parameter // eslint-disable-line
 
 class Builder extends NotTagged {
   constructor(first, rest) {
@@ -78,7 +78,7 @@ class Builder extends NotTagged {
 
     return keyword.fn(this.first, this.rest, parameters, types, transform)
   }
-};module.exports.Builder = Builder
+};module.exports.Builder = Builder // eslint-disable-line
 
 module.exports.handleValue = handleValue;function handleValue(x, parameters, types) {
   if (Array.isArray(x))

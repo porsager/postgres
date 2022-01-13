@@ -4,7 +4,7 @@ class PostgresError extends Error {
     this.name = this.constructor.name
     Object.assign(this, x)
   }
-};module.exports.PostgresError = PostgresError
+};module.exports.PostgresError = PostgresError // eslint-disable-line
 
 const Errors = module.exports.Errors = {
   connection,

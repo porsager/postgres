@@ -19,9 +19,9 @@ function ignore(cmd, args) {
     throw stderr
 }
 
-export async function exec(cmd, args) {
+export async function exec(cmd, args) { // eslint-disable-line
   let stderr = ''
-  const cp = await spawn(cmd, args, { stdio: 'pipe', encoding: 'utf8' })
+  const cp = await spawn(cmd, args, { stdio: 'pipe', encoding: 'utf8' }) // eslint-disable-line
   cp.stderr.on('data', x => stderr += x)
   await new Promise(x => cp.on('exit', x))
   if (stderr && !stderr.includes('already exists') && !stderr.includes('does not exist'))
