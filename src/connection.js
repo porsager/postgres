@@ -91,6 +91,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     , rows = 0
     , serverSignature = null
     , nextWriteTimer = null
+    , terminated = false
     , incomings = null
     , results = null
     , initial = null
@@ -143,6 +144,9 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   }
 
   function execute(q) {
+    if (terminated)
+      return q.reject(Errors.connection('CONNECTION_DESTROYED', options))
+
     if (q.cancelled)
       return
 
@@ -325,6 +329,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   }
 
   function connect() {
+    terminated = false
     backendParameters = {}
     connectTimer.start()
     socket.on('connect', ssl ? secure : connected)
@@ -370,14 +375,13 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   }
 
   function queryError(query, err) {
-    err.stack += query.origin.replace(/.*\n/, '\n')
-    Object.defineProperties(err, {
+    query.reject(Object.create(err, {
+      stack: { value: err.stack + query.origin.replace(/.*\n/, '\n'), enumerable: options.debug },
       query: { value: query.string, enumerable: options.debug },
       parameters: { value: query.parameters, enumerable: options.debug },
       args: { value: query.args, enumerable: options.debug },
       types: { value: query.statement && query.statement.types, enumerable: options.debug }
-    })
-    query.reject(err)
+    }))
   }
 
   function end() {
@@ -390,6 +394,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   }
 
   function terminate() {
+    terminated = true
     if (query || initial || sent.length)
       error(Errors.connection('CONNECTION_DESTROYED', options))
 
@@ -499,7 +504,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     }
   }
 
-  function ReadyForQuery() {
+  function ReadyForQuery(x) {
     query && query.options.simple && query.resolve(results || result)
     query = results = null
     result = new Result()
@@ -524,13 +529,14 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     while (sent.length && (query = sent.shift()) && (query.active = true) && query.cancelled)
       Connection(options, {}).cancel(query.state, query.cancelled.resolve, query.cancelled.reject)
 
-    if (query) // Consider opening if able and sent.length < 50
-      return
+    if (query)
+      return // Consider opening if able and sent.length < 50
 
-    ending
-      ? terminate()
-      : onopen(connection)
-
+    connection.reserved && x[5] !== 73
+      ? connection.reserved()
+      : ending
+        ? terminate()
+        : onopen(connection)
   }
 
   function CommandComplete(x) {

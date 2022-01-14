@@ -235,7 +235,9 @@ function Postgres(a, b) {
     function onexecute(c) {
       queues[c.state].remove(c)
       c.state = 'reserved'
-      c.reserved = () => queries.length && c.execute(queries.shift())
+      c.reserved = () => queries.length
+        ? c.execute(queries.shift())
+        : c.state = 'reserved'
       reserved.push(c)
       connection = c
     }
@@ -394,14 +396,6 @@ function Postgres(a, b) {
 
   function onopen(c) {
     queues[c.state].remove(c)
-
-    if (c.reserved) {
-      c.state = 'reserved'
-      c.reserved()
-      reserved.push(c)
-      return
-    }
-
     if (queries.length === 0)
       return (c.state = 'open', open.push(c))
 

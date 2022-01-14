@@ -1832,3 +1832,18 @@ t('Catches type parse errors in transactions', async() => {
     )).catch(e => e.message))
   ]
 })
+
+t('Prevent premature end of connection in transaction', async() => {
+  const sql = postgres({ max_lifetime: 0.1, idle_timeout })
+  const result = await sql.begin(async sql => {
+    await sql`select 1`
+    await delay(200)
+    return 'yay'
+  })
+
+
+  return [
+    'yay',
+    result
+  ]
+})
