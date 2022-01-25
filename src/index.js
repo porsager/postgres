@@ -81,7 +81,6 @@ function Postgres(a, b) {
       }, {}),
       unsafe,
       array,
-      jsonb,
       json,
       file
     })
@@ -312,12 +311,8 @@ function Postgres(a, b) {
     })
   }
 
-  function jsonb(x) {
-    return new Parameter(x, 3802)
-  }
-
   function json(x) {
-    return new Parameter(x, 114)
+    return new Parameter(x, 3802)
   }
 
   function array(x, type) {
