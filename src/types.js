@@ -81,9 +81,6 @@ export class Builder extends NotTagged {
 }; // eslint-disable-line
 
 export function handleValue(x, parameters, types) {
-  if (Array.isArray(x))
-    return x.map(x => handleValue(x, parameters, types)).join(',')
-
   const value = x instanceof Parameter ? x.value : x
   if (value === undefined)
     throw Errors.generic({ code: 'UNDEFINED_VALUE', message: 'Undefined values are not allowed' })

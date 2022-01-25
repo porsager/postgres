@@ -874,7 +874,7 @@ t('dynamic insert pluck', async() => {
 
 t('array insert', async() => {
   await sql`create table test (a int, b int)`
-  return [2, (await sql`insert into test (a, b) values (${ [1, 2] }) returning *`)[0].b, await sql`drop table test`]
+  return [2, (await sql`insert into test (a, b) values ${ sql([1, 2]) } returning *`)[0].b, await sql`drop table test`]
 })
 
 t('parameters in()', async() => {
@@ -882,7 +882,7 @@ t('parameters in()', async() => {
     with rows as (
       select * from (values (1), (2), (3), (4)) as x(a)
     )
-    select * from rows where a in (${ [3, 4] })
+    select * from rows where a in ${ sql([3, 4]) }
   `).count]
 })
 
