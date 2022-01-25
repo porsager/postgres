@@ -81,6 +81,7 @@ function Postgres(a, b) {
       }, {}),
       unsafe,
       array,
+      jsonb,
       json,
       file
     })
@@ -309,6 +310,10 @@ function Postgres(a, b) {
         }
       }).catch(reject)
     })
+  }
+
+  function jsonb(x) {
+    return new Parameter(x, 3802)
   }
 
   function json(x) {
