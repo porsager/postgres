@@ -815,7 +815,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   /* c8 ignore next 3 */
   function CopyBothResponse() {
-    stream = new Stream.Readable({
+    stream = new Stream.Duplex({
       read() { socket.resume() },
       /* c8 ignore next 11 */
       write(chunk, encoding, callback) {

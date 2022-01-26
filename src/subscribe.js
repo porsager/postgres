@@ -7,14 +7,26 @@ export default function Subscribe(postgres, options) {
     event = parseEvent(event)
 
     options.max = 1
+    options.onclose = onclose
     options.connection = {
       ...options.connection,
       replication: 'database'
     }
 
-    const sql = postgres(options)
+    let stream
+      , ended = false
 
-    !connection && (subscribe.sql = sql, connection = init(sql, options.publications))
+    const sql = postgres(options)
+        , slot = 'postgresjs_' + Math.random().toString(36).slice(2)
+        , end = sql.end
+
+    sql.end = async() => {
+      ended = true
+      stream && (await new Promise(r => (stream.once('end', r), stream.end())))
+      return end()
+    }
+
+    !connection && (subscribe.sql = sql, connection = init(sql, slot, options.publications))
 
     const fns = listeners.has(event)
       ? listeners.get(event).add(fn)
@@ -25,14 +37,18 @@ export default function Subscribe(postgres, options) {
       fns.size === 0 && listeners.delete(event)
     }
 
-    return connection.then(() => ({ unsubscribe }))
+    return connection.then(x => (stream = x, { unsubscribe }))
+
+    async function onclose() {
+      stream = null
+      !ended && (stream = await init(sql, slot, options.publications))
+    }
   }
 
-  async function init(sql, publications = 'alltables') {
+  async function init(sql, slot, publications = 'alltables') {
     if (!publications)
       throw new Error('Missing publication names')
 
-    const slot = 'postgresjs_' + Math.random().toString(36).slice(2)
     const [x] = await sql.unsafe(
       `CREATE_REPLICATION_SLOT ${ slot } TEMPORARY LOGICAL pgoutput NOEXPORT_SNAPSHOT`
     )
@@ -48,6 +64,12 @@ export default function Subscribe(postgres, options) {
     }
 
     stream.on('data', data)
+    stream.on('error', (error) => {
+      console.error('Logical Replication Error - Reconnecting', error)
+      sql.end()
+    })
+
+    return stream
 
     function data(x) {
       if (x[0] === 0x77)
