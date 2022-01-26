@@ -370,6 +370,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   }
 
   function errored(err) {
+    stream && (stream.destroy(err), stream = null)
     query && queryError(query, err)
     initial && (queryError(initial, err), initial = null)
   }
@@ -395,7 +396,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   function terminate() {
     terminated = true
-    if (query || initial || sent.length)
+    if (stream || query || initial || sent.length)
       error(Errors.connection('CONNECTION_DESTROYED', options))
 
     clearImmediate(nextWriteTimer)
@@ -815,7 +816,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   /* c8 ignore next 3 */
   function CopyBothResponse() {
-    stream = new Stream.Readable({
+    stream = new Stream.Duplex({
       read() { socket.resume() },
       /* c8 ignore next 11 */
       write(chunk, encoding, callback) {
@@ -839,6 +840,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   function CopyDone() {
     stream.push(null)
+    stream = null
   }
 
   function NoticeResponse(x) {

@@ -312,7 +312,7 @@ function Postgres(a, b) {
   }
 
   function json(x) {
-    return new Parameter(x, 114)
+    return new Parameter(x, 3802)
   }
 
   function array(x, type) {
