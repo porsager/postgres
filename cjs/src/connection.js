@@ -245,7 +245,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   function fragment(string, q, parameters, types) {
     q.fragment = true
-    return stringify(q, string + q.strings[0], q.args[0], parameters, types)
+    return stringify(q, q.strings[0], q.args[0], parameters, types)
   }
 
   function write(x, fn) {
@@ -533,7 +533,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     if (query)
       return // Consider opening if able and sent.length < 50
 
-    connection.reserved && x[5] !== 73
+    connection.reserved && x[5] !== 73 // I
       ? connection.reserved()
       : ending
         ? terminate()

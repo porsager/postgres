@@ -9,7 +9,7 @@ const types = module.exports.types = {
   },
   number: {
     to: 0,
-    from: [21, 23, 26, 700],
+    from: [21, 23, 26, 700, 701],
     serialize: x => '' + x,
     parse: x => +x
   },
