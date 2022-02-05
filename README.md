@@ -14,29 +14,29 @@
 <img height="220" alt="Good UX with Postgres.js" src="https://raw.githubusercontent.com/porsager/postgres/master/demo.gif" />
 <br>
 
-**Install**
+**Installation**
 ```bash
 $ npm install postgres
 ```
 
-**Use**
+**Usage**
 ```js
-// db.js
 const postgres = require('postgres')
+// import postgres from 'postgres'
 
 const sql = postgres({ ...options }) // will default to the same as psql
 
-module.exports = sql
-```
+const insertUser = await sql`
+  INSERT INTO users ${
+    sql({ name: "Serena", age: 35 })
+  } RETURNING *
+`;
+// [{ name: "Serena", age: 35 }]
 
-```js
-// other.js
-const sql = require('./db.js')
-
-const users = await sql`
+const selectUsers = await sql`
   select name, age from users
 `
-// users: [{ name: 'Murray', age: 68 }, { name: 'Walter', age: 78 }]
+// [{ name: "Serena", age: 35 }, { name: 'Murray', age: 68 }, ...]
 ```
 
 ## Connection options `postgres([url], [options])`
@@ -53,6 +53,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   password             : '',            // Password of database user
   ssl                  : false,         // true, prefer, require, tls.connect options
   max                  : 10,            // Max number of connections
+  max_lifetime         : 10,            // Maximum lifetime of a connection in seconds
   idle_timeout         : 0,             // Idle connection timeout in seconds
   connect_timeout      : 30,            // Connect timeout in seconds
   no_prepare           : false,         // No automatic creation of prepared statements
@@ -71,15 +72,14 @@ const sql = postgres('postgres://username:password@host:port/database', {
   },
   target_session_attrs : null,          // Use 'read-write' with multiple hosts to 
                                         // ensure only connecting to primary
-  fetch_types           : true,         // Automatically fetches types on connect
+  fetch_types          : true,          // Automatically fetches types on connect
                                         // on initial connection.
 })
 ```
 
 ### SSL
-More info for the `ssl` option can be found in the [Node.js docs for tls connect options](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options).
 
-Although it is [vulnerable to MITM attacks](https://security.stackexchange.com/a/229297/174913), a common configuration for the `ssl` option for some cloud providers like Heroku is to set `rejectUnauthorized` to `false` (if `NODE_ENV` is `production`):
+Although [vulnerable to MITM attacks](https://security.stackexchange.com/a/229297/174913), a common configuration for the `ssl` option for some cloud providers is to set `rejectUnauthorized` to `false` (if `NODE_ENV` is `production`):
 
 ```js
 const sql =
@@ -90,21 +90,24 @@ const sql =
     : postgres();
 ```
 
+For more information regarding `ssl` with `postgres`, check out the [Node.js documentation for tls](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options).
+
+
 ### Multi host connections - High Availability (HA)
 
-Connection uri strings with multiple hosts works like in [`psql multiple host uris`](https://www.postgresql.org/docs/13/libpq-connect.html#LIBPQ-MULTIPLE-HOSTS)
+Multiple connection strings can be passed to `postgres()` in the form of `postgres('postgres://localhost:5432,localhost:5433', ...)`. This works the same as native the `psql` command. Read more at [multiple host uris](https://www.postgresql.org/docs/13/libpq-connect.html#LIBPQ-MULTIPLE-HOSTS)
 
-Connecting to the specified hosts/ports will be tried in order, and on a successfull connection retries will be reset. This ensures that hosts can come up and down seamless to your application.
+Connections will be attempted in order of the specified hosts/ports, and on a successfully connection retries will be reset. This ensures that hosts can come up and down seamless to your application.
 
 If you specify `target_session_attrs: 'primary'` or `PGTARGETSESSIONATTRS=primary` Postgres.js will only connect to a the primary host allowing for zero down time failovers.
 
 ### Auto fetching of array types
 
-When Postgres.js first connects to the database it automatically fetches array type information.  
+Postgres.js will automatically fetch table/array-type information when it first connects to a database.  
 
 If you have revoked access to `pg_catalog` this feature will no longer work and will need to be disabled.  
 
-You can disable fetching array types by setting `fetch_types` to `false` when creating an instance.
+You can disable this feature by setting `fetch_types` to `false`.
 
 ### Environment Variables for Options
 
