@@ -74,7 +74,7 @@ export class Builder extends NotTagged {
   build(before, parameters, types, transform) {
     const keyword = builders.map(([x, fn]) => ({ fn, i: before.search(x) })).sort((a, b) => a.i - b.i).pop()
     if (keyword.i === -1)
-      throw new Error('WTF')
+      throw new Error('Could not infer helper mode')
 
     return keyword.fn(this.first, this.rest, parameters, types, transform)
   }
@@ -153,7 +153,7 @@ const builders = Object.entries({
     ).join(',') + ')values' +
     valuesBuilder(Array.isArray(first) ? first : [first], parameters, types, transform, columns)
   }
-}).map(([x, fn]) => ([new RegExp('(^|[\\s(])' + x), fn]))
+}).map(([x, fn]) => ([new RegExp('(^|[\\s(])' + x, 'i'), fn]))
 
 function notTagged() {
   throw Errors.generic({ message: 'Query not called as a tagged template literal', code: 'NOT_TAGGED_CALL' })
