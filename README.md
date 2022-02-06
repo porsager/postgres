@@ -27,12 +27,12 @@
   * [`cursor`](#cursor)
   * [`describe`](#describe)
   * [`raw`](#raw)
+  * [`file`](#file)
+  * [Transactions](#transactions)
 * [Custom types](#custom-types)
 * [Advanced communication](#advanced-communication)
   * [`LISTEN` and `NOTIFY`](#listen-and-notify)
-  * [`.file`](#file)
   * [Subscribe / Realtime](#subscribe-realtime)
-  * [Transactions](#transactions)
 * [Connection options](#connection-options)
   * [SSL](#ssl)
   * [Multi-host connection](#multi-host-connections-high-availability-ha)
@@ -346,24 +346,6 @@ const users = await sql`
 `
 ```
 
-#### JSON `sql.json(object)`
-
-```js
-
-const body = { hello: 'postgres' }
-
-const [{ json }] = await sql`
-  insert into json (
-    body
-  ) values (
-    ${sql.json(body)}
-  )
-  returning body
-`
-
-// json = { hello: 'postgres' }
-```
-
 #### SQL functions
 
 ```js
@@ -461,6 +443,91 @@ Using `.raw()` will return rows as an array with `Buffer` values for each column
 
 This can be useful to receive identically named columns, or for specific performance/transformation reasons. The column definitions are still included on the result array, plus access to parsers for each column.
 
+### File
+#### `sql.file(path, [args], [options]) -> Promise`
+
+Using a `.sql` file for a query.
+
+The contents will be cached in memory so that the file is only read once.
+
+```js
+
+sql.file(path.join(__dirname, 'query.sql'), [], {
+  cache: true // Default true - disable for single shot queries or memory reasons
+})
+
+```
+
+### Transactions
+
+#### BEGIN / COMMIT `sql.begin(fn) -> Promise`
+
+Calling `.begin` with a function will return a Promise. This will resolve with the returned value from the function. The function provides a single argument which is `sql` with a context of the newly created transaction. 
+
+`BEGIN` is automatically called, and if the Promise fails `ROLLBACK` will be called. If it succeeds `COMMIT` will be called.
+
+```js
+
+const [user, account] = await sql.begin(async sql => {
+  const [user] = await sql`
+    insert into users (
+      name
+    ) values (
+      'Alice'
+    )
+  `
+
+  const [account] = await sql`
+    insert into accounts (
+      user_id
+    ) values (
+      ${ user.user_id }
+    )
+  `
+
+  return [user, account]
+})
+
+```
+
+#### SAVEPOINT `sql.savepoint([name], fn) -> Promise`
+
+```js
+
+sql.begin(async sql => {
+  const [user] = await sql`
+    insert into users (
+      name
+    ) values (
+      'Alice'
+    )
+  `
+
+  const [account] = (await sql.savepoint(sql => 
+    sql`
+      insert into accounts (
+        user_id
+      ) values (
+        ${ user.user_id }
+      )
+    `
+  ).catch(err => {
+    // Account could not be created. ROLLBACK SAVEPOINT is called because we caught the rejection.
+  })) || []
+
+  return [user, account]
+})
+.then(([user, account]) => {
+  // great success - COMMIT succeeded
+})
+.catch(() => {
+  // not so good - ROLLBACK was called
+})
+
+```
+
+Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
+
 <details>
 <summary><code>sql.unsafe</code> - Advanced unsafe use cases</summary>
 
@@ -540,21 +607,6 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 
 ```
 
-### File
-#### `sql.file(path, [args], [options]) -> Promise`
-
-Using a `.sql` file for a query.
-
-The contents will be cached in memory so that the file is only read once.
-
-```js
-
-sql.file(path.join(__dirname, 'query.sql'), [], {
-  cache: true // Default true - disable for single shot queries or memory reasons
-})
-
-```
-
 ### Subscribe / Realtime
 
 Postgres.js implements the logical replication protocol of PostgreSQL to support subscription to real-time updates of `insert`, `update` and `delete` operations.
@@ -600,79 +652,6 @@ sql.subscribe('*:users',          () => /* all operations on the public.users ta
 sql.subscribe('delete:users',     () => /* all deletes on the public.users table */ )
 sql.subscribe('update:users=1',   () => /* all updates on the users row with a primary key = 1 */ )
 ```
-
-### Transactions
-
-#### BEGIN / COMMIT `sql.begin(fn) -> Promise`
-
-Calling `.begin` with a function will return a Promise. This will resolve with the returned value from the function. The function provides a single argument which is `sql` with a context of the newly created transaction. 
-
-`BEGIN` is automatically called, and if the Promise fails `ROLLBACK` will be called. If it succeeds `COMMIT` will be called.
-
-```js
-
-const [user, account] = await sql.begin(async sql => {
-  const [user] = await sql`
-    insert into users (
-      name
-    ) values (
-      'Alice'
-    )
-  `
-
-  const [account] = await sql`
-    insert into accounts (
-      user_id
-    ) values (
-      ${ user.user_id }
-    )
-  `
-
-  return [user, account]
-})
-
-```
-
-
-#### SAVEPOINT `sql.savepoint([name], fn) -> Promise`
-
-```js
-
-sql.begin(async sql => {
-  const [user] = await sql`
-    insert into users (
-      name
-    ) values (
-      'Alice'
-    )
-  `
-
-  const [account] = (await sql.savepoint(sql => 
-    sql`
-      insert into accounts (
-        user_id
-      ) values (
-        ${ user.user_id }
-      )
-    `
-  ).catch(err => {
-    // Account could not be created. ROLLBACK SAVEPOINT is called because we caught the rejection.
-  })) || []
-
-  return [user, account]
-})
-.then(([user, account]) => {
-  // great success - COMMIT succeeded
-})
-.catch(() => {
-  // not so good - ROLLBACK was called
-})
-
-```
-
-Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
-
-
 
 ## Teardown / Cleanup
 
