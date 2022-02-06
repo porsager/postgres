@@ -3,8 +3,6 @@
 import { exec } from './bootstrap.js'
 
 import { t, nt, ot } from './test.js' // eslint-disable-line
-import cp from 'child_process'
-import path from 'path'
 import net from 'net'
 import fs from 'fs'
 import crypto from 'crypto'
@@ -661,8 +659,6 @@ t('listen reconnects after connection error', { timeout: 3 }, async() => {
   const sql = postgres()
       , xs = []
 
-  const a = (await sql`show data_directory`)[0].data_directory
-
   const { state: { pid } } = await sql.listen('test', x => xs.push(x))
   await sql.notify('test', 'a')
   await sql`select pg_terminate_backend(${ pid }::int)`
@@ -937,8 +933,8 @@ t('dynamic values single row', async() => {
 })
 
 t('dynamic values multi row', async() => {
-  const [_, { b }] = await sql`
-    select * from (values ${ sql([['a', 'b', 'c'],['a', 'b', 'c']]) }) AS x(a, b, c)
+  const [, { b }] = await sql`
+    select * from (values ${ sql([['a', 'b', 'c'], ['a', 'b', 'c']]) }) AS x(a, b, c)
   `
 
   return ['b', b]
@@ -1105,12 +1101,12 @@ t('Cursor error works', async() => [
 
 t('Multiple Cursors', { timeout: 2 }, async() => {
   const result = []
-  const xs = await sql.begin(async sql => [
-    await sql`select 1 as cursor, x from generate_series(1,4) as x`.cursor(async ([row]) => {
+  await sql.begin(async sql => [
+    await sql`select 1 as cursor, x from generate_series(1,4) as x`.cursor(async([row]) => {
       result.push(row.x)
       await new Promise(r => setTimeout(r, 200))
     }),
-    await sql`select 2 as cursor, x from generate_series(101,104) as x`.cursor(async ([row]) => {
+    await sql`select 2 as cursor, x from generate_series(101,104) as x`.cursor(async([row]) => {
       result.push(row.x)
       await new Promise(r => setTimeout(r, 100))
     })
@@ -1651,9 +1647,7 @@ t('subscribe', { timeout: 2 }, async() => {
 
 t('Execute works', async() => {
   const result = await new Promise((resolve) => {
-    const sql = postgres({ ...options, fetch_types: false, debug (id, query)  {
-      resolve(query)
-    }})
+    const sql = postgres({ ...options, fetch_types: false, debug:(id, query) => resolve(query) })
     sql`select 1`.execute()
   })
 
