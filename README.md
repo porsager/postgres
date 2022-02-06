@@ -9,39 +9,6 @@
 
 <br>
 
-# Table of Contents
-
-* [Getting started](#getting-started)
-* [Connection](#connection)
-* [Queries](#queries)
-  * [Select](#select)
-  * [Insert](#insert)
-  * [Update](#update)
-  * [Delete](#delete)
-* [Dynamic queries](#dynamic-queries)
-  * [Building partial queries](#partial-queries)
-  * [WHERE clause](#dynamic-where-clause)
-  * [Identifiers](#identifier-and-value-utilities)
-* [Advanced query methods](#advanced-query-methods)
-  * [`forEach`](#foreach)
-  * [`cursor`](#cursor)
-  * [`describe`](#describe)
-  * [`raw`](#raw)
-  * [`file`](#file)
-  * [Transactions](#transactions)
-* [Custom types](#custom-types)
-* [Advanced communication](#advanced-communication)
-  * [`LISTEN` and `NOTIFY`](#listen-and-notify)
-  * [Subscribe / Realtime](#subscribe-realtime)
-* [Connection options](#connection-options)
-  * [SSL](#ssl)
-  * [Multi-host connection](#multi-host-connections-high-availability-ha)
-  * [Connection timeout](#connection-timeout)
-  * [Environmental variables](#environmental-variables)
-* [Error handling](#error-handling)
-* [TypeScript support](#typescript-support)
-
-
 ## Getting started
 
 <br>
@@ -72,6 +39,38 @@ const selectUsers = await sql`
 `
 // [{ name: "Serena", age: 35 }, { name: 'Murray', age: 68 }, ...]
 ```
+
+# Table of Contents
+
+* [Connection](#connection)
+* [Queries](#queries)
+  * [Select](#select)
+  * [Insert](#insert)
+  * [Update](#update)
+  * [Delete](#delete)
+* [Dynamic queries](#dynamic-queries)
+  * [Building partial queries](#partial-queries)
+  * [WHERE clause](#dynamic-where-clause)
+  * [Identifiers](#identifier-and-value-utilities)
+* [Advanced query methods](#advanced-query-methods)
+  * [`forEach`](#foreach)
+  * [`cursor`](#cursor)
+  * [`describe`](#describe)
+  * [`raw`](#raw)
+  * [`file`](#file)
+  * [Transactions](#transactions)
+* [Custom types](#custom-types)
+* [Advanced communication](#advanced-communication)
+  * [`LISTEN` and `NOTIFY`](#listen-and-notify)
+  * [Subscribe / Realtime](#subscribe-realtime)
+* [Connection options](#connection-options)
+  * [SSL](#ssl)
+  * [Multi-host connection](#multi-host-connections-high-availability-ha)
+  * [Connection timeout](#connection-timeout)
+  * [Environmental variables](#environmental-variables)
+* [Error handling](#error-handling)
+* [TypeScript support](#typescript-support)
+
 
 ## Connection 
 
@@ -337,12 +336,11 @@ select * from users where age > $1 and user_id = $2
 Arrays will be handled by replacement parameters too, so `where in` queries are also simple.
 
 ```js
-
 const users = await sql`
   select
     *
   from users
-  where age in (${ [68, 75, 23] })
+  where age in ${sql([68, 75, 23])}
 `
 ```
 
