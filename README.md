@@ -119,6 +119,8 @@ const [new_user] = await sql`
 // new_user = { user_id: 1, name: 'Murray', age: 68 }
 ```
 
+Please note that queries are executed when `awaited` – or manually by using `.execute`.
+
 #### Query parameters
 
 Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessary, simply use JS tagged template literals as usual. **Dynamic and partial queries can be seen in the [next section]()**.
@@ -387,7 +389,7 @@ await sql`
 Use cursors if you need to throttle the amount of rows being returned from a query. New results won't be requested until the promise / async callback function has resolved.
 
 ```js
-for await (const row of sql`select * from generate_series(1,4) as x`.cursor()) {
+for await (const [row] of sql`select * from generate_series(1,4) as x`.cursor()) {
   // row = { x: 1 }
   await http.request('https://example.com/wat', { row })
 }
@@ -696,7 +698,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   password             : '',            // Password of database user
   ssl                  : false,         // true, prefer, require, tls.connect options
   max                  : 10,            // Max number of connections
-  max_lifetime         : null,          // Maximum lifetime of a connection in seconds
+  max_lifetime         : null,          // Max lifetime in seconds (more info below)
   idle_timeout         : 0,             // Idle connection timeout in seconds
   connect_timeout      : 30,            // Connect timeout in seconds
   no_prepare           : false,         // No automatic creation of prepared statements
@@ -719,6 +721,8 @@ const sql = postgres('postgres://username:password@host:port/database', {
                                         // on initial connection.
 })
 ```
+
+Note that `max_lifetime = 60 * (30 + Math.random() * 30)` by default. This resolves to an interval between 45 and 90 minutes to optimize for the benefits of prepared statements **and** working nicely with Linux's OOM killer.
 
 ### SSL
 
