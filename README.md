@@ -389,30 +389,23 @@ await sql`
 Use cursors if you need to throttle the amount of rows being returned from a query. New results won't be requested until the promise / async callback function has resolved.
 
 ```js
-
-await sql`
-  select * from generate_series(1,4) as x
-`.cursor(async ([row]) => {
+for await (const row of sql`select * from generate_series(1,4) as x`.cursor()) {
   // row = { x: 1 }
   await http.request('https://example.com/wat', { row })
-})
+}
 
 // All rows iterated
 ```
 
-A single row will be returned by default, but you can also request batches by setting the number of rows desired in each batch as the first argument. That is useful if you can do work with the rows in parallel like in this example:
+A single row will be returned by default, but you can also request batches by setting the number of rows desired in each batch as an argument of `.cursor`:
 
 ```js
-
-await sql`
-  select * from generate_series(1,1000) as x
-`.cursor(10, async rows => {
+for await (const rows of sql`select * from generate_series(1,1000) as x`.cursor(10)) {
   // rows = [{ x: 1 }, { x: 2 }, ... ]
   await Promise.all(rows.map(row =>
     http.request('https://example.com/wat', { row })
   ))
-})
-
+}
 ```
 
 If an error is thrown inside the callback function no more rows will be requested and the promise will reject with the thrown error.
