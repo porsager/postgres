@@ -65,7 +65,7 @@ const selectUsers = await sql`
   * [Subscribe / Realtime](#subscribe-realtime)
 * [Connection options](#connection-options)
   * [SSL](#ssl)
-  * [Multi-host connection](#multi-host-connections-high-availability-ha)
+  * [Multi-host connection](#multi-host-connections---high-availability-ha)
   * [Connection timeout](#connection-timeout)
   * [Environmental variables](#environmental-variables)
 * [Error handling](#error-handling)
