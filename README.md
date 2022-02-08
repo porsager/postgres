@@ -1,4 +1,4 @@
-<img align="left" width="440" height="140" alt="Fastest full PostgreSQL nodejs client" src="https://raw.githubusercontent.com/porsager/postgres/master/postgresjs.svg?sanitize=true" />
+<img align="left" width="440" height="143" alt="Fastest full PostgreSQL nodejs client" src="https://raw.githubusercontent.com/porsager/postgres/master/postgresjs.svg?sanitize=true" />
 
 - [🚀 Fastest full-featured PostgreSQL node client](https://github.com/porsager/postgres-benchmarks#results)
 - 🚯 1850 LOC - 0 dependencies
@@ -65,7 +65,7 @@ const selectUsers = await sql`
   * [Subscribe / Realtime](#subscribe-realtime)
 * [Connection options](#connection-options)
   * [SSL](#ssl)
-  * [Multi-host connection](#multi-host-connections-high-availability-ha)
+  * [Multi-host connection](#multi-host-connections---high-availability-ha)
   * [Connection timeout](#connection-timeout)
   * [Environmental variables](#environmental-variables)
 * [Error handling](#error-handling)
