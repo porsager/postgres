@@ -72,7 +72,7 @@ const selectUsers = await sql`
 * [TypeScript support](#typescript-support)
 
 
-## Connection 
+## Connection
 
 ### `postgres([url], [options])`
 
@@ -537,7 +537,9 @@ sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 
 ## Custom Types
 
-You can add ergonomic support for custom types, or simply pass an object with a `{ type, value }` signature that contains the Postgres `oid` for the type and the correctly serialized value. _(`oid` values for types can be found in the `pg_catalog.pg_types` table.)_
+You can add ergonomic support for custom types, or simply use `sql.typed(value, type)` inline, where type is the PostgreSQL `oid` for the type and the correctly serialized value. _(`oid` values for types can be found in the `pg_catalog.pg_types` table.)_
+
+Using custom types is necessary if using parameters with [`DO` queries](https://www.postgresql.org/docs/9.0/sql-do.html). If not doing this, PostgreSQL will throw a `could not determine data type of parameter $1` error.
 
 Adding Query helpers is the recommended approach which can be done like this:
 
@@ -560,14 +562,14 @@ const sql = postgres({
   }
 })
 
-// Now you can use sql.types.rect() as specified above
+// Now you can use sql.typed.rect() as specified above
 const [custom] = sql`
   insert into rectangles (
     name,
     rect
   ) values (
     'wat',
-    ${ sql.types.rect({ x: 13, y: 37, width: 42, height: 80 }) }
+    ${ sql.typed.rect({ x: 13, y: 37, width: 42, height: 80 }) }
   )
   returning *
 `
