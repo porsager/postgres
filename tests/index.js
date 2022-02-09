@@ -1126,6 +1126,18 @@ t('Cursor as async iterator', async() => {
   return ['1a1b2a2b', order.join('')]
 })
 
+t('Cursor as async iterator with break', async() => {
+  const order = []
+  for await (const xs of sql`select generate_series(1,2) as x;`.cursor()) {
+    order.push(xs[0].x + 'a')
+    await delay(10)
+    order.push(xs[0].x + 'b')
+    break
+  }
+
+  return ['1a1b', order.join('')]
+})
+
 t('Transform row', async() => {
   const sql = postgres({
     ...options,

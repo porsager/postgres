@@ -1,3 +1,5 @@
+import { CLOSE } from './types.js'
+
 const originCache = new Map()
 
 export default class Query extends Promise {
@@ -71,8 +73,8 @@ export default class Query extends Promise {
         next: () => {
           prev && prev()
           const promise = new Promise((resolve, reject) => {
-            this.cursorFn = x => {
-              resolve({ value: x, done: false })
+            this.cursorFn = value => {
+              resolve({ value, done: false })
               return new Promise(r => prev = r)
             }
             this.resolve = () => (this.active = false, resolve({ done: true }))
@@ -80,6 +82,10 @@ export default class Query extends Promise {
           })
           this.execute()
           return promise
+        },
+        return() {
+          prev && prev(CLOSE)
+          return { done: true }
         }
       })
     }
