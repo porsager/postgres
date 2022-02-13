@@ -657,7 +657,7 @@ const sql = postgres({
 })
 ```
 
-There is currently no way to handle `numeric / decimal` in a native way in Javascript, so these and similar will be returned as `string`. You can also handle types like these using [custom types](#types) if you want to.
+There is currently no way to handle `numeric / decimal` in a native way in Javascript, so these and similar will be returned as `string`. You can also handle types like these using [custom types](#custom-types) if you want to.
 
 ## The Connection Pool
 
