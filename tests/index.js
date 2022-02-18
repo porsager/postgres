@@ -1138,6 +1138,39 @@ t('Cursor as async iterator with break', async() => {
   return ['1a1b', order.join('')]
 })
 
+t('Async Iterator Unsafe cursor works', async() => {
+  const order = []
+  for await (const [x] of sql.unsafe('select 1 as x union select 2 as x').cursor()) {
+    order.push(x.x + 'a')
+    await delay(100)
+    order.push(x.x + 'b')
+  }
+  return ['1a1b2a2b', order.join('')]
+})
+
+t('Async Iterator Cursor custom n works', async() => {
+  const order = []
+  for await (const x of sql`select * from generate_series(1,20)`.cursor(10))
+    order.push(x.length)
+
+  return ['10,10', order.join(',')]
+})
+
+t('Async Iterator Cursor custom with rest n works', async() => {
+  const order = []
+  for await (const x of sql`select * from generate_series(1,20)`.cursor(11))
+    order.push(x.length)
+
+  return ['11,9', order.join(',')]
+})
+
+t('Async Iterator Cursor custom with less results than batch size works', async() => {
+  const order = []
+  for await (const x of sql`select * from generate_series(1,20)`.cursor(21))
+    order.push(x.length)
+  return ['20', order.join(',')]
+})
+
 t('Transform row', async() => {
   const sql = postgres({
     ...options,

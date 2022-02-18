@@ -71,6 +71,9 @@ export default class Query extends Promise {
     return {
       [Symbol.asyncIterator]: () => ({
         next: () => {
+          if (this.executed && !this.active)
+            return { done: true }
+
           prev && prev()
           const promise = new Promise((resolve, reject) => {
             this.cursorFn = value => {
