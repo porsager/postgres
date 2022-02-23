@@ -3,8 +3,6 @@
 const { exec } = require('./bootstrap.js')
 
 const { t, nt, ot } = require('./test.js') // eslint-disable-line
-const cp = require('child_process')
-const path = require('path')
 const net = require('net')
 const fs = require('fs')
 const crypto = require('crypto')
@@ -12,7 +10,7 @@ const crypto = require('crypto')
 const postgres = require('../src/index.js')
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
-const rel = x => path.join(__dirname, x)
+const rel = x => require("path").join(__dirname, x)
 const idle_timeout = 1
 
 const login = {
@@ -661,8 +659,6 @@ t('listen reconnects after connection error', { timeout: 3 }, async() => {
   const sql = postgres()
       , xs = []
 
-  const a = (await sql`show data_directory`)[0].data_directory
-
   const { state: { pid } } = await sql.listen('test', x => xs.push(x))
   await sql.notify('test', 'a')
   await sql`select pg_terminate_backend(${ pid }::int)`
@@ -937,8 +933,8 @@ t('dynamic values single row', async() => {
 })
 
 t('dynamic values multi row', async() => {
-  const [_, { b }] = await sql`
-    select * from (values ${ sql([['a', 'b', 'c'],['a', 'b', 'c']]) }) AS x(a, b, c)
+  const [, { b }] = await sql`
+    select * from (values ${ sql([['a', 'b', 'c'], ['a', 'b', 'c']]) }) AS x(a, b, c)
   `
 
   return ['b', b]
@@ -1105,12 +1101,12 @@ t('Cursor error works', async() => [
 
 t('Multiple Cursors', { timeout: 2 }, async() => {
   const result = []
-  const xs = await sql.begin(async sql => [
-    await sql`select 1 as cursor, x from generate_series(1,4) as x`.cursor(async ([row]) => {
+  await sql.begin(async sql => [
+    await sql`select 1 as cursor, x from generate_series(1,4) as x`.cursor(async([row]) => {
       result.push(row.x)
       await new Promise(r => setTimeout(r, 200))
     }),
-    await sql`select 2 as cursor, x from generate_series(101,104) as x`.cursor(async ([row]) => {
+    await sql`select 2 as cursor, x from generate_series(101,104) as x`.cursor(async([row]) => {
       result.push(row.x)
       await new Promise(r => setTimeout(r, 100))
     })
@@ -1128,6 +1124,51 @@ t('Cursor as async iterator', async() => {
   }
 
   return ['1a1b2a2b', order.join('')]
+})
+
+t('Cursor as async iterator with break', async() => {
+  const order = []
+  for await (const xs of sql`select generate_series(1,2) as x;`.cursor()) {
+    order.push(xs[0].x + 'a')
+    await delay(10)
+    order.push(xs[0].x + 'b')
+    break
+  }
+
+  return ['1a1b', order.join('')]
+})
+
+t('Async Iterator Unsafe cursor works', async() => {
+  const order = []
+  for await (const [x] of sql.unsafe('select 1 as x union select 2 as x').cursor()) {
+    order.push(x.x + 'a')
+    await delay(100)
+    order.push(x.x + 'b')
+  }
+  return ['1a1b2a2b', order.join('')]
+})
+
+t('Async Iterator Cursor custom n works', async() => {
+  const order = []
+  for await (const x of sql`select * from generate_series(1,20)`.cursor(10))
+    order.push(x.length)
+
+  return ['10,10', order.join(',')]
+})
+
+t('Async Iterator Cursor custom with rest n works', async() => {
+  const order = []
+  for await (const x of sql`select * from generate_series(1,20)`.cursor(11))
+    order.push(x.length)
+
+  return ['11,9', order.join(',')]
+})
+
+t('Async Iterator Cursor custom with less results than batch size works', async() => {
+  const order = []
+  for await (const x of sql`select * from generate_series(1,20)`.cursor(21))
+    order.push(x.length)
+  return ['20', order.join(',')]
 })
 
 t('Transform row', async() => {
@@ -1651,9 +1692,7 @@ t('subscribe', { timeout: 2 }, async() => {
 
 t('Execute works', async() => {
   const result = await new Promise((resolve) => {
-    const sql = postgres({ ...options, fetch_types: false, debug (id, query)  {
-      resolve(query)
-    }})
+    const sql = postgres({ ...options, fetch_types: false, debug:(id, query) => resolve(query) })
     sql`select 1`.execute()
   })
 

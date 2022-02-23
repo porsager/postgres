@@ -6,11 +6,11 @@ import { tls } from '../polyfills.js'
 import crypto from 'https://deno.land/std@0.120.0/node/crypto.ts'
 import Stream from 'https://deno.land/std@0.120.0/node/stream.ts'
 
-import { Identifier, Builder, handleValue, arrayParser, arraySerializer, CLOSE } from './types.js'
+import { Identifier, Builder, handleValue, arrayParser, arraySerializer } from './types.js'
 import { Errors } from './errors.js'
 import Result from './result.js'
 import Queue from './queue.js'
-import Query from './query.js'
+import { Query, CLOSE } from './query.js'
 import b from './bytes.js'
 
 export default Connection

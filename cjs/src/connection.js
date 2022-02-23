@@ -3,11 +3,11 @@ const tls = require('tls')
 const crypto = require('crypto')
 const Stream = require('stream')
 
-const { Identifier, Builder, handleValue, arrayParser, arraySerializer, CLOSE } = require('./types.js')
+const { Identifier, Builder, handleValue, arrayParser, arraySerializer } = require('./types.js')
 const { Errors } = require('./errors.js')
 const Result = require('./result.js')
 const Queue = require('./queue.js')
-const Query = require('./query.js')
+const { Query, CLOSE } = require('./query.js')
 const b = require('./bytes.js')
 
 module.exports = Connection

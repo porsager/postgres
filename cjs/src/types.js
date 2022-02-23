@@ -1,4 +1,4 @@
-const Query = require('./query.js')
+const { Query } = require('./query.js')
 const { Errors } = require('./errors.js')
 
 const types = module.exports.types = {
@@ -48,23 +48,23 @@ const BigInt = module.exports.BigInt = {
 
 class NotTagged { then() { notTagged() } catch() { notTagged() } finally() { notTagged() }}
 
-class Identifier extends NotTagged {
+const Identifier = module.exports.Identifier = class Identifier extends NotTagged {
   constructor(value) {
     super()
     this.value = escapeIdentifier(value)
   }
-};module.exports.Identifier = Identifier // eslint-disable-line
+}
 
-class Parameter extends NotTagged {
+const Parameter = module.exports.Parameter = class Parameter extends NotTagged {
   constructor(value, type, array) {
     super()
     this.value = value
     this.type = type
     this.array = array
   }
-};module.exports.Parameter = Parameter // eslint-disable-line
+}
 
-class Builder extends NotTagged {
+const Builder = module.exports.Builder = class Builder extends NotTagged {
   constructor(first, rest) {
     super()
     this.first = first
@@ -78,7 +78,7 @@ class Builder extends NotTagged {
 
     return keyword.fn(this.first, this.rest, parameters, types, transform)
   }
-};module.exports.Builder = Builder // eslint-disable-line
+}
 
 module.exports.handleValue = handleValue;function handleValue(x, parameters, types) {
   const value = x instanceof Parameter ? x.value : x
@@ -94,8 +94,6 @@ module.exports.handleValue = handleValue;function handleValue(x, parameters, typ
       : (parameters.push(x), inferType(x))
   ))
 }
-
-const CLOSE = module.exports.CLOSE = {}
 
 const defaultHandlers = typeHandlers(types)
 

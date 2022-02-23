@@ -1,6 +1,7 @@
 const originCache = new Map()
 
-module.exports = class Query extends Promise {
+const CLOSE = module.exports.CLOSE = {}
+const Query = module.exports.Query = class Query extends Promise {
   constructor(strings, args, handler, canceller, options = {}) {
     let resolve
       , reject
@@ -69,10 +70,13 @@ module.exports = class Query extends Promise {
     return {
       [Symbol.asyncIterator]: () => ({
         next: () => {
+          if (this.executed && !this.active)
+            return { done: true }
+
           prev && prev()
           const promise = new Promise((resolve, reject) => {
-            this.cursorFn = x => {
-              resolve({ value: x, done: false })
+            this.cursorFn = value => {
+              resolve({ value, done: false })
               return new Promise(r => prev = r)
             }
             this.resolve = () => (this.active = false, resolve({ done: true }))
@@ -80,6 +84,10 @@ module.exports = class Query extends Promise {
           })
           this.execute()
           return promise
+        },
+        return() {
+          prev && prev(CLOSE)
+          return { done: true }
         }
       })
     }

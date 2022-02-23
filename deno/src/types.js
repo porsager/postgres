@@ -1,5 +1,5 @@
 import { Buffer } from 'https://deno.land/std@0.120.0/node/buffer.ts'
-import Query from './query.js'
+import { Query } from './query.js'
 import { Errors } from './errors.js'
 
 export const types = {
@@ -54,7 +54,7 @@ export class Identifier extends NotTagged {
     super()
     this.value = escapeIdentifier(value)
   }
-}; // eslint-disable-line
+}
 
 export class Parameter extends NotTagged {
   constructor(value, type, array) {
@@ -63,7 +63,7 @@ export class Parameter extends NotTagged {
     this.type = type
     this.array = array
   }
-}; // eslint-disable-line
+}
 
 export class Builder extends NotTagged {
   constructor(first, rest) {
@@ -79,7 +79,7 @@ export class Builder extends NotTagged {
 
     return keyword.fn(this.first, this.rest, parameters, types, transform)
   }
-}; // eslint-disable-line
+}
 
 export function handleValue(x, parameters, types) {
   const value = x instanceof Parameter ? x.value : x
@@ -95,8 +95,6 @@ export function handleValue(x, parameters, types) {
       : (parameters.push(x), inferType(x))
   ))
 }
-
-export const CLOSE = {}
 
 const defaultHandlers = typeHandlers(types)
 

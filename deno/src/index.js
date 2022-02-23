@@ -14,12 +14,11 @@ import {
   toKebab,
   fromPascal,
   fromCamel,
-  fromKebab,
-  CLOSE
+  fromKebab
 } from './types.js'
 
 import Connection from './connection.js'
-import Query from './query.js'
+import { Query, CLOSE } from './query.js'
 import Queue from './queue.js'
 import { Errors, PostgresError } from './errors.js'
 import Subscribe from './subscribe.js'
@@ -75,11 +74,14 @@ function Postgres(a, b) {
   function Sql(handler, instant) {
     handler.debug = options.debug
 
+    Object.entries(options.types).reduce((acc, [name, type]) => {
+      acc[name] = (x) => new Parameter(x, type.to)
+      return acc
+    }, typed)
+
     Object.assign(sql, {
-      types: Object.entries(options.types).reduce((acc, [name, type]) => {
-        acc[name] = (x) => new Parameter(x, type.to)
-        return acc
-      }, {}),
+      types: typed,
+      typed,
       unsafe,
       array,
       json,
@@ -87,6 +89,10 @@ function Postgres(a, b) {
     })
 
     return sql
+
+    function typed(value, type) {
+      return new Parameter(value, type)
+    }
 
     function sql(strings, ...args) {
       const query = strings && Array.isArray(strings.raw)
