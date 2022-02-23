@@ -1,8 +1,7 @@
-import { CLOSE } from './types.js'
-
 const originCache = new Map()
 
-export default class Query extends Promise {
+export const CLOSE = {}
+export class Query extends Promise {
   constructor(strings, args, handler, canceller, options = {}) {
     let resolve
       , reject

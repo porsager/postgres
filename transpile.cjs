@@ -31,7 +31,7 @@ fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ type: 'common
 
 function transpile(x) {
   return x.replace(/export default function ([^(]+)/, 'module.exports = $1;function $1')
-          .replace(/export class ([^ ]+) ([^;]+?);/g, 'class $1 $2;module.exports.$1 = $1')
+          .replace(/export class ([a-z0-9_$]+)/gi, 'const $1 = module.exports.$1 = class $1')
           .replace(/export default /, 'module.exports = ')
           .replace(/export {/g, 'module.exports = {')
           .replace(/export const ([a-z0-9_$]+)/gi, 'const $1 = module.exports.$1')
@@ -39,5 +39,5 @@ function transpile(x) {
           .replace(/import {([^{}]*?)} from (['"].*?['"])/gi, 'const {$1} = require($2)')
           .replace(/import (.*?) from (['"].*?['"])/gi, 'const $1 = require($2)')
           .replace(/import (['"].*?['"])/gi, 'require($1)')
-          .replace('new URL(x, import.meta.url)', 'path.join(__dirname, x)')
+          .replace('new URL(x, import.meta.url)', 'require("path").join(__dirname, x)')
 }
