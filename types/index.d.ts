@@ -573,8 +573,8 @@ declare namespace postgres {
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 
     array<T extends SerializableParameter[] = SerializableParameter[]>(value: T, type?: number): ArrayParameter<T>;
-    file<T extends readonly any[] = Row[]>(path: import('node:fs').PathOrFileDescriptor, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
-    file<T extends readonly any[] = Row[]>(path: import('node:fs').PathOrFileDescriptor, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
+    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
+    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
     json(value: any): Parameter;
   }
 
