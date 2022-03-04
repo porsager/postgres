@@ -111,8 +111,15 @@ function valuesBuilder(first, parameters, types, transform, columns) {
   ).join(',')
 }
 
+function values(first, rest, parameters, types, transform) {
+  const multi = Array.isArray(first[0])
+  const columns = rest.length ? rest.flat() : Object.keys(multi ? first[0] : first)
+  return valuesBuilder(multi ? first : [first], parameters, types, transform, columns)
+}
+
 const builders = Object.entries({
-  valuesBuilder,
+  values,
+  in: values,
 
   update(first, rest, parameters, types, transform) {
     return (rest.length ? rest.flat() : Object.keys(first)).map(x =>
@@ -136,12 +143,6 @@ const builders = Object.entries({
         handleValue(value, parameters, types)
       ) + ' as ' + escapeIdentifier(transform.column.to ? transform.column.to(x) : x)
     }).join(',')
-  },
-
-  values(first, rest, parameters, types, transform) {
-    const multi = Array.isArray(first[0])
-    const columns = rest.length ? rest.flat() : Object.keys(multi ? first[0] : first)
-    return valuesBuilder(multi ? first : [first], parameters, types, transform, columns)
   },
 
   insert(first, rest, parameters, types, transform) {

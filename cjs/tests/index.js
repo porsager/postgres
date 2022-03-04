@@ -873,7 +873,17 @@ t('array insert', async() => {
   return [2, (await sql`insert into test (a, b) values ${ sql([1, 2]) } returning *`)[0].b, await sql`drop table test`]
 })
 
-t('parameters in()', async() => {
+t('where parameters in()', async() => {
+  await sql`create table test (x text)`
+  await sql`insert into test values ('a')`
+  return [
+    (await sql`select * from test where x in ${ sql(['a', 'b', 'c']) }`)[0].x,
+    'a',
+    await sql`drop table test`
+  ]
+})
+
+t('where parameters in() values before', async() => {
   return [2, (await sql`
     with rows as (
       select * from (values (1), (2), (3), (4)) as x(a)
