@@ -127,7 +127,6 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   function createSocket() {
     const x = net.Socket()
-    x.setKeepAlive(true, 1000 * keep_alive)
     x.on('error', error)
     x.on('close', closed)
     x.on('drain', drain)
@@ -353,6 +352,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
       statementCount = 1
       lifeTimer.start()
       socket.on('data', data)
+      socket.setKeepAlive(true, 1000 * keep_alive)
       const s = StartupMessage()
       write(s)
     } catch (err) {
