@@ -749,14 +749,16 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   function ErrorResponse(x) {
     query && (query.cursorFn || query.describeFirst) && write(Sync)
     const error = Errors.postgres(parseError(x))
-    query && !query.retried && retryRoutines.has(error.routine)
-      ? retry(query)
-      : errored(error)
+    query && query.retried
+      ? errored(query.retried)
+      : query && retryRoutines.has(error.routine)
+        ? retry(query, error)
+        : errored(error)
   }
 
-  function retry(q) {
+  function retry(q, error) {
     delete statements[q.signature]
-    q.retried = true
+    q.retried = error
     execute(q)
   }
 

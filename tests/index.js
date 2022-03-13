@@ -1456,6 +1456,16 @@ t('Recreate prepared statements on transformAssignedExpr error', async() => {
   ]
 })
 
+t('Throws correct error when retrying in transactions', async() => {
+  await sql`create table test(x int)`
+  const error = await sql.begin(sql => sql`insert into test (x) values (${ false })`).catch(e => e)
+  return [
+    error.code,
+    '42804',
+    sql`drop table test`
+  ]
+})
+
 t('Recreate prepared statements on RevalidateCachedQuery error', async() => {
   const select = () => sql`select name from test`
   await sql`create table test (name text)`
