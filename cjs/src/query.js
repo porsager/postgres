@@ -1,4 +1,6 @@
 const originCache = new Map()
+    , originStackCache = new Map()
+    , originError = Symbol('OriginError')
 
 const CLOSE = module.exports.CLOSE = {}
 const Query = module.exports.Query = class Query extends Promise {
@@ -29,7 +31,17 @@ const Query = module.exports.Query = class Query extends Promise {
     this.executed = false
     this.signature = ''
 
-    this.origin = handler.debug ? new Error().stack : cachedError(this.strings)
+    this[originError] = handler.debug || !this.tagged
+      ? new Error()
+      : cachedError(this.strings)
+  }
+
+  get origin() {
+    return this.handler.debug || !this.tagged
+      ? this[originError].stack
+      : originStackCache.has(this.strings)
+        ? originStackCache.get(this.strings)
+        : originStackCache.set(this.strings, this[originError].stack).get(this.strings)
   }
 
   static get [Symbol.species]() {
@@ -143,7 +155,7 @@ function cachedError(xs) {
 
   const x = Error.stackTraceLimit
   Error.stackTraceLimit = 4
-  originCache.set(xs, new Error().stack)
+  originCache.set(xs, new Error())
   Error.stackTraceLimit = x
   return originCache.get(xs)
 }

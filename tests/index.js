@@ -253,6 +253,12 @@ t('Parallel transactions', async() => {
   ])).map(x => x.count).join(''), await sql`drop table test`]
 })
 
+t('Many transactions at beginning of connection', async() => {
+  const sql = postgres(options)
+  const xs = await Promise.all(Array.from({ length: 100 }, () => sql.begin(sql => sql`select 1`)))
+  return [100, xs.length]
+})
+
 t('Transactions array', async() => {
   await sql`create table test (a int)`
 
@@ -1605,7 +1611,6 @@ t('Copy write as first works', async() => {
   ]
 })
 
-
 t('Copy from file works', async() => {
   await sql`create table test (x int, y int, z int)`
   await new Promise(async r => fs
@@ -1897,6 +1902,7 @@ t('Prevent premature end of connection in transaction', async() => {
   const result = await sql.begin(async sql => {
     await sql`select 1`
     await delay(200)
+    await sql`select 1`
     return 'yay'
   })
 

@@ -130,7 +130,6 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   function createSocket() {
     const x = net.Socket()
-    x
     x.on('error', error)
     x.on('close', closed)
     x.on('drain', drain)
@@ -356,6 +355,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
       statementCount = 1
       lifeTimer.start()
       socket.on('data', data)
+      socket
       const s = StartupMessage()
       write(s)
     } catch (err) {
@@ -536,8 +536,10 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     if (query)
       return // Consider opening if able and sent.length < 50
 
-    connection.reserved && x[5] !== 73 // I
-      ? connection.reserved()
+    connection.reserved
+      ? x[5] === 73
+        ? ending && terminate()
+        : connection.reserved() // I
       : ending
         ? terminate()
         : onopen(connection)
@@ -752,14 +754,16 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   function ErrorResponse(x) {
     query && (query.cursorFn || query.describeFirst) && write(Sync)
     const error = Errors.postgres(parseError(x))
-    query && !query.retried && retryRoutines.has(error.routine)
-      ? retry(query)
-      : errored(error)
+    query && query.retried
+      ? errored(query.retried)
+      : query && retryRoutines.has(error.routine)
+        ? retry(query, error)
+        : errored(error)
   }
 
-  function retry(q) {
+  function retry(q, error) {
     delete statements[q.signature]
-    q.retried = true
+    q.retried = error
     execute(q)
   }
 

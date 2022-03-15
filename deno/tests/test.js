@@ -34,7 +34,7 @@ async function test(o, name, options, fn) {
       ? (ignored++, ignore)
       : fn()
   ]))
-    .then((x) => {
+    .then(async x => {
       clearTimeout(fn.timer)
       if (x === ignore)
         return
@@ -42,7 +42,7 @@ async function test(o, name, options, fn) {
       if (!Array.isArray(x))
         throw new Error('Test should return result array')
 
-      const [expected, got] = x
+      const [expected, got] = await Promise.all(x)
       if (expected !== got) {
         failed = true
         throw new Error(util.inspect(expected) + ' != ' + util.inspect(got))

@@ -254,6 +254,12 @@ t('Parallel transactions', async() => {
   ])).map(x => x.count).join(''), await sql`drop table test`]
 })
 
+t('Many transactions at beginning of connection', async() => {
+  const sql = postgres(options)
+  const xs = await Promise.all(Array.from({ length: 100 }, () => sql.begin(sql => sql`select 1`)))
+  return [100, xs.length]
+})
+
 t('Transactions array', async() => {
   await sql`create table test (a int)`
 
@@ -1457,6 +1463,16 @@ t('Recreate prepared statements on transformAssignedExpr error', async() => {
   ]
 })
 
+t('Throws correct error when retrying in transactions', async() => {
+  await sql`create table test(x int)`
+  const error = await sql.begin(sql => sql`insert into test (x) values (${ false })`).catch(e => e)
+  return [
+    error.code,
+    '42804',
+    sql`drop table test`
+  ]
+})
+
 t('Recreate prepared statements on RevalidateCachedQuery error', async() => {
   const select = () => sql`select name from test`
   await sql`create table test (name text)`
@@ -1595,7 +1611,6 @@ t('Copy write as first works', async() => {
     await sql`drop table test`
   ]
 })
-
 
 nt('Copy from file works', async() => {
   await sql`create table test (x int, y int, z int)`
@@ -1888,6 +1903,7 @@ t('Prevent premature end of connection in transaction', async() => {
   const result = await sql.begin(async sql => {
     await sql`select 1`
     await delay(200)
+    await sql`select 1`
     return 'yay'
   })
 

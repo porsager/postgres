@@ -533,8 +533,10 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     if (query)
       return // Consider opening if able and sent.length < 50
 
-    connection.reserved && x[5] !== 73 // I
-      ? connection.reserved()
+    connection.reserved
+      ? x[5] === 73
+        ? ending && terminate()
+        : connection.reserved() // I
       : ending
         ? terminate()
         : onopen(connection)
