@@ -28,9 +28,15 @@
     "/src",
     "/types"
   ],
-  "author": "Rasmus Porsager <rasmus@porsager.com>",
+  "author": "Rasmus Porsager <rasmus@porsager.com> (https://www.porsager.com)",
+  "funding": {
+    "type" : "individual",
+    "url" : "https://github.com/sponsors/porsager"
+  },
   "license": "Unlicense",
   "repository": "porsager/postgres",
+  "homepage": "https://github.com/porsager/postgres",
+  "bugs": "https://github.com/porsager/postgres/issues",
   "keywords": [
     "driver",
     "postgresql",

@@ -1,7 +1,6 @@
 <img align="left" width="440" height="180" alt="Fastest full PostgreSQL nodejs client" src="https://raw.githubusercontent.com/porsager/postgres/master/postgresjs.svg?sanitize=true" />
 
 - [🚀 Fastest full-featured PostgreSQL node client](https://github.com/porsager/postgres-benchmarks#results)
-- 🚯 1850 LOC - 0 dependencies
 - 🏷 ES6 Tagged Template Strings at the core
 - 🏄‍♀️ Simple surface API
 - 🖊️ Dynamic query support
@@ -21,23 +20,39 @@ $ npm install postgres
 ```
 
 ### Usage
+Create your `sql` database instance
 ```js
-const postgres = require('postgres')
-// import postgres from 'postgres'
+// db.js
+import postgres from 'postgres'
 
-const sql = postgres({ ...options }) // will default to the same as psql
+const sql = postgres({ /* options */ }) // will use psql environment variables
 
-const insertUser = await sql`
-  INSERT INTO users ${
-    sql({ name: "Serena", age: 35 })
-  } RETURNING *
-`;
-// [{ name: "Serena", age: 35 }]
+export default sql
+```
 
-const selectUsers = await sql`
-  select name, age from users
+Simply import for use elsewhere
+```js
+// other.js
+import sql from './db.js'
+
+const users = await sql`
+  select 
+    name,
+    age 
+  from users
+  where age > ${ 65 }
 `
-// [{ name: "Serena", age: 35 }, { name: 'Murray', age: 68 }, ...]
+// Result [{ name: "Walter", age: 80 }, { name: 'Murray', age: 68 }, ...]
+
+const [user] = await sql`
+  insert into users 
+    (name, age) 
+  values 
+    (${ 'Ludwig' }, ${ 92 })
+  returning name, age
+`
+// Result [{ name: "Murray", age: 68 }]
+
 ```
 
 # Table of Contents
@@ -58,6 +73,7 @@ const selectUsers = await sql`
   * [`describe`](#describe)
   * [`raw`](#raw)
   * [`file`](#file)
+  * [`cancel`](#canceling-queries-in-progress)
   * [Transactions](#transactions)
 * [Custom types](#custom-types)
 * [Advanced communication](#advanced-communication)
@@ -76,7 +92,7 @@ const selectUsers = await sql`
 
 ### `postgres([url], [options])`
 
-You can use either a `postgres://` url connection string or the options to define your database connection properties. Options in the object will override any present in the url.
+You can use either a `postgres://` url connection string or the options to define your database connection properties. Options in the object will override any present in the url. Options will fall back to the same environment variables as psql.
 
 ```js
 const sql = postgres('postgres://username:password@host:port/database', {
@@ -93,9 +109,9 @@ More options can be found in the [Advanced Connection Options section](#advanced
 
 ## Queries
 
-### ```sql`` -> Promise```
+### ```sql`` -> Promise -> Result[]```
 
-Postgres.js utilizes [Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) to process query parameters **before** interpolation. Using this advanced form of template literals benefits developers by:
+Postgres.js utilizes [Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) to process query parameters **before** interpolation. Using tagged template literals benefits developers by:
 
 1. **Enforcing** safe query generation
 2. Giving the `sql`` ` function powerful [utility](#insert) and [dynamic parameterization](#dynamic-queries) features.
@@ -119,16 +135,15 @@ const [new_user] = await sql`
 // new_user = { user_id: 1, name: 'Murray', age: 68 }
 ```
 
-Please note that queries are executed when `awaited` – or manually by using `.execute`.
+Please note that queries are executed when `awaited` – or manually by using `.execute()`.
 
 #### Query parameters
 
-Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessary, simply use JS tagged template literals as usual. **Dynamic and partial queries can be seen in the [next section]()**.
+Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessary, simply use tagged template literals as usual. **Dynamic and partial queries can be seen in the [next section]()**.
 
 ```js
-let searchName = 'Mur'
-let searchAge = 60
-
+const name = 'Mur'
+    , age = 60
 
 const users = await sql`
   select
@@ -136,46 +151,30 @@ const users = await sql`
     age
   from users
   where
-    name like ${searchName + '%'}
-    and age > ${searchAge}
+    name like ${ name + '%' }
+    and age > ${ age }
 `
-
 // users = [{ name: 'Murray', age: 68 }]
-
 ```
 
 > Be careful with quotation marks here. Because Postgres infers column types, you do not need to wrap your interpolated parameters in quotes like `'${name}'`. This will cause an error because the tagged template replaces `${name}` with `$1` in the query string, leaving Postgres to do the interpolation. If you wrap that in a string, Postgres will see `'$1'` and interpret it as a string as opposed to a parameter.
 
-### Select
+### Dynamic column selection
 
 ```js
 const columns = ['name', 'age']
 
 sql`
-  select ${
-    sql(columns)
-  } from users
+  select 
+    ${ sql(columns) } 
+  from users
 `
 
-// Is translated into this query:
+// Which results in:
 select "name", "age" from users
 ```
 
-```js
-let resultOne = await sql`
-  select user_id, name from users
-`
-// [{ user_id: 0, name: "Serena" }, { user_id: 1, name: "Murray" }, { user_id: 2, name: "Lysander" }, ...]
-
-resultOne.unshift()
-
-let resultTwo = await sql`
-  select user_id from users where user_id IN ${resultOne.map(row => row.user_id)}
-`
-// [{ user_id: 1, name: 'Murray' }, { user_id: 2, name: "Lysander" }, ...]
-```
-
-### Insert
+### Dynamic insert
 
 ```js
 const user = {
@@ -189,7 +188,7 @@ sql`
   }
 `
 
-// Is translated to:
+// Which results in:
 insert into users ("name", "age") values ($1, $2)
 ```
 
@@ -199,176 +198,206 @@ insert into users ("name", "age") values ($1, $2)
 If you need to insert multiple rows at the same time it's also much faster to do it with a single `insert`. Simply pass an array of objects to `sql()`.
 
 ```js
-const users = [
-  {
-    name: 'Murray',
-    age: 68,
-    garbage: 'ignore'
-  }, 
-  {
-    name: 'Walter',
-    age: 78
-  }
-]
+const users = [{
+  name: 'Murray',
+  age: 68,
+  garbage: 'ignore'
+}, 
+{
+  name: 'Walter',
+  age: 80
+}]
 
-sql`insert into users ${sql(users, 'name', 'age')}`
+sql`insert into users ${ sql(users, 'name', 'age') }`
 
 // Is translated to:
 insert into users ("name", "age") values ($1, $2), ($3, $4)
 
-// Omitting column names
+// You can also omit column names which will use object keys as columns
+sql`insert into users ${ sql(users) }`
 
-users[0] = {
-  name: 'Serena',
-  age: 35,
-}
-
-sql`insert into users ${sql(users)}`
-
-// Is translated to:
+// Which results in:
 insert into users ("name", "age") values ($1, $2), ($3, $4)
 ```
 
-### Update
+### Dynamic Updates
 This is also useful for update queries 
 ```js
-
 const user = {
   id: 1,
-  name: 'Muray'
+  name: 'Murray'
 }
 
 sql`
   update users set ${
     sql(user, 'name')
-  } where 
-    user_id = ${user.id}
+  } 
+  where user_id = ${ user.id }
 `
 
-// Is translated to:
+// Which results in:
 update users set "name" = $1 where user_id = $2
 ```
 
-### Delete
+### Dynamic delete
 
 ```js
 
 const user = {
   id: 1,
-  name: 'Muray'
+  name: 'Murray'
 }
 
-sql`delete from users where user_id = ${user.id}`
+sql`delete from users where user_id = ${ user.id }`
 
-// Is translated to:
+// Which results in:
 delete from users where user_id = $1
 ```
 
 ## Dynamic queries
 
-Postgres.js features a powerful dynamic query parser for conditionally appending/omitting query fragments.
-
-This works by nestings a ` sql`` ` call within another ` sql`` ` call.
+Postgres.js features a simple dynamic query builder by conditionally appending/omitting query fragments.
+It works by nesting ` sql`` ` fragments within other ` sql`` ` calls or fragments. This allows you to build dynamic queries safely without risking sql injections through usual string concatenation.
 
 #### Partial queries
-
 ```js
-let savedQuery = () => sql`and age > 50`
+const olderThan = x => sql`and age > ${ x }`
 
-let isQueryingForAge = true
+const filterAge = true
 
 sql`
   select
    *
   from users 
-  where 
-    name is not null
-    ${isQueryingForAge ?
-     savedQuery()
-     :
-     sql``
-    }
+  where name is not null ${
+    filterAge
+      ? olderThan(50)
+      : sql``
+  }
 `
+// Which results in:
+select * from users where name is not null
+// Or
+select * from users where name is not null and age > 50
 ```
 
-#### Dynamic where clause
+#### Dynamic filters
 ```js
 sql` 
-  select 
-    * 
-  from users ${id ? 
-    sql`where user_id = ${ id }` 
-    : 
-    sql`` 
+  select
+    *
+  from users ${
+    id 
+      ? sql`where user_id = ${ id }`
+      : sql``
   }
 `
 
-// Is translated to:
+// Which results in:
 select * from users
 // Or
 select * from users where user_id = $1
 ```
 
-#### Dynamic filters
-```js
-let ageFilter = 50;
-
-sql` 
-  select 
-    * 
-  from users 
-  where
-   age > ${ageFilter}
-  ${id ? 
-    sql`and user_id = ${id}` 
-    : 
-    sql`` 
-  }
-`
-
-// Is translated to:
-select * from users where age > $1
-// Or
-select * from users where age > $1 and user_id = $2
-```
-
 ### Identifier and value utilities
 
-#### Arrays
-Arrays will be handled by replacement parameters too, so `where in` queries are also simple.
-
+#### Where ` in `
+Value lists can also be created dynamically, making `where in` queries simple too.
 ```js
 const users = await sql`
   select
     *
   from users
-  where age in ${sql([68, 75, 23])}
+  where age in ${ sql([68, 75, 23]) }
 `
 ```
 
 #### SQL functions
-
+Using keywords or calling functions dynamically is also possible by using ``` sql`` ``` fragments.
 ```js
-let now = true
+const date = null
 
 sql` 
-  update users set updated_at = ${ now ? sql`now()` : someDate }
+  update users set updated_at = ${ date || sql`now()` }
 `
+
+// Which results in:
+update users set updated_at = now()
 ```
 
 #### Table names
-
+Dynamic identifiers like table names and column names is also supported like so:
 ```js
 const table = 'users'
 
 sql`
   select id from ${ sql(table) }
 `
+
+// Which results in:
+select id from "users"
 ```
 
 ## Advanced query methods
 
-### forEach
+### .cursor()
+#### ```sql``.cursor([rows = 1], [fn]) -> Promise```
+
+Use cursors if you need to throttle the amount of rows being returned from a query. You can use a cursor either as an [async iterable](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of) or with a callback function. For a callback function new results won't be requested until the promise / async callback function has resolved.
+
+##### callback function
+```js
+await sql`
+  select 
+    * 
+  from generate_series(1,4) as x
+`.cursor(async([row]) => {
+  // row = { x: 1 }
+  await http.request('https://example.com/wat', { row })
+}
+```
+
+##### for await...of
+```js
+// for await...of
+const cursor = sql`select * from generate_series(1,4) as x`.cursor()
+
+for await (const [row] of cursor) {
+  // row = { x: 1 }
+  await http.request('https://example.com/wat', { row })
+}
+```
+
+
+A single row will be returned by default, but you can also request batches by setting the number of rows desired in each batch as the first argument to `.cursor`:
+```js
+await sql`
+  select 
+    * 
+  from generate_series(1,1000) as x
+`.cursor(10, async rows => {
+  // rows = [{ x: 1 }, { x: 2 }, ... ]
+  await Promise.all(rows.map(row =>
+    http.request('https://example.com/wat', { row })
+  ))
+}
+```
+
+If an error is thrown inside the callback function no more rows will be requested and the outer promise will reject with the thrown error.
+
+You can close the cursor early either by calling `break` in the `for await...of` loop, or by returning the token `sql.CLOSE` from the callback function.
+
+```js
+
+await sql`
+  select * from generate_series(1,1000) as x
+`.cursor(row => {
+  return Math.random() > 0.9 && sql.END
+})
+
+```
+
+### .forEach()
 #### ```sql``.forEach(fn) -> Promise```
 
 If you want to handle rows returned by a query one by one, you can use `.forEach` which returns a promise that resolves once there are no more rows.
@@ -381,45 +410,6 @@ await sql`
 })
 
 // No more rows
-```
-
-### Cursor 
-#### ```sql``.cursor([rows = 1], fn) -> Promise```
-
-Use cursors if you need to throttle the amount of rows being returned from a query. New results won't be requested until the promise / async callback function has resolved.
-
-```js
-for await (const [row] of sql`select * from generate_series(1,4) as x`.cursor()) {
-  // row = { x: 1 }
-  await http.request('https://example.com/wat', { row })
-}
-
-// All rows iterated
-```
-
-A single row will be returned by default, but you can also request batches by setting the number of rows desired in each batch as an argument of `.cursor`:
-
-```js
-for await (const rows of sql`select * from generate_series(1,1000) as x`.cursor(10)) {
-  // rows = [{ x: 1 }, { x: 2 }, ... ]
-  await Promise.all(rows.map(row =>
-    http.request('https://example.com/wat', { row })
-  ))
-}
-```
-
-If an error is thrown inside the callback function no more rows will be requested and the promise will reject with the thrown error.
-
-You can also stop receiving any more rows early by returning an end token `sql.END` from the callback function.
-
-```js
-
-await sql`
-  select * from generate_series(1,1000) as x
-`.cursor(row => {
-  return Math.random() > 0.9 && sql.END
-})
-
 ```
 
 ### describe 
@@ -451,13 +441,25 @@ sql.file(path.join(__dirname, 'query.sql'), [], {
 
 ```
 
-### Transactions
+## Canceling Queries in Progress
 
-#### BEGIN / COMMIT `sql.begin(fn) -> Promise`
+Postgres.js supports, [canceling queries in progress](https://www.postgresql.org/docs/7.1/protocol-protocol.html#AEN39000). It works by opening a new connection with a protocol level startup message to cancel the current query running on a specific connection. That means there is no guarantee that the query will be canceled, and due to the possible race conditions it might even result in canceling another query. This is fine for long running queries, but in the case of high load and fast queries it might be better to simply ignore results instead of canceling.
 
-Calling `.begin` with a function will return a Promise. This will resolve with the returned value from the function. The function provides a single argument which is `sql` with a context of the newly created transaction. 
+```js
 
-`BEGIN` is automatically called, and if the Promise fails `ROLLBACK` will be called. If it succeeds `COMMIT` will be called.
+const query = sql`select pg_sleep 100`.execute()
+setTimeout(() => query.cancel(), 100)
+const result = await query
+
+```
+
+## Transactions
+
+#### BEGIN / COMMIT `sql.begin([options = ''], fn) -> Promise`
+
+Use `sql.begin` to start a new transaction. Postgres.js will reserve a connection for the transaction and supply a scoped `sql` instance for all transaction uses in the callback function. `sql.begin` will resolve with the returned value from the callback function.
+
+`BEGIN` is automatically sent with the optional options, and if anything fails `ROLLBACK` will be called so the connection can be released and execution can continue.
 
 ```js
 
@@ -466,7 +468,7 @@ const [user, account] = await sql.begin(async sql => {
     insert into users (
       name
     ) values (
-      'Alice'
+      'Murray'
     )
   `
 
@@ -483,16 +485,28 @@ const [user, account] = await sql.begin(async sql => {
 
 ```
 
+It's also possible to pipeline the requests in a transaction if needed by returning an array with queries from the callback function like this:
+
+```js
+
+const result = await sql.begin(sql => [
+  sql`update ...`,
+  sql`update ...`,
+  sql`insert ...`
+])
+
+```
+
 #### SAVEPOINT `sql.savepoint([name], fn) -> Promise`
 
 ```js
 
-sql.begin(async sql => {
+sql.begin('read write', async sql => {
   const [user] = await sql`
     insert into users (
       name
     ) values (
-      'Alice'
+      'Murray'
     )
   `
 
@@ -521,10 +535,12 @@ sql.begin(async sql => {
 
 Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
 
-<details>
-<summary><code>sql.unsafe</code> - Advanced unsafe use cases</summary>
+## Unsafe raw string queries
 
-### Unsafe queries `sql.unsafe(query, [args], [options]) -> promise`
+<details>
+<summary>Advanced unsafe use cases</summary>
+
+### `sql.unsafe(query, [args], [options]) -> promise`
 
 If you know what you're doing, you can use `unsafe` to pass any string you'd like to postgres. Please note that this can lead to sql injection if you're not careful.
 
@@ -537,11 +553,9 @@ sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 
 ## Custom Types
 
-You can add ergonomic support for custom types, or simply use `sql.typed(value, type)` inline, where type is the PostgreSQL `oid` for the type and the correctly serialized value. _(`oid` values for types can be found in the `pg_catalog.pg_types` table.)_
+You can add ergonomic support for custom types, or simply use `sql.typed(value, type)` inline, where type is the PostgreSQL `oid` for the type and the correctly serialized string. _(`oid` values for types can be found in the `pg_catalog.pg_types` table.)_
 
-Using custom types is necessary if using parameters with [`DO` queries](https://www.postgresql.org/docs/9.0/sql-do.html). If not doing this, PostgreSQL will throw a `could not determine data type of parameter $1` error.
-
-Adding Query helpers is the recommended approach which can be done like this:
+Adding Query helpers is the cleanest approach which can be done like this:
 
 ```js
 const sql = postgres({
@@ -619,7 +633,7 @@ CREATE PUBLICATION alltables FOR ALL TABLES
 ```js
 const sql = postgres({ publications: 'alltables' })
 
-const { unsubscribe } = await sql.subscribe('insert:events', row =>
+const { unsubscribe } = await sql.subscribe('insert:events', (row, { command, relation, key, old }) =>
   // tell about new event row over eg. websockets or do something else
 )
 ```
@@ -650,9 +664,9 @@ sql.subscribe('update:users=1',   () => /* all updates on the users row with a p
 
 ## Teardown / Cleanup
 
-To ensure proper teardown and cleanup on server restarts use `sql.end({ timeout: 0 })` before `process.exit()`.
+To ensure proper teardown and cleanup on server restarts use `await sql.end()` before `process.exit()`.
 
-Calling `sql.end()` will reject new queries and return a Promise which resolves when all queries are finished and the underlying connections are closed. If a timeout is provided any pending queries will be rejected once the timeout is reached and the connections will be destroyed.
+Calling `sql.end()` will reject new queries and return a Promise which resolves when all queries are finished and the underlying connections are closed. If a `{ timeout }` option is provided any pending queries will be rejected once the timeout (in seconds) is reached and the connections will be destroyed.
 
 #### Sample shutdown using [Prexit](http://npmjs.com/prexit)
 
@@ -683,7 +697,7 @@ const sql = postgres({
 })
 ```
 
-There is currently no guaranteed way to handle `numeric / decimal` types in native Javascript. **These [and similar] types will be returned as a `string`**. The best way this case is to use  [custom types](#custom-types).
+There is currently no guaranteed way to handle `numeric / decimal` types in native Javascript. **These [and similar] types will be returned as a `string`**. The best way in this case is to use  [custom types](#custom-types).
 
 
 ## Connection options
@@ -736,7 +750,7 @@ const sql =
     ? // "Unless you're using a Private or Shield Heroku Postgres database, Heroku Postgres does not currently support verifiable certificates"
       // https://help.heroku.com/3DELT3RK/why-can-t-my-third-party-utility-connect-to-heroku-postgres-with-ssl
       postgres({ ssl: { rejectUnauthorized: false } })
-    : postgres();
+    : postgres()
 ```
 
 For more information regarding `ssl` with `postgres`, check out the [Node.js documentation for tls](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options).
@@ -762,6 +776,8 @@ Any query which was already sent over the wire will be rejected if the connectio
 
 There are no guarantees about queries executing in order unless using a transaction with `sql.begin()` or setting `max: 1`. Of course doing a series of queries, one awaiting the other will work as expected, but that's just due to the nature of js async/promise handling, so it's not necessary for this library to be concerned with ordering.
 
+Since this library automatically creates prepared statements, it also has a default max lifetime for connections to prevent memory bloat on the database itself. This is a random interval for each connection between 45 and 90 minutes. This allows multiple connections to come up and down seamlessly without user interference.
+
 ### Connection timeout
 
 By default, connections will not close until `.end()` is called. However, it may be useful to have them close automatically when:
@@ -772,12 +788,12 @@ By default, connections will not close until `.end()` is called. However, it may
 
 This can be done using the `idle_timeout` or `max_lifetime` options. These configuration options specify the number of seconds to wait before automatically closing an idle connection and the maximum time a connection can exist, respectively.
 
-For example, to close a connection that has either been idle for 2 seconds or exists for 30 seconds:
+For example, to close a connection that has either been idle for 20 seconds or existed for more than 30 minutes:
 
 ```js
 const sql = postgres({
-  idle_timeout: 2,
-  max_lifetime: 30
+  idle_timeout: 20,
+  max_lifetime: 60 * 30
 })
 ```
 
@@ -813,11 +829,11 @@ Prepared statements will automatically be created for any queries where it can b
 
 ## Error handling
 
-Errors are all thrown to related queries and never globally. Errors coming from PostgreSQL itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
+Errors are all thrown to related queries and never globally. Errors coming from database itself are always in the [native Postgres format](https://www.postgresql.org/docs/current/errcodes-appendix.html), and the same goes for any [Node.js errors](https://nodejs.org/api/errors.html#errors_common_system_errors) eg. coming from the underlying connection.
 
 Query errors will contain a stored error with the origin of the query to aid in tracing errors.
 
-Query errors will also contain the `query` string and the `parameters` which are not enumerable to avoid accidentally leaking confidential information in logs. To log these it is required to specifically access `error.query` and `error.parameters`.
+Query errors will also contain the `query` string and the `parameters`. These are not enumerable to avoid accidentally leaking confidential information in logs. To log these it is required to specifically access `error.query` and `error.parameters`, or set `debug: true` in options.
 
 There are also the following errors specifically for this library.
 
