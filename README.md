@@ -63,6 +63,23 @@ async function insertUser({ name, age }) {
 
 ```
 
+## Table of Contents
+
+* [Connection](#connection)
+* [Queries](#queries)
+* [Building queries](#building-queries)
+* [Advanced query methods](#advanced-query-methods)
+* [Transactions](#transactions)
+* [Listen & notify](#listen--notify)
+* [Realtime subscribe](#realtime-subscribe)
+* [Numbers, bigint, numeric](#numbers-bigint-numeric)
+* [Connection details](#connection-details)
+* [Custom Types](#custom-types)
+* [Teardown / Cleanup](#teardown--cleanup)
+* [Error handling](#error-handling)
+* [TypeScript support](#typescript-support)
+
+
 ## Connection
 
 ### `postgres([url], [options])`
@@ -80,7 +97,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
 })
 ```
 
-More options can be found in the [Advanced Connection Options section](#connection-options).
+More options can be found in the [Connection details section](#connection-details).
 
 ## Queries
 
@@ -406,7 +423,7 @@ const result = await sql.file('query.sql', ['Murray', 68])
 
 ```
 
-## Canceling Queries in Progress
+### Canceling Queries in Progress
 
 Postgres.js supports, [canceling queries in progress](https://www.postgresql.org/docs/7.1/protocol-protocol.html#AEN39000). It works by opening a new connection with a protocol level startup message to cancel the current query running on a specific connection. That means there is no guarantee that the query will be canceled, and due to the possible race conditions it might even result in canceling another query. This is fine for long running queries, but in the case of high load and fast queries it might be better to simply ignore results instead of canceling.
 
@@ -417,6 +434,22 @@ setTimeout(() => query.cancel(), 100)
 const result = await query
 
 ```
+
+### Unsafe raw string queries
+
+<details>
+<summary>Advanced unsafe use cases</summary>
+
+### `await sql.unsafe(query, [args], [options]) -> Result[]`
+
+If you know what you're doing, you can use `unsafe` to pass any string you'd like to postgres. Please note that this can lead to sql injection if you're not careful.
+
+```js
+
+sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
+
+```
+</details>
 
 ## Transactions
 
@@ -500,66 +533,7 @@ sql.begin('read write', async sql => {
 
 Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
 
-## Unsafe raw string queries
-
-<details>
-<summary>Advanced unsafe use cases</summary>
-
-### `await sql.unsafe(query, [args], [options]) -> Result[]`
-
-If you know what you're doing, you can use `unsafe` to pass any string you'd like to postgres. Please note that this can lead to sql injection if you're not careful.
-
-```js
-
-sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
-
-```
-</details>
-
-## Custom Types
-
-You can add ergonomic support for custom types, or simply use `sql.typed(value, type)` inline, where type is the PostgreSQL `oid` for the type and the correctly serialized string. _(`oid` values for types can be found in the `pg_catalog.pg_types` table.)_
-
-Adding Query helpers is the cleanest approach which can be done like this:
-
-```js
-const sql = postgres({
-  types: {
-    rect: {
-      // The pg_types oid to pass to the db along with the serialized value.
-      to        : 1337,
-
-      // An array of pg_types oids to handle when parsing values coming from the db.
-      from      : [1337],
-
-      //Function that transform values before sending them to the db.
-      serialize : ({ x, y, width, height }) => [x, y, width, height],
-
-      // Function that transforms values coming from the db.
-      parse     : ([x, y, width, height]) => { x, y, width, height }
-    }
-  }
-})
-
-// Now you can use sql.typed.rect() as specified above
-const [custom] = sql`
-  insert into rectangles (
-    name,
-    rect
-  ) values (
-    'wat',
-    ${ sql.typed.rect({ x: 13, y: 37, width: 42, height: 80 }) }
-  )
-  returning *
-`
-
-// custom = { name: 'wat', rect: { x: 13, y: 37, width: 42, height: 80 } }
-
-```
-
-## Advanced communication
-
-### Listen and notify
+## Listen & notify
 
 When you call `.listen`, a dedicated connection will be created to ensure that you receive notifications in real-time. This connection will be used for any further calls to `.listen`.
 
@@ -581,20 +555,20 @@ sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))
 
 ```
 
-### Subscribe / Realtime
+## Realtime subscribe
 
 Postgres.js implements the logical replication protocol of PostgreSQL to support subscription to real-time updates of `insert`, `update` and `delete` operations.
 
 > **NOTE** To make this work you must [create the proper publications in your database](https://www.postgresql.org/docs/current/sql-createpublication.html), enable logical replication by setting `wal_level = logical` in `postgresql.conf` and connect using either a replication or superuser.
 
-#### Quick start
+### Quick start
 
-##### Create a publication (eg. in migration)
+#### Create a publication (eg. in migration)
 ```sql
 CREATE PUBLICATION alltables FOR ALL TABLES
 ```
 
-##### Subscribe to updates
+#### Subscribe to updates
 ```js
 const sql = postgres({ publications: 'alltables' })
 
@@ -603,11 +577,11 @@ const { unsubscribe } = await sql.subscribe('insert:events', (row, { command, re
 )
 ```
 
-#### Subscribe pattern
+### Subscribe pattern
 
 You can subscribe to specific operations, tables, or even rows with primary keys.
 
-##### `operation`      `:` `schema` `.` `table` `=` `primary_key`
+#### `operation`      `:` `schema` `.` `table` `=` `primary_key`
 
 **`operation`** is one of ``` * | insert | update | delete ``` and defaults to `*`
 
@@ -617,7 +591,7 @@ You can subscribe to specific operations, tables, or even rows with primary keys
 
 **`primary_key`** can be used to only subscribe to specific rows
 
-#### Examples
+### Examples
 
 ```js
 sql.subscribe('*',                () => /* everything */ )
@@ -625,25 +599,6 @@ sql.subscribe('insert',           () => /* all inserts */ )
 sql.subscribe('*:users',          () => /* all operations on the public.users table */ )
 sql.subscribe('delete:users',     () => /* all deletes on the public.users table */ )
 sql.subscribe('update:users=1',   () => /* all updates on the users row with a primary key = 1 */ )
-```
-
-## Teardown / Cleanup
-
-To ensure proper teardown and cleanup on server restarts use `await sql.end()` before `process.exit()`.
-
-Calling `sql.end()` will reject new queries and return a Promise which resolves when all queries are finished and the underlying connections are closed. If a `{ timeout }` option is provided any pending queries will be rejected once the timeout (in seconds) is reached and the connections will be destroyed.
-
-#### Sample shutdown using [Prexit](https://github.com/porsager/prexit)
-
-```js
-
-import prexit from 'prexit'
-
-prexit(async () => {
-  await sql.end({ timeout: 5 })
-  await new Promise(r => server.close(r))
-})
-
 ```
 
 ## Numbers, bigint, numeric
@@ -665,7 +620,7 @@ const sql = postgres({
 There is currently no guaranteed way to handle `numeric / decimal` types in native Javascript. **These [and similar] types will be returned as a `string`**. The best way in this case is to use  [custom types](#custom-types).
 
 
-## Connection options
+## Connection details
 
 ### All Postgres options
 
@@ -791,6 +746,66 @@ const sql = postgres()
 ### Prepared statements
 
 Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `no_prepare` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93).
+
+## Custom Types
+
+You can add ergonomic support for custom types, or simply use `sql.typed(value, type)` inline, where type is the PostgreSQL `oid` for the type and the correctly serialized string. _(`oid` values for types can be found in the `pg_catalog.pg_types` table.)_
+
+Adding Query helpers is the cleanest approach which can be done like this:
+
+```js
+const sql = postgres({
+  types: {
+    rect: {
+      // The pg_types oid to pass to the db along with the serialized value.
+      to        : 1337,
+
+      // An array of pg_types oids to handle when parsing values coming from the db.
+      from      : [1337],
+
+      //Function that transform values before sending them to the db.
+      serialize : ({ x, y, width, height }) => [x, y, width, height],
+
+      // Function that transforms values coming from the db.
+      parse     : ([x, y, width, height]) => { x, y, width, height }
+    }
+  }
+})
+
+// Now you can use sql.typed.rect() as specified above
+const [custom] = sql`
+  insert into rectangles (
+    name,
+    rect
+  ) values (
+    'wat',
+    ${ sql.typed.rect({ x: 13, y: 37, width: 42, height: 80 }) }
+  )
+  returning *
+`
+
+// custom = { name: 'wat', rect: { x: 13, y: 37, width: 42, height: 80 } }
+
+```
+
+## Teardown / Cleanup
+
+To ensure proper teardown and cleanup on server restarts use `await sql.end()` before `process.exit()`.
+
+Calling `sql.end()` will reject new queries and return a Promise which resolves when all queries are finished and the underlying connections are closed. If a `{ timeout }` option is provided any pending queries will be rejected once the timeout (in seconds) is reached and the connections will be destroyed.
+
+#### Sample shutdown using [Prexit](https://github.com/porsager/prexit)
+
+```js
+
+import prexit from 'prexit'
+
+prexit(async () => {
+  await sql.end({ timeout: 5 })
+  await new Promise(r => server.close(r))
+})
+
+```
 
 ## Error handling
 
