@@ -1,6 +1,6 @@
 {
   "name": "postgres",
-  "version": "2.0.0-beta.11",
+  "version": "3.0.0-rc.1",
   "description": "Fastest full featured PostgreSQL client for Node.js",
   "type": "module",
   "module": "src/index.js",
@@ -31,8 +31,8 @@
   ],
   "author": "Rasmus Porsager <rasmus@porsager.com> (https://www.porsager.com)",
   "funding": {
-    "type" : "individual",
-    "url" : "https://github.com/sponsors/porsager"
+    "type": "individual",
+    "url": "https://github.com/sponsors/porsager"
   },
   "license": "Unlicense",
   "repository": "porsager/postgres",
