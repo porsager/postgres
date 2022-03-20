@@ -821,6 +821,11 @@ Query errors will also contain the `query` string and the `parameters` which are
 
 There are also the following errors specifically for this library.
 
+##### UNSAFE_TRANSACTION
+> Only use sql.begin or max: 1
+
+To ensure statements in a transaction runs on the same connection (which is required for them to run inside the transaction), you must use [`sql.begin(...)`](#Transactions) or only allow a single connection in options (`max: 1`).
+
 ##### UNDEFINED_VALUE
 > Undefined values are not allowed
 

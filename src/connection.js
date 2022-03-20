@@ -51,6 +51,7 @@ const errorFields = {
 function Connection(options, { onopen = noop, onend = noop, ondrain = noop, onclose = noop } = {}) {
   const {
     ssl,
+    max,
     user,
     host,
     port,
@@ -556,6 +557,9 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     }
 
     final && (final(), final = null)
+
+    if (result.command === 'BEGIN' && max !== 1 && !connection.reserved)
+      return errored(Errors.generic('UNSAFE_TRANSACTION', 'Only use sql.begin or max: 1'))
 
     if (query.options.simple)
       return

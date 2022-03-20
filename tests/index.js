@@ -160,6 +160,15 @@ t('null for int', async() => {
   return [1, (await sql`insert into test values(${ null })`).count, await sql`drop table test`]
 })
 
+t('Throws on illegal transactions', async() => {
+  const sql = postgres({ ...options, max: 2, fetch_types: false })
+  const error = await sql`begin`.catch(e => e)
+  return [
+    error.code,
+    'UNSAFE_TRANSACTION'
+  ]
+})
+
 t('Transaction throws', async() => {
   await sql`create table test (a int)`
   return ['22P02', await sql.begin(async sql => {
