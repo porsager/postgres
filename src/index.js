@@ -359,7 +359,7 @@ function Postgres(a, b) {
         : (
           queries.remove(query),
           query.cancelled = true,
-          query.reject(Errors.generic({ code: '57014', message: 'canceling statement due to user request' })),
+          query.reject(Errors.generic('57014', 'canceling statement due to user request')),
           resolve()
         )
     })

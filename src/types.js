@@ -83,7 +83,7 @@ export class Builder extends NotTagged {
 export function handleValue(x, parameters, types) {
   const value = x instanceof Parameter ? x.value : x
   if (value === undefined)
-    throw Errors.generic({ code: 'UNDEFINED_VALUE', message: 'Undefined values are not allowed' })
+    throw Errors.generic('UNDEFINED_VALUE', 'Undefined values are not allowed')
 
   return '$' + (types.push(
     x instanceof Parameter
@@ -155,7 +155,7 @@ const builders = Object.entries({
 }).map(([x, fn]) => ([new RegExp('(^|[\\s(])' + x, 'i'), fn]))
 
 function notTagged() {
-  throw Errors.generic({ message: 'Query not called as a tagged template literal', code: 'NOT_TAGGED_CALL' })
+  throw Errors.generic('NOT_TAGGED_CALL', 'Query not called as a tagged template literal')
 }
 
 export const serializers = defaultHandlers.serializers

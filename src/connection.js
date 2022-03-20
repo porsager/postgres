@@ -169,7 +169,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   function toBuffer(q) {
     if (q.parameters.length >= 65534)
-      throw Errors.generic({ message: 'Max number of parameters (65534) exceeded', code: 'MAX_PARAMETERS_EXCEEDED' })
+      throw Errors.generic('MAX_PARAMETERS_EXCEEDED', 'Max number of parameters (65534) exceeded')
 
     return q.options.simple
       ? b().Q().str(q.strings[0] + b.N).end()
@@ -679,10 +679,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     if (x.toString('utf8', 9).split(b.N, 1)[0].slice(2) === serverSignature)
       return
     /* c8 ignore next 5 */
-    errored(Errors.generic({
-      message: 'The server did not return the correct signature',
-      code: 'SASL_SIGNATURE_MISMATCH'
-    }))
+    errored(Errors.generic('SASL_SIGNATURE_MISMATCH', 'The server did not return the correct signature'))
     socket.destroy()
   }
 
