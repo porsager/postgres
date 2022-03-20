@@ -32,61 +32,36 @@ export default sql
 
 Simply import for use elsewhere
 ```js
-// other.js
+// users.js
 import sql from './db.js'
 
-const users = await sql`
-  select 
-    name,
-    age 
-  from users
-  where age > ${ 65 }
-`
-// Result [{ name: "Walter", age: 80 }, { name: 'Murray', age: 68 }, ...]
+async function getUsersOver(age) {
+  const users = await sql`
+    select 
+      name,
+      age 
+    from users
+    where age > ${ age }
+  `
+  // users = Result [{ name: "Walter", age: 80 }, { name: 'Murray', age: 68 }, ...]
+  return users
+}
 
-const [user] = await sql`
-  insert into users 
-    (name, age) 
-  values 
-    (${ 'Ludwig' }, ${ 92 })
-  returning name, age
-`
-// Result [{ name: "Murray", age: 68 }]
+
+async function insertUser({ name, age }) {
+  const users = sql`
+    insert into users 
+      (name, age) 
+    values 
+      (${ name }, ${ age })
+    returning name, age
+  `
+  // users = Result [{ name: "Murray", age: 68 }]
+  return users
+}
+
 
 ```
-
-# Table of Contents
-
-* [Connection](#connection)
-* [Queries](#queries)
-  * [Select](#select)
-  * [Insert](#insert)
-  * [Update](#update)
-  * [Delete](#delete)
-* [Dynamic queries](#dynamic-queries)
-  * [Building partial queries](#partial-queries)
-  * [WHERE clause](#dynamic-where-clause)
-  * [Identifiers](#identifier-and-value-utilities)
-* [Advanced query methods](#advanced-query-methods)
-  * [`forEach`](#foreach)
-  * [`cursor`](#cursor)
-  * [`describe`](#describe)
-  * [`raw`](#raw)
-  * [`file`](#file)
-  * [`cancel`](#canceling-queries-in-progress)
-  * [Transactions](#transactions)
-* [Custom types](#custom-types)
-* [Advanced communication](#advanced-communication)
-  * [`LISTEN` and `NOTIFY`](#listen-and-notify)
-  * [Subscribe / Realtime](#subscribe-realtime)
-* [Connection options](#connection-options)
-  * [SSL](#ssl)
-  * [Multi-host connection](#multi-host-connections---high-availability-ha)
-  * [Connection timeout](#connection-timeout)
-  * [Environmental variables](#environmental-variables)
-* [Error handling](#error-handling)
-* [TypeScript support](#typescript-support)
-
 
 ## Connection
 
@@ -109,20 +84,20 @@ More options can be found in the [Advanced Connection Options section](#advanced
 
 ## Queries
 
-### ```sql`` -> Promise -> Result[]```
+### ```await sql`...` -> Result[]```
 
 Postgres.js utilizes [Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) to process query parameters **before** interpolation. Using tagged template literals benefits developers by:
 
 1. **Enforcing** safe query generation
 2. Giving the `sql`` ` function powerful [utility](#insert) and [dynamic parameterization](#dynamic-queries) features.
 
-Any generic value will be serialized according to an inferred type, and replaced by a PostgreSQL protocol placeholder `$1, $2, ...`. This is then sent to the database as a parameter to handle escaping & casting.
+Any generic value will be serialized according to an inferred type, and replaced by a PostgreSQL protocol placeholder `$1, $2, ...`. The parameters are then sent separately to the database which handles escaping & casting.
 
-All queries will return a `Result` array, mapping column names to each row.
+All queries will return a `Result` array, with objects mapping column names to each row.
 
 ```js
 
-const [new_user] = await sql`
+const xs = await sql`
   insert into users (
     name, age
   ) values (
@@ -132,14 +107,14 @@ const [new_user] = await sql`
   returning *
 `
 
-// new_user = { user_id: 1, name: 'Murray', age: 68 }
+// xs = [{ user_id: 1, name: 'Murray', age: 68 }]
 ```
 
-Please note that queries are executed when `awaited` – or manually by using `.execute()`.
+> Please note that queries are first executed when `awaited` – or manually by using `.execute()`.
 
-#### Query parameters
+### Query parameters
 
-Parameters are automatically inferred and handled by Postgres so that SQL injection isn't possible. No special handling is necessary, simply use tagged template literals as usual. **Dynamic and partial queries can be seen in the [next section]()**.
+Parameters are automatically extracted and handled by the database so that SQL injection isn't possible. No special handling is necessary, simply use tagged template literals as usual. **Dynamic queries and query building can be seen in the [next section]()**. // todo
 
 ```js
 const name = 'Mur'
@@ -174,7 +149,7 @@ sql`
 select "name", "age" from users
 ```
 
-### Dynamic insert
+### Dynamic inserts
 
 ```js
 const user = {
@@ -192,7 +167,7 @@ sql`
 insert into users ("name", "age") values ($1, $2)
 ```
 
-**You can omit column names and simply execute `sql(user)` to get all the fields from the object as columns**. Be careful to not allow users to supply columns that you do not want to be inserted.
+**You can omit column names and simply execute `sql(user)` to get all the fields from the object as columns**. Be careful not to allow users to supply columns that you do not want to be inserted.
 
 #### Multiple inserts in one query
 If you need to insert multiple rows at the same time it's also much faster to do it with a single `insert`. Simply pass an array of objects to `sql()`.
@@ -213,53 +188,58 @@ sql`insert into users ${ sql(users, 'name', 'age') }`
 // Is translated to:
 insert into users ("name", "age") values ($1, $2), ($3, $4)
 
-// You can also omit column names which will use object keys as columns
+// Here you can also omit column names which will use object keys as columns
 sql`insert into users ${ sql(users) }`
 
 // Which results in:
 insert into users ("name", "age") values ($1, $2), ($3, $4)
 ```
 
-### Dynamic Updates
+### Dynamic columns in updates
 This is also useful for update queries 
 ```js
 const user = {
   id: 1,
-  name: 'Murray'
+  name: 'Murray',
+  age: 68
 }
 
 sql`
   update users set ${
-    sql(user, 'name')
+    sql(user, 'name', 'age')
   } 
   where user_id = ${ user.id }
 `
 
 // Which results in:
-update users set "name" = $1 where user_id = $2
+update users set "name" = $1, "age" = $2 where user_id = $3
 ```
 
-### Dynamic delete
-
+### Dyanmic values and `where in`
+Value lists can also be created dynamically, making `where in` queries simple too.
 ```js
-
-const user = {
-  id: 1,
-  name: 'Murray'
-}
-
-sql`delete from users where user_id = ${ user.id }`
-
-// Which results in:
-delete from users where user_id = $1
+const users = await sql`
+  select
+    *
+  from users
+  where age in ${ sql([68, 75, 23]) }
+`
 ```
 
-## Dynamic queries
+or 
+```js
+const [{ a, b, c }] => await sql`
+  select 
+    * 
+  from (values ${ sql(['a', 'b', 'c']) }) as x(a, b, c)
+```
+
+## Building queries
 
 Postgres.js features a simple dynamic query builder by conditionally appending/omitting query fragments.
 It works by nesting ` sql`` ` fragments within other ` sql`` ` calls or fragments. This allows you to build dynamic queries safely without risking sql injections through usual string concatenation.
 
-#### Partial queries
+### Partial queries
 ```js
 const olderThan = x => sql`and age > ${ x }`
 
@@ -281,7 +261,7 @@ select * from users where name is not null
 select * from users where name is not null and age > 50
 ```
 
-#### Dynamic filters
+### Dynamic filters
 ```js
 sql` 
   select
@@ -299,20 +279,7 @@ select * from users
 select * from users where user_id = $1
 ```
 
-### Identifier and value utilities
-
-#### Where ` in `
-Value lists can also be created dynamically, making `where in` queries simple too.
-```js
-const users = await sql`
-  select
-    *
-  from users
-  where age in ${ sql([68, 75, 23]) }
-`
-```
-
-#### SQL functions
+### SQL functions
 Using keywords or calling functions dynamically is also possible by using ``` sql`` ``` fragments.
 ```js
 const date = null
@@ -325,22 +292,24 @@ sql`
 update users set updated_at = now()
 ```
 
-#### Table names
+### Table names
 Dynamic identifiers like table names and column names is also supported like so:
 ```js
 const table = 'users'
+    , column = 'id'
 
 sql`
-  select id from ${ sql(table) }
+  select ${ sql(column) } from ${ sql(table) }
 `
 
 // Which results in:
-select id from "users"
+select "id" from "users"
 ```
 
 ## Advanced query methods
 
 ### .cursor()
+
 #### ```sql``.cursor([rows = 1], [fn]) -> Promise```
 
 Use cursors if you need to throttle the amount of rows being returned from a query. You can use a cursor either as an [async iterable](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of) or with a callback function. For a callback function new results won't be requested until the promise / async callback function has resolved.
@@ -367,7 +336,6 @@ for await (const [row] of cursor) {
   await http.request('https://example.com/wat', { row })
 }
 ```
-
 
 A single row will be returned by default, but you can also request batches by setting the number of rows desired in each batch as the first argument to `.cursor`:
 ```js
@@ -398,7 +366,8 @@ await sql`
 ```
 
 ### .forEach()
-#### ```sql``.forEach(fn) -> Promise```
+
+#### ```await sql``.forEach(fn)```
 
 If you want to handle rows returned by a query one by one, you can use `.forEach` which returns a promise that resolves once there are no more rows.
 ```js
@@ -413,7 +382,7 @@ await sql`
 ```
 
 ### describe 
-#### ```sql``.describe([rows = 1], fn) -> Promise```
+#### ```await sql``.describe([rows = 1], fn) -> Result[]```
 
 Rather than executing a given query, `.describe` will return information utilized in the query process. This information can include the query identifier, column types, etc.
 
@@ -427,17 +396,13 @@ Using `.raw()` will return rows as an array with `Buffer` values for each column
 This can be useful to receive identically named columns, or for specific performance/transformation reasons. The column definitions are still included on the result array, plus access to parsers for each column.
 
 ### File
-#### `sql.file(path, [args], [options]) -> Promise`
+#### `await sql.file(path, [args], [options]) -> Result[]`
 
-Using a `.sql` file for a query.
-
-The contents will be cached in memory so that the file is only read once.
+Using a `.sql` file for a query is also supported with optional parameters to use if the file includes `$1, $2, etc`
 
 ```js
 
-sql.file(path.join(__dirname, 'query.sql'), [], {
-  cache: true // Default true - disable for single shot queries or memory reasons
-})
+const result = await sql.file('query.sql', ['Murray', 68])
 
 ```
 

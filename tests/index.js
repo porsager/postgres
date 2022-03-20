@@ -951,7 +951,7 @@ t('dynamic select args', async() => {
 
 t('dynamic values single row', async() => {
   const [{ b }] = await sql`
-    select * from (values ${ sql(['a', 'b', 'c']) }) AS x(a, b, c)
+    select * from (values ${ sql(['a', 'b', 'c']) }) as x(a, b, c)
   `
 
   return ['b', b]
@@ -959,7 +959,7 @@ t('dynamic values single row', async() => {
 
 t('dynamic values multi row', async() => {
   const [, { b }] = await sql`
-    select * from (values ${ sql([['a', 'b', 'c'], ['a', 'b', 'c']]) }) AS x(a, b, c)
+    select * from (values ${ sql([['a', 'b', 'c'], ['a', 'b', 'c']]) }) as x(a, b, c)
   `
 
   return ['b', b]

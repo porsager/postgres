@@ -114,7 +114,7 @@ function Postgres(a, b) {
       return query
     }
 
-    function file(path, args = [], options = { cache: true }) {
+    function file(path, args = [], options = {}) {
       arguments.length === 2 && !Array.isArray(args) && (options = args, args = [])
       const query = new Query([], args, (query) => {
         fs.readFile(path, 'utf8', (err, string) => {
