@@ -33,8 +33,8 @@ function postgres(x) {
   return error
 }
 
-function generic(x) {
-  const error = Object.assign(new Error(x.message), x)
+function generic(code, message) {
+  const error = Object.assign(new Error(code + ': ' + message), { code })
   Error.captureStackTrace(error, generic)
   return error
 }

@@ -114,7 +114,7 @@ function Postgres(a, b) {
       return query
     }
 
-    function file(path, args = [], options = { cache: true }) {
+    function file(path, args = [], options = {}) {
       arguments.length === 2 && !Array.isArray(args) && (options = args, args = [])
       const query = new Query([], args, (query) => {
         fs.readFile(path, 'utf8', (err, string) => {
@@ -359,7 +359,7 @@ function Postgres(a, b) {
         : (
           queries.remove(query),
           query.cancelled = true,
-          query.reject(Errors.generic({ code: '57014', message: 'canceling statement due to user request' })),
+          query.reject(Errors.generic('57014', 'canceling statement due to user request')),
           resolve()
         )
     })

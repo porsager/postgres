@@ -160,6 +160,15 @@ t('null for int', async() => {
   return [1, (await sql`insert into test values(${ null })`).count, await sql`drop table test`]
 })
 
+t('Throws on illegal transactions', async() => {
+  const sql = postgres({ ...options, max: 2, fetch_types: false })
+  const error = await sql`begin`.catch(e => e)
+  return [
+    error.code,
+    'UNSAFE_TRANSACTION'
+  ]
+})
+
 t('Transaction throws', async() => {
   await sql`create table test (a int)`
   return ['22P02', await sql.begin(async sql => {
@@ -942,7 +951,7 @@ t('dynamic select args', async() => {
 
 t('dynamic values single row', async() => {
   const [{ b }] = await sql`
-    select * from (values ${ sql(['a', 'b', 'c']) }) AS x(a, b, c)
+    select * from (values ${ sql(['a', 'b', 'c']) }) as x(a, b, c)
   `
 
   return ['b', b]
@@ -950,7 +959,7 @@ t('dynamic values single row', async() => {
 
 t('dynamic values multi row', async() => {
   const [, { b }] = await sql`
-    select * from (values ${ sql([['a', 'b', 'c'], ['a', 'b', 'c']]) }) AS x(a, b, c)
+    select * from (values ${ sql([['a', 'b', 'c'], ['a', 'b', 'c']]) }) as x(a, b, c)
   `
 
   return ['b', b]
