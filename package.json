@@ -24,7 +24,8 @@
     "prepublishOnly": "npm run lint"
   },
   "files": [
-    "/cjs",
+    "/cjs/src",
+    "/cjs/package.json",
     "/src",
     "/types"
   ],
