@@ -1,10 +1,10 @@
 <img align="left" width="440" height="180" alt="Fastest full PostgreSQL nodejs client" src="https://raw.githubusercontent.com/porsager/postgres/master/postgresjs.svg?sanitize=true" />
 
-- [🚀 Fastest full-featured PostgreSQL node client](https://github.com/porsager/postgres-benchmarks#results)
+- [🚀 Fastest full-featured node & deno client](https://github.com/porsager/postgres-benchmarks#results)
 - 🏷 ES6 Tagged Template Strings at the core
 - 🏄‍♀️ Simple surface API
 - 🖊️ Dynamic query support
-- 💬 Chat on [Gitter](https://gitter.im/porsager/postgres)
+- 💬 Chat and help on [Gitter](https://gitter.im/porsager/postgres)
 
 <br>
 
@@ -80,7 +80,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
 })
 ```
 
-More options can be found in the [Advanced Connection Options section](#advanced-connection-options).
+More options can be found in the [Advanced Connection Options section](#connection-options).
 
 ## Queries
 
@@ -89,7 +89,7 @@ More options can be found in the [Advanced Connection Options section](#advanced
 Postgres.js utilizes [Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) to process query parameters **before** interpolation. Using tagged template literals benefits developers by:
 
 1. **Enforcing** safe query generation
-2. Giving the `sql`` ` function powerful [utility](#insert) and [dynamic parameterization](#dynamic-queries) features.
+2. Giving the `sql`` ` function powerful [utility](#dynamic-inserts) and [query building](#building-queries) features.
 
 Any generic value will be serialized according to an inferred type, and replaced by a PostgreSQL protocol placeholder `$1, $2, ...`. The parameters are then sent separately to the database which handles escaping & casting.
 
@@ -310,7 +310,7 @@ select "id" from "users"
 
 ### .cursor()
 
-#### ```sql``.cursor([rows = 1], [fn]) -> Promise```
+#### ```await sql``.cursor([rows = 1], [fn])```
 
 Use cursors if you need to throttle the amount of rows being returned from a query. You can use a cursor either as an [async iterable](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of) or with a callback function. For a callback function new results won't be requested until the promise / async callback function has resolved.
 
@@ -420,7 +420,7 @@ const result = await query
 
 ## Transactions
 
-#### BEGIN / COMMIT `sql.begin([options = ''], fn) -> Promise`
+#### BEGIN / COMMIT `await sql.begin([options = ''], fn) -> fn()`
 
 Use `sql.begin` to start a new transaction. Postgres.js will reserve a connection for the transaction and supply a scoped `sql` instance for all transaction uses in the callback function. `sql.begin` will resolve with the returned value from the callback function.
 
@@ -462,7 +462,7 @@ const result = await sql.begin(sql => [
 
 ```
 
-#### SAVEPOINT `sql.savepoint([name], fn) -> Promise`
+#### SAVEPOINT `await sql.savepoint([name], fn) -> fn()`
 
 ```js
 
@@ -505,7 +505,7 @@ Do note that you can often achieve the same result using [`WITH` queries (Common
 <details>
 <summary>Advanced unsafe use cases</summary>
 
-### `sql.unsafe(query, [args], [options]) -> promise`
+### `await sql.unsafe(query, [args], [options]) -> Result[]`
 
 If you know what you're doing, you can use `unsafe` to pass any string you'd like to postgres. Please note that this can lead to sql injection if you're not careful.
 
@@ -633,7 +633,7 @@ To ensure proper teardown and cleanup on server restarts use `await sql.end()` b
 
 Calling `sql.end()` will reject new queries and return a Promise which resolves when all queries are finished and the underlying connections are closed. If a `{ timeout }` option is provided any pending queries will be rejected once the timeout (in seconds) is reached and the connections will be destroyed.
 
-#### Sample shutdown using [Prexit](http://npmjs.com/prexit)
+#### Sample shutdown using [Prexit](https://github.com/porsager/prexit)
 
 ```js
 
@@ -718,7 +718,7 @@ const sql =
     : postgres()
 ```
 
-For more information regarding `ssl` with `postgres`, check out the [Node.js documentation for tls](https://nodejs.org/dist/latest-v10.x/docs/api/tls.html#tls_new_tls_tlssocket_socket_options).
+For more information regarding `ssl` with `postgres`, check out the [Node.js documentation for tls](https://nodejs.org/dist/latest-v16.x/docs/api/tls.html#new-tlstlssocketsocket-options).
 
 
 ### Multi-host connections - High Availability (HA)
@@ -805,7 +805,7 @@ There are also the following errors specifically for this library.
 ##### UNSAFE_TRANSACTION
 > Only use sql.begin or max: 1
 
-To ensure statements in a transaction runs on the same connection (which is required for them to run inside the transaction), you must use [`sql.begin(...)`](#Transactions) or only allow a single connection in options (`max: 1`).
+To ensure statements in a transaction runs on the same connection (which is required for them to run inside the transaction), you must use [`sql.begin(...)`](#transactions) or only allow a single connection in options (`max: 1`).
 
 ##### UNDEFINED_VALUE
 > Undefined values are not allowed
@@ -845,12 +845,12 @@ This error is thrown if the connection was closed without an error. This should 
 ##### CONNECTION_ENDED
 > write CONNECTION_ENDED host:port
 
-This error is thrown if the user has called [`sql.end()`](#sql_end) and performed a query afterward.
+This error is thrown if the user has called [`sql.end()`](#teardown--cleanup) and performed a query afterward.
 
 ##### CONNECTION_DESTROYED
 > write CONNECTION_DESTROYED host:port
 
-This error is thrown for any queries that were pending when the timeout to [`sql.end({ timeout: X })`](#sql_destroy) was reached.
+This error is thrown for any queries that were pending when the timeout to [`sql.end({ timeout: X })`](#teardown--cleanup) was reached.
 
 ##### CONNECTION_CONNECT_TIMEOUT
 > write CONNECTION_CONNECT_TIMEOUT host:port
