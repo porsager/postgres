@@ -400,6 +400,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     if (stream || query || initial || sent.length)
       error(Errors.connection('CONNECTION_DESTROYED', options))
 
+    onclose(connection)
     clearImmediate(nextWriteTimer)
     socket.removeListener('data', data)
     socket.removeListener('connect', connected)
