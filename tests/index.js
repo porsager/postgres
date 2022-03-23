@@ -1921,3 +1921,16 @@ t('Prevent premature end of connection in transaction', async() => {
     result
   ]
 })
+
+t('Ensure reconnect after max_lifetime with transactions', { timeout: 5000 }, async() => {
+  const sql = postgres({
+    max_lifetime: 0.01,
+    idle_timeout,
+    max: 1
+  })
+
+  let x = 0
+  while (x++ < 10) await sql.begin(sql => sql`select 1 as x`)
+
+  return [true, true]
+})

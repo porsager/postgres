@@ -194,11 +194,6 @@ function Postgres(a, b) {
       return await scope(connection, fn)
     } catch (error) {
       throw error
-    } finally {
-      if (connection) {
-        connection.reserved = null
-        onopen(connection)
-      }
     }
 
     async function scope(c, fn, name) {
