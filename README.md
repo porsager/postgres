@@ -76,6 +76,7 @@ async function insertUser({ name, age }) {
 * [Teardown / Cleanup](#teardown--cleanup)
 * [Error handling](#error-handling)
 * [TypeScript support](#typescript-support)
+* [Changelog](./CHANGELOG.md)
 
 
 ## Connection
