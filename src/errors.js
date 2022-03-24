@@ -1,4 +1,4 @@
-class PostgresError extends Error {
+export class PostgresError extends Error {
   constructor(x) {
     super(x.message)
     this.name = this.constructor.name
@@ -6,9 +6,7 @@ class PostgresError extends Error {
   }
 }
 
-module.exports.PostgresError = PostgresError
-
-module.exports.errors = {
+export const Errors = {
   connection,
   postgres,
   generic,
@@ -16,13 +14,14 @@ module.exports.errors = {
 }
 
 function connection(x, options, socket) {
+  const { host, port } = socket || options
   const error = Object.assign(
-    new Error(('write ' + x + ' ' + (options.path || (socket.host + ':' + socket.port)))),
+    new Error(('write ' + x + ' ' + (options.path || (host + ':' + port)))),
     {
       code: x,
       errno: x,
-      address: options.path || socket.host
-    }, options.path ? {} : { port: socket.port }
+      address: options.path || host
+    }, options.path ? {} : { port: port }
   )
   Error.captureStackTrace(error, connection)
   return error
@@ -34,12 +33,13 @@ function postgres(x) {
   return error
 }
 
-function generic(x) {
-  const error = Object.assign(new Error(x.message), x)
+function generic(code, message) {
+  const error = Object.assign(new Error(code + ': ' + message), { code })
   Error.captureStackTrace(error, generic)
   return error
 }
 
+/* c8 ignore next 10 */
 function notSupported(x) {
   const error = Object.assign(
     new Error(x + ' (B) is not supported'),
