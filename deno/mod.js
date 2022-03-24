@@ -1,2 +1,2 @@
 // @deno-types="./types/index.d.ts"
-export { default } from './deno/src/index.js'
+export { default } from './src/index.js'
