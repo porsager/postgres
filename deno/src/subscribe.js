@@ -1,4 +1,5 @@
-module.exports = function(postgres, a, b) {
+import { Buffer } from 'https://deno.land/std@0.120.0/node/buffer.ts'
+export default function Subscribe(postgres, options) {
   const listeners = new Map()
 
   let connection
@@ -6,16 +7,27 @@ module.exports = function(postgres, a, b) {
   return async function subscribe(event, fn) {
     event = parseEvent(event)
 
-    const options = typeof a === 'string' ? b : a || {}
     options.max = 1
+    options.onclose = onclose
     options.connection = {
       ...options.connection,
       replication: 'database'
     }
 
-    const sql = postgres(a, b)
+    let stream
+      , ended = false
 
-    !connection && (subscribe.sql = sql, connection = init(sql, options.publications))
+    const sql = postgres(options)
+        , slot = 'postgresjs_' + Math.random().toString(36).slice(2)
+        , end = sql.end
+
+    sql.end = async() => {
+      ended = true
+      stream && (await new Promise(r => (stream.once('end', r), stream.end())))
+      return end()
+    }
+
+    !connection && (subscribe.sql = sql, connection = init(sql, slot, options.publications))
 
     const fns = listeners.has(event)
       ? listeners.get(event).add(fn)
@@ -26,19 +38,23 @@ module.exports = function(postgres, a, b) {
       fns.size === 0 && listeners.delete(event)
     }
 
-    return connection.then(() => ({ unsubscribe }))
+    return connection.then(x => (stream = x, { unsubscribe }))
+
+    async function onclose() {
+      stream = null
+      !ended && (stream = await init(sql, slot, options.publications))
+    }
   }
 
-  async function init(sql, publications = 'alltables') {
+  async function init(sql, slot, publications = 'alltables') {
     if (!publications)
       throw new Error('Missing publication names')
 
-    const slot = 'postgresjs_' + Math.random().toString(36).slice(2)
     const [x] = await sql.unsafe(
       `CREATE_REPLICATION_SLOT ${ slot } TEMPORARY LOGICAL pgoutput NOEXPORT_SNAPSHOT`
     )
 
-    const stream = sql.unsafe(
+    const stream = await sql.unsafe(
       `START_REPLICATION SLOT ${ slot } LOGICAL ${
         x.consistent_point
       } (proto_version '1', publication_names '${ publications }')`
@@ -49,6 +65,12 @@ module.exports = function(postgres, a, b) {
     }
 
     stream.on('data', data)
+    stream.on('error', (error) => {
+      console.error('Logical Replication Error - Reconnecting', error)
+      sql.end()
+    })
+
+    return stream
 
     function data(x) {
       if (x[0] === 0x77)
@@ -91,10 +113,10 @@ function parse(x, state, parsers, handle) {
   Object.entries({
     R: x => {  // Relation
       let i = 1
-      const r = state[x.readInt32BE(i)] = {
+      const r = state[x.readUInt32BE(i)] = {
         schema: String(x.slice(i += 4, i = x.indexOf(0, i))) || 'pg_catalog',
         table: String(x.slice(i + 1, i = x.indexOf(0, i + 1))),
-        columns: Array(x.readInt16BE(i += 2)),
+        columns: Array(x.readUInt16BE(i += 2)),
         keys: []
       }
       i += 2
@@ -106,9 +128,9 @@ function parse(x, state, parsers, handle) {
         column = r.columns[columnIndex++] = {
           key: x[i++],
           name: String(x.slice(i, i = x.indexOf(0, i))),
-          type: x.readInt32BE(i += 1),
-          parser: parsers[x.readInt32BE(i)],
-          atttypmod: x.readInt32BE(i += 4)
+          type: x.readUInt32BE(i += 1),
+          parser: parsers[x.readUInt32BE(i)],
+          atttypmod: x.readUInt32BE(i += 4)
         }
 
         column.key && r.keys.push(column)
@@ -123,7 +145,7 @@ function parse(x, state, parsers, handle) {
     },
     I: x => { // Insert
       let i = 1
-      const relation = state[x.readInt32BE(i)]
+      const relation = state[x.readUInt32BE(i)]
       const row = {}
       tuples(x, row, relation.columns, i += 7)
 
@@ -134,7 +156,7 @@ function parse(x, state, parsers, handle) {
     },
     D: x => { // Delete
       let i = 1
-      const relation = state[x.readInt32BE(i)]
+      const relation = state[x.readUInt32BE(i)]
       i += 4
       const key = x[i] === 75
       const row = key || x[i] === 79
@@ -151,7 +173,7 @@ function parse(x, state, parsers, handle) {
     },
     U: x => { // Update
       let i = 1
-      const relation = state[x.readInt32BE(i)]
+      const relation = state[x.readUInt32BE(i)]
       i += 4
       const key = x[i] === 75
       const old = key || x[i] === 79
@@ -187,10 +209,10 @@ function tuples(x, row, columns, xi) {
       : type === 117 // u
         ? undefined
         : column.parser === undefined
-          ? x.toString('utf8', xi + 4, xi += 4 + x.readInt32BE(xi))
+          ? x.toString('utf8', xi + 4, xi += 4 + x.readUInt32BE(xi))
           : column.parser.array === true
-            ? column.parser(x.toString('utf8', xi + 5, xi += 4 + x.readInt32BE(xi)))
-            : column.parser(x.toString('utf8', xi + 4, xi += 4 + x.readInt32BE(xi)))
+            ? column.parser(x.toString('utf8', xi + 5, xi += 4 + x.readUInt32BE(xi)))
+            : column.parser(x.toString('utf8', xi + 4, xi += 4 + x.readUInt32BE(xi)))
   }
 
   return xi
