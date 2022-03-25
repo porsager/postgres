@@ -49,7 +49,7 @@ async function getUsersOver(age) {
 
 
 async function insertUser({ name, age }) {
-  const users = sql`
+  const users = await sql`
     insert into users
       (name, age)
     values
