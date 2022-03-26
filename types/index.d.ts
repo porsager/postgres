@@ -67,7 +67,7 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
   /** (key; value) when a server param change */
   onparameter: (key: string, value: any) => void;
   /** Is called with (connection; query; parameters) */
-  debug: boolean | ((connection: number, query: string, parameters: any[]) => void);
+  debug: boolean | ((connection: number, query: string, parameters: any[], paramTypes: any[]) => void);
   /** Transform hooks */
   transform: {
     /** Transforms incoming and outgoing column names */
@@ -109,6 +109,10 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
    * @default 'alltables'
    */
   publications: string
+  onclose: (connId: number) => void;
+  backoff: boolean | ((attemptNum:number) => number);
+  max_lifetime: number | null;
+  keep_alive: number | null;
 }
 
 type PostgresTypeList<T> = {
