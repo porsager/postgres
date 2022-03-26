@@ -151,6 +151,44 @@ type UnwrapPromiseArray<T> = T extends any[] ? {
   [k in keyof T]: T[k] extends Promise<infer R> ? R : T[k]
 } : T;
 
+type Keys = string
+
+type SerializableObject<T, K extends any[]> =
+  number extends K['length'] ? {} :
+  Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.SerializableParameter>
+
+type First<T, K extends any[]> =
+  // Tagged template string call
+  T extends TemplateStringsArray ? TemplateStringsArray :
+  // Identifiers helper
+  T extends string ? string :
+  // Dynamic values helper (depth 2)
+  T extends readonly any[][] ? postgres.EscapableArray[] :
+  // Insert/update helper (depth 2)
+  T extends (object & infer R)[] ? SerializableObject<R, K>[] :
+  // Dynamic values helper (depth 1)
+  T extends readonly any[] ? postgres.EscapableArray :
+  // Insert/update helper (depth 1)
+  T extends object ? SerializableObject<T, K> :
+  // Unexpected type
+  never
+
+type Rest<T> =
+  T extends TemplateStringsArray ? never : // force fallback to the tagged template function overload
+  T extends string ? string[] :
+  T extends readonly any[][] ? [] :
+  T extends (object & infer R)[] ? (Keys & keyof R)[] :
+  T extends readonly any[] ? [] :
+  T extends object ? (Keys & keyof T)[] :
+  any
+
+type Return<T, K extends any[]> =
+  [T] extends [TemplateStringsArray] ?
+  [unknown] extends [T] ? postgres.Helper<T, K> : // ensure no `PendingQuery` with `any` types
+  [TemplateStringsArray] extends [T] ? postgres.PendingQuery<postgres.Row[]> :
+  postgres.Helper<T, K> :
+  postgres.Helper<T, K>
+
 declare namespace postgres {
   class PostgresError extends Error {
     name: 'PostgresError';
@@ -408,29 +446,22 @@ declare namespace postgres {
     size(): Promise<[{ position: bigint, size: bigint }]>;
   }
 
-  type Serializable = null
+  type EscapableArray = (string | number)[]
+
+  type Serializable = never
+    | null
     | boolean
     | number
     | string
     | Date
     | Uint8Array;
 
-  type SerializableParameter = Serializable
+  type SerializableParameter = never
+    | Serializable
     | Helper<any>
     | Parameter<any>
     | ArrayParameter
-    | Record<string, any> // implicit JSON
     | readonly SerializableParameter[];
-
-  type HelperSerializable = { [index: string]: SerializableParameter } | { [index: string]: SerializableParameter }[];
-
-  type SerializableKeys<T> = (keyof T) extends infer R
-    ? R extends keyof T
-    ? T[R] extends SerializableParameter
-    ? R
-    : never
-    : keyof T
-    : keyof T;
 
   interface Row {
     [column: string]: any;
@@ -526,30 +557,21 @@ declare namespace postgres {
   }
 
   interface Sql<TTypes extends JSToPostgresTypeMap> {
+    /**
+     * Query helper
+     * @param first Define how the helper behave
+     * @param rest Other optional arguments, depending on the helper type
+     * @returns An helper object usable as tagged template parameter in sql queries
+     */
+    <T, K extends Rest<T>>(first: T & First<T, K>, ...rest: K): Return<T, K>;
 
     /**
      * Execute the SQL query passed as a template string. Can only be used as template string tag.
      * @param template The template generated from the template string
-     * @param args Interpoled values of the template string
+     * @param parameters Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends readonly any[] = Row[]>(template: TemplateStringsArray, ...args: SerializableParameter[]): PendingQuery<AsRowList<T>>;
-
-    /**
-     * Escape column names
-     * @param columns Columns to escape
-     * @returns A formated representation of the column names
-     */
-    (columns: string[]): Helper<string>;
-    (...columns: string[]): Helper<string>;
-
-    /**
-     * Extract properties from an object or from an array of objects
-     * @param objOrArray An object or an array of objects to extract properties from
-     * @param keys Keys to extract from the object or from objets inside the array
-     * @returns A formated representation of the parameter
-     */
-    <T extends object | readonly object[], U extends SerializableKeys<T extends readonly object[] ? T[number] : T>>(objOrArray: T, ...keys: U[]): Helper<T, U[]>;
+    <T extends readonly any[] = Row[]>(template: TemplateStringsArray, ...parameters: (SerializableParameter | PendingQuery<any>)[]): PendingQuery<AsRowList<T>>;
 
     CLOSE: {};
     END: this['CLOSE'];
