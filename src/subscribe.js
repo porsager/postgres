@@ -8,6 +8,7 @@ export default function Subscribe(postgres, options) {
 
     options.max = 1
     options.onclose = onclose
+    options.fetch_types = false
     options.connection = {
       ...options.connection,
       replication: 'database'
