@@ -5,10 +5,23 @@ const empty = x => fs.readdirSync(x).forEach(f => fs.unlinkSync(path.join(x, f))
     , ensureEmpty = x => !fs.existsSync(x) ? fs.mkdirSync(x) : empty(x)
     , root = 'deno'
     , src = path.join(root, 'src')
+    , types = path.join(root, 'types')
     , tests = path.join(root, 'tests')
 
 ensureEmpty(src)
+ensureEmpty(types)
 ensureEmpty(tests)
+
+fs.writeFileSync(path.join(types, 'index.d.ts'), fs.readFileSync(path.join('types', 'index.d.ts')))
+fs.writeFileSync(
+  path.join(root, 'README.md'),
+  fs.readFileSync('README.md', 'utf8')
+    .replace(/### Installation(\n.*){4}/, '')
+    .replace(
+      'import postgres from \'postgres\'',
+      'import postgres from \'https://deno.land/x/postgresjs/mod.js\''
+    )
+)
 
 fs.readdirSync('src').forEach(name =>
   fs.writeFileSync(
