@@ -198,14 +198,17 @@ function Postgres(a, b) {
     async function scope(c, fn, name) {
       const sql = Sql(handler, true)
       sql.savepoint = savepoint
-      let errored
+      let uncaughtError
       name && await sql`savepoint ${ sql(name) }`
       try {
         const result = await new Promise((resolve, reject) => {
-          errored = reject
           const x = fn(sql)
           Promise.resolve(Array.isArray(x) ? Promise.all(x) : x).then(resolve, reject)
         })
+
+        if (uncaughtError)
+          throw uncaughtError
+
         !name && await sql`commit`
         return result
       } catch (e) {
@@ -213,7 +216,7 @@ function Postgres(a, b) {
           ? sql`rollback to ${ sql(name) }`
           : sql`rollback`
         )
-        throw e
+        throw e instanceof PostgresError && e.code === '25P02' && uncaughtError || e
       }
 
       function savepoint(name, fn) {
@@ -225,7 +228,7 @@ function Postgres(a, b) {
       }
 
       function handler(q) {
-        errored && q.catch(errored)
+        q.catch(e => uncaughtError || (uncaughtError = e))
         c.state === 'full'
           ? queries.push(q)
           : c.execute(q) || (c.state = 'full', full.push(c))

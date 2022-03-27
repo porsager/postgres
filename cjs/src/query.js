@@ -31,17 +31,19 @@ const Query = module.exports.Query = class Query extends Promise {
     this.executed = false
     this.signature = ''
 
-    this[originError] = handler.debug || !this.tagged
+    this[originError] = this.handler.debug
       ? new Error()
-      : cachedError(this.strings)
+      : this.tagged && cachedError(this.strings)
   }
 
   get origin() {
-    return this.handler.debug || !this.tagged
+    return this.handler.debug
       ? this[originError].stack
-      : originStackCache.has(this.strings)
-        ? originStackCache.get(this.strings)
-        : originStackCache.set(this.strings, this[originError].stack).get(this.strings)
+      : this.tagged
+        ? originStackCache.has(this.strings)
+          ? originStackCache.get(this.strings)
+          : originStackCache.set(this.strings, this[originError].stack).get(this.strings)
+        : ''
   }
 
   static get [Symbol.species]() {

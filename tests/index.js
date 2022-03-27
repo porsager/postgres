@@ -254,6 +254,17 @@ t('Uncaught transaction request errors bubbles to transaction', async() => [
   )).catch(e => e.code))
 ])
 
+t('Transaction rejects with rethrown error', async() => [
+  'WAT',
+  await sql.begin(async sql => {
+    try {
+      await sql`select exception`
+    } catch (ex) {
+      throw new Error('WAT')
+    }
+  }).catch(e => e.message)
+])
+
 t('Parallel transactions', async() => {
   await sql`create table test (a int)`
   return ['11', (await Promise.all([
