@@ -145,7 +145,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   function execute(q) {
     if (terminated)
-      return q.reject(Errors.connection('CONNECTION_DESTROYED', options))
+      return queryError(q, Errors.connection('CONNECTION_DESTROYED', options))
 
     if (q.cancelled)
       return
