@@ -1,6 +1,5 @@
 const os = require('os')
 const fs = require('fs')
-const Stream = require('stream')
 
 const {
   mergeUserTypes,
@@ -21,6 +20,7 @@ const { Query, CLOSE } = require('./query.js')
 const Queue = require('./queue.js')
 const { Errors, PostgresError } = require('./errors.js')
 const Subscribe = require('./subscribe.js')
+const largeObject = require('./large.js')
 
 Object.assign(Postgres, {
   PostgresError,
@@ -42,21 +42,22 @@ function Postgres(a, b) {
   let ending = false
 
   const queries = Queue()
-      , connections = [...Array(options.max)].map(() => Connection(options, { onopen, onend, ondrain, onclose }))
-      , closed = Queue(connections)
+      , connecting = Queue()
       , reserved = Queue()
+      , closed = Queue()
+      , ended = Queue()
       , open = Queue()
       , busy = Queue()
       , full = Queue()
-      , ended = Queue()
-      , connecting = Queue()
-      , queues = { closed, ended, connecting, reserved, open, busy, full }
+      , queues = { connecting, reserved, closed, ended, open, busy, full }
+
+  const connections = [...Array(options.max)].map(() => Connection(options, queues, { onopen, onend, onclose }))
 
   const sql = Sql(handler)
 
   Object.assign(sql, {
     get parameters() { return options.parameters },
-    largeObject,
+    largeObject: largeObject.bind(null, sql),
     subscribe,
     CLOSE,
     END: CLOSE,
@@ -229,90 +230,28 @@ function Postgres(a, b) {
 
       function handler(q) {
         q.catch(e => uncaughtError || (uncaughtError = e))
-        c.state === 'full'
+        c.queue === full
           ? queries.push(q)
-          : c.execute(q) || (c.state = 'full', full.push(c))
+          : c.execute(q) || move(c, full)
       }
     }
 
     function onexecute(c) {
-      queues[c.state].remove(c)
-      c.state = 'reserved'
+      connection = c
+      move(c, reserved)
       c.reserved = () => queries.length
         ? c.execute(queries.shift())
-        : c.state = 'reserved'
-      reserved.push(c)
-      connection = c
+        : move(c, reserved)
     }
   }
 
-  function largeObject(oid, mode = 0x00020000 | 0x00040000) {
-    return new Promise(async(resolve, reject) => {
-      await sql.begin(async sql => {
-        let finish
-        !oid && ([{ oid }] = await sql`select lo_creat(-1) as oid`)
-        const [{ fd }] = await sql`select lo_open(${ oid }, ${ mode }) as fd`
-
-        const lo = {
-          writable,
-          readable,
-          close     : () => sql`select lo_close(${ fd })`.then(finish),
-          tell      : () => sql`select lo_tell64(${ fd })`,
-          read      : (x) => sql`select loread(${ fd }, ${ x }) as data`,
-          write     : (x) => sql`select lowrite(${ fd }, ${ x })`,
-          truncate  : (x) => sql`select lo_truncate64(${ fd }, ${ x })`,
-          seek      : (x, whence = 0) => sql`select lo_lseek64(${ fd }, ${ x }, ${ whence })`,
-          size      : () => sql`
-            select
-              lo_lseek64(${ fd }, location, 0) as position,
-              seek.size
-            from (
-              select
-                lo_lseek64($1, 0, 2) as size,
-                tell.location
-              from (select lo_tell64($1) as location) tell
-            ) seek
-          `
-        }
-
-        resolve(lo)
-
-        return new Promise(async r => finish = r)
-
-        async function readable({
-          highWaterMark = 2048 * 8,
-          start = 0,
-          end = Infinity
-        } = {}) {
-          let max = end - start
-          start && await lo.seek(start)
-          return new Stream.Readable({
-            highWaterMark,
-            async read(size) {
-              const l = size > max ? size - max : size
-              max -= size
-              const [{ data }] = await lo.read(l)
-              this.push(data)
-              if (data.length < size)
-                this.push(null)
-            }
-          })
-        }
-
-        async function writable({
-          highWaterMark = 2048 * 8,
-          start = 0
-        } = {}) {
-          start && await lo.seek(start)
-          return new Stream.Writable({
-            highWaterMark,
-            write(chunk, encoding, callback) {
-              lo.write(chunk).then(() => callback(), callback)
-            }
-          })
-        }
-      }).catch(reject)
-    })
+  function move(c, queue) {
+    c.queue.remove(c)
+    queue.push(c)
+    c.queue = queue
+    queue === open
+      ? c.idleTimer.start()
+      : c.idleTimer.cancel()
   }
 
   function json(x) {
@@ -331,28 +270,27 @@ function Postgres(a, b) {
       return query.reject(Errors.connection('CONNECTION_ENDED', options, options))
 
     if (open.length)
-      return go(open, query)
+      return go(open.shift(), query)
 
     if (closed.length)
       return connect(closed.shift(), query)
 
     busy.length
-      ? go(busy, query)
+      ? go(busy.shift(), query)
       : queries.push(query)
   }
 
-  function go(xs, query) {
-    const c = xs.shift()
+  function go(c, query) {
     return c.execute(query)
-      ? (c.state = 'busy', busy.push(c))
-      : (c.state = 'full', full.push(c))
+      ? move(c, busy)
+      : move(c, full)
   }
 
   function cancel(query) {
     return new Promise((resolve, reject) => {
       query.state
         ? query.active
-          ? Connection(options, {}).cancel(query.state, resolve, reject)
+          ? Connection(options).cancel(query.state, resolve, reject)
           : query.cancelled = { resolve, reject }
         : (
           queries.remove(query),
@@ -386,21 +324,17 @@ function Postgres(a, b) {
   }
 
   function connect(c, query) {
-    c.state = 'connecting'
-    connecting.push(c)
+    move(c, connecting)
     c.connect(query)
   }
 
   function onend(c) {
-    queues[c.state].remove(c)
-    c.state = 'ended'
-    ended.push(c)
+    move(c, ended)
   }
 
   function onopen(c) {
-    queues[c.state].remove(c)
     if (queries.length === 0)
-      return (c.state = 'open', open.push(c))
+      return move(c, open)
 
     let max = Math.ceil(queries.length / (connecting.length + 1))
       , ready = true
@@ -409,23 +343,15 @@ function Postgres(a, b) {
       ready = c.execute(queries.shift())
 
     ready
-      ? (c.state = 'busy', busy.push(c))
-      : (c.state = 'full', full.push(c))
-  }
-
-  function ondrain(c) {
-    full.remove(c)
-    onopen(c)
+      ? move(c, busy)
+      : move(c, full)
   }
 
   function onclose(c) {
-    queues[c.state].remove(c)
-    c.state = 'closed'
+    move(c, closed)
     c.reserved = null
     options.onclose && options.onclose(c.id)
-    queries.length
-      ? connect(c, queries.shift())
-      : queues.closed.push(c)
+    queries.length && connect(c, queries.shift())
   }
 }
 
@@ -468,7 +394,8 @@ function parseOptions(a, b) {
     debug           : o.debug,
     fetch_types     : 'fetch_types' in o ? o.fetch_types : true,
     parameters      : {},
-    shared          : { retries: 0, typeArrayMap: {} }
+    shared          : { retries: 0, typeArrayMap: {} },
+    publications    : o.publications || query.get('publications') || 'alltables'
   },
     mergeUserTypes(o.types)
   )

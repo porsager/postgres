@@ -46,7 +46,7 @@ module.exports = Subscribe;function Subscribe(postgres, options) {
     }
   }
 
-  async function init(sql, slot, publications = 'alltables') {
+  async function init(sql, slot, publications) {
     if (!publications)
       throw new Error('Missing publication names')
 

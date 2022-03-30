@@ -51,7 +51,7 @@ const errorFields = {
   82  : 'routine'            // R
 }
 
-function Connection(options, { onopen = noop, onend = noop, ondrain = noop, onclose = noop } = {}) {
+function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop } = {}) {
   const {
     ssl,
     max,
@@ -83,7 +83,6 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     , needsTypes = options.fetch_types
     , backendParameters = {}
     , statements = {}
-    , state = 'closed'
     , statementId = Math.random().toString(36).slice(2)
     , statementCount = 1
     , closedDate = 0
@@ -108,13 +107,8 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     , final = null
 
   const connection = {
-    get state() { return state },
-    set state(x) {
-      state = x
-      state === 'open'
-        ? idleTimer.start()
-        : idleTimer.cancel()
-    },
+    queue: queues.closed,
+    idleTimer,
     connect(query) {
       initial = query
       reconnect()
@@ -126,6 +120,8 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     count: 0,
     id
   }
+
+  queues.closed && queues.closed.push(connection)
 
   return connection
 
@@ -294,7 +290,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
 
   /* c8 ignore next 3 */
   function drain() {
-    ondrain(connection)
+    onopen(connection)
   }
 
   function data(x) {
@@ -365,7 +361,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
   }
 
   function error(err) {
-    if (connection.state === 'connecting' && options.host[retries + 1])
+    if (connection.queue === queues.connecting && options.host[retries + 1])
       return
 
     errored(err)
@@ -532,7 +528,7 @@ function Connection(options, { onopen = noop, onend = noop, ondrain = noop, oncl
     }
 
     while (sent.length && (query = sent.shift()) && (query.active = true) && query.cancelled)
-      Connection(options, {}).cancel(query.state, query.cancelled.resolve, query.cancelled.reject)
+      Connection(options).cancel(query.state, query.cancelled.resolve, query.cancelled.reject)
 
     if (query)
       return // Consider opening if able and sent.length < 50

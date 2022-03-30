@@ -617,7 +617,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   types                : [],            // Array of custom types, see more below
   onnotice             : fn,            // Defaults to console.log
   onparameter          : fn,            // (key, value) when server param change
-  debug                : fn,            // Is called with (connection, query, params)
+  debug                : fn,            // Is called with (connection, query, params, types)
   transform            : {
     column             : fn,            // Transforms incoming column names
     value              : fn,            // Transforms incoming row values
