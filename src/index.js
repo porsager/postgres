@@ -399,7 +399,8 @@ function parseOptions(a, b) {
     debug           : o.debug,
     fetch_types     : 'fetch_types' in o ? o.fetch_types : true,
     parameters      : {},
-    shared          : { retries: 0, typeArrayMap: {} }
+    shared          : { retries: 0, typeArrayMap: {} },
+    publications    : o.publications || query.get('publications') || 'alltables'
   },
     mergeUserTypes(o.types)
   )
