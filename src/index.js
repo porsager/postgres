@@ -42,15 +42,16 @@ function Postgres(a, b) {
   let ending = false
 
   const queries = Queue()
-      , connections = [...Array(options.max)].map(() => Connection(options, { onopen, onend, ondrain, onclose }))
-      , closed = Queue(connections)
+      , connecting = Queue()
       , reserved = Queue()
+      , closed = Queue()
+      , ended = Queue()
       , open = Queue()
       , busy = Queue()
       , full = Queue()
-      , ended = Queue()
-      , connecting = Queue()
-      , queues = { closed, ended, connecting, reserved, open, busy, full }
+      , queues = { connecting, reserved, closed, ended, open, busy, full }
+
+  const connections = [...Array(options.max)].map(() => Connection(options, queues, { onopen, onend, onclose }))
 
   const sql = Sql(handler)
 
@@ -229,21 +230,28 @@ function Postgres(a, b) {
 
       function handler(q) {
         q.catch(e => uncaughtError || (uncaughtError = e))
-        c.state === 'full'
+        c.queue === full
           ? queries.push(q)
-          : c.execute(q) || (c.state = 'full', full.push(c))
+          : c.execute(q) || move(c, full)
       }
     }
 
     function onexecute(c) {
-      queues[c.state].remove(c)
-      c.state = 'reserved'
+      connection = c
+      move(c, reserved)
       c.reserved = () => queries.length
         ? c.execute(queries.shift())
-        : c.state = 'reserved'
-      reserved.push(c)
-      connection = c
+        : move(c, reserved)
     }
+  }
+
+  function move(c, queue) {
+    c.queue.remove(c)
+    queue.push(c)
+    c.queue = queue
+    queue === open
+      ? c.idleTimer.start()
+      : c.idleTimer.cancel()
   }
 
   function json(x) {
@@ -262,28 +270,27 @@ function Postgres(a, b) {
       return query.reject(Errors.connection('CONNECTION_ENDED', options, options))
 
     if (open.length)
-      return go(open, query)
+      return go(open.shift(), query)
 
     if (closed.length)
       return connect(closed.shift(), query)
 
     busy.length
-      ? go(busy, query)
+      ? go(busy.shift(), query)
       : queries.push(query)
   }
 
-  function go(xs, query) {
-    const c = xs.shift()
+  function go(c, query) {
     return c.execute(query)
-      ? (c.state = 'busy', busy.push(c))
-      : (c.state = 'full', full.push(c))
+      ? move(c, busy)
+      : move(c, full)
   }
 
   function cancel(query) {
     return new Promise((resolve, reject) => {
       query.state
         ? query.active
-          ? Connection(options, {}).cancel(query.state, resolve, reject)
+          ? Connection(options).cancel(query.state, resolve, reject)
           : query.cancelled = { resolve, reject }
         : (
           queries.remove(query),
@@ -317,21 +324,17 @@ function Postgres(a, b) {
   }
 
   function connect(c, query) {
-    c.state = 'connecting'
-    connecting.push(c)
+    move(c, connecting)
     c.connect(query)
   }
 
   function onend(c) {
-    queues[c.state].remove(c)
-    c.state = 'ended'
-    ended.push(c)
+    move(c, ended)
   }
 
   function onopen(c) {
-    queues[c.state].remove(c)
     if (queries.length === 0)
-      return (c.state = 'open', open.push(c))
+      return move(c, open)
 
     let max = Math.ceil(queries.length / (connecting.length + 1))
       , ready = true
@@ -340,23 +343,15 @@ function Postgres(a, b) {
       ready = c.execute(queries.shift())
 
     ready
-      ? (c.state = 'busy', busy.push(c))
-      : (c.state = 'full', full.push(c))
-  }
-
-  function ondrain(c) {
-    full.remove(c)
-    onopen(c)
+      ? move(c, busy)
+      : move(c, full)
   }
 
   function onclose(c) {
-    queues[c.state].remove(c)
-    c.state = 'closed'
+    move(c, closed)
     c.reserved = null
     options.onclose && options.onclose(c.id)
-    queries.length
-      ? connect(c, queries.shift())
-      : queues.closed.push(c)
+    queries.length && connect(c, queries.shift())
   }
 }
 
