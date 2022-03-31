@@ -31,7 +31,7 @@ export default function Subscribe(postgres, options) {
 
     const fns = listeners.has(event)
       ? listeners.get(event).add(fn)
-      : listeners.set(event, new Set([fn]))
+      : listeners.set(event, new Set([fn])).get(event)
 
     const unsubscribe = () => {
       fns.delete(fn)
