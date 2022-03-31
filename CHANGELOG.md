@@ -1,6 +1,11 @@
 # Changelog
 
-## [3.0.1] - 31 Mar 2022
+## [3.0.2] - 31 Mar 2022
+- Fix BigInt handling  36a70df
+- Fix unsubscribing  (#300)  b6c597f
+- Parse update properly with identity full - Fixes #296  3ed11e7
+
+## [3.0.1] - 30 Mar 2022
  - Improve connection queue handling + fix leak cee1a57
  - Use publications option - fixes #295 b5ceecc
  - Throw proper query error if destroyed e148a0a
