@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.0.1] - 31 Mar 2022
+ - Improve connection queue handling + fix leak cee1a57
+ - Use publications option - fixes #295 b5ceecc
+ - Throw proper query error if destroyed e148a0a
+ - Transaction rejects with rethrown error - fixes #289 f7c8ae6
+ - Only create origin stacktrace for tagged and debug - fixes #290 a782edf
+ - Include types and readme in deno release - fixes #287 9068820
+ - Disable fetch_types for Subscribe options 72e0cdb
+ - Update TypeScript types with v3 changes (#293) db05836
+
 ## [3.0.0] - 24 Mar 2022
 This is a complete rewrite to better support all the features that I was trying to get into v2. There are a few breaking changes from v2 beta, which some (myself included) was using in production, so I'm skipping a stable v2 release and going straight to v3.
 
