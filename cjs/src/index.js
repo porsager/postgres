@@ -30,7 +30,12 @@ Object.assign(Postgres, {
   fromPascal,
   fromCamel,
   fromKebab,
-  BigInt
+  BigInt: {
+    to: 20,
+    from: [20],
+    parse: x => BigInt(x), // eslint-disable-line
+    serialize: x => x.toString()
+  }
 })
 
 module.exports = Postgres

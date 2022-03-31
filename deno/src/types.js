@@ -40,13 +40,6 @@ export const types = {
   }
 }
 
-export const BigInt = {
-  to: 1700,
-  from: [20, 701, 1700],
-  parse: x => BigInt(x), // eslint-disable-line
-  serialize: x => x.toString()
-}
-
 class NotTagged { then() { notTagged() } catch() { notTagged() } finally() { notTagged() }}
 
 export class Identifier extends NotTagged {
@@ -197,7 +190,7 @@ export const inferType = function inferType(x) {
     x instanceof Date ? 1184 :
     x instanceof Uint8Array ? 17 :
     (x === true || x === false) ? 16 :
-    typeof x === 'bigint' ? 1700 :
+    typeof x === 'bigint' ? 20 :
     Array.isArray(x) ? inferType(x[0]) :
     0
   )
