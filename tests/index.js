@@ -1712,7 +1712,7 @@ t('subscribe', { timeout: 2 }, async() => {
 
   const result = []
 
-  await sql.subscribe('*', (row, { command, old }) =>
+  const { unsubscribe } = await sql.subscribe('*', (row, { command, old }) =>
     result.push(command, row.name || row.id, old && old.name)
   )
 
@@ -1723,6 +1723,7 @@ t('subscribe', { timeout: 2 }, async() => {
     )
   `
 
+  await sql`alter table test replica identity default`
   await sql`insert into test (name) values ('Murray')`
   await sql`update test set name = 'Rothbard'`
   await sql`delete from test`
@@ -1730,6 +1731,9 @@ t('subscribe', { timeout: 2 }, async() => {
   await sql`insert into test (name) values ('Murray')`
   await sql`update test set name = 'Rothbard'`
   await sql`delete from test`
+  await delay(100)
+  await unsubscribe()
+  await sql`insert into test (name) values ('Oh noes')`
   await delay(100)
   return [
     'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
