@@ -59,11 +59,11 @@ function transpile(x, name, folder) {
   }
 
   const buffer = x.includes('Buffer')
-    ? 'import { Buffer } from \'https://deno.land/std@0.132.0/node/buffer.ts\'\n'
+    ? 'import { Buffer } from \'https://deno.land/std@0.128.0/node/buffer.ts\'\n'
     : ''
 
   const process = x.includes('process.')
-    ? 'import process from \'https://deno.land/std@0.132.0/node/process.ts\'\n'
+    ? 'import process from \'https://deno.land/std@0.128.0/node/process.ts\'\n'
     : ''
 
   const timers = x.includes('setImmediate')
@@ -71,7 +71,7 @@ function transpile(x, name, folder) {
     : ''
 
   const hmac = x.includes('createHmac')
-    ? 'import { HmacSha256 } from \'https://deno.land/std@0.132.0/hash/sha256.ts\'\n'
+    ? 'import { HmacSha256 } from \'https://deno.land/std@0.128.0/hash/sha256.ts\'\n'
     : ''
 
   return hmac + buffer + process + timers + x
@@ -87,5 +87,5 @@ function transpile(x, name, folder) {
     .replace(/.setKeepAlive\([^)]+\)/g, '')
     .replace(/import net from 'net'/, 'import { net } from \'../polyfills.js\'')
     .replace(/import tls from 'tls'/, 'import { tls } from \'../polyfills.js\'')
-    .replace(/ from '([a-z_]+)'/g, ' from \'https://deno.land/std@0.132.0/node/$1.ts\'')
+    .replace(/ from '([a-z_]+)'/g, ' from \'https://deno.land/std@0.128.0/node/$1.ts\'')
 }

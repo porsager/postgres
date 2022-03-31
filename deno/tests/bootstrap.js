@@ -1,4 +1,4 @@
-import { spawn } from 'https://deno.land/std@0.132.0/node/child_process.ts'
+import { spawn } from 'https://deno.land/std@0.128.0/node/child_process.ts'
 
 await exec('psql', ['-c', 'alter system set ssl=on'])
 await exec('psql', ['-c', 'create user postgres_js_test'])

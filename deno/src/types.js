@@ -1,4 +1,4 @@
-import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
+import { Buffer } from 'https://deno.land/std@0.128.0/node/buffer.ts'
 import { Query } from './query.js'
 import { Errors } from './errors.js'
 
