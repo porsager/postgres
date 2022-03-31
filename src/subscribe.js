@@ -180,7 +180,7 @@ function parse(x, state, parsers, handle) {
         ? {}
         : null
 
-      old && (i = tuples(x, old, key ? relation.keys : relation.columns, ++i))
+      old && (i = tuples(x, old, key ? relation.keys : relation.columns, i += 3))
 
       const row = {}
       i = tuples(x, row, relation.columns, i += 3)

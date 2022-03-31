@@ -1712,8 +1712,8 @@ t('subscribe', { timeout: 2 }, async() => {
 
   const result = []
 
-  await sql.subscribe('*', (row, info) =>
-    result.push(info.command, row.name || row.id)
+  await sql.subscribe('*', (row, { command, old }) =>
+    result.push(command, row.name || row.id, old && old.name)
   )
 
   await sql`
@@ -1722,12 +1722,17 @@ t('subscribe', { timeout: 2 }, async() => {
       name text
     )
   `
+
+  await sql`insert into test (name) values ('Murray')`
+  await sql`update test set name = 'Rothbard'`
+  await sql`delete from test`
+  await sql`alter table test replica identity full`
   await sql`insert into test (name) values ('Murray')`
   await sql`update test set name = 'Rothbard'`
   await sql`delete from test`
   await delay(100)
   return [
-    'insert,Murray,update,Rothbard,delete,1',
+    'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
     result.join(','),
     await sql`drop table test`,
     await sql`drop publication alltables`,
