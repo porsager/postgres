@@ -31,11 +31,11 @@ export default function Subscribe(postgres, options) {
 
     const fns = listeners.has(event)
       ? listeners.get(event).add(fn)
-      : listeners.set(event, new Set([fn]))
+      : listeners.set(event, new Set([fn])).get(event)
 
     const unsubscribe = () => {
-      fns.get(event).delete(fn)
-      fns.get(event).size === 0 && listeners.delete(event)
+      fns.delete(fn)
+      fns.size === 0 && listeners.delete(event)
     }
 
     return connection.then(x => (stream = x, { unsubscribe }))
