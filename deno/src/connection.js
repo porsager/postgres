@@ -935,7 +935,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       Object.entries(Object.assign({
         user,
         database,
-        client_encoding: '\'utf-8\''
+        client_encoding: 'UTF8'
       },
         options.connection
       )).filter(([, v]) => v).map(([k, v]) => k + b.N + v).join(b.N)
