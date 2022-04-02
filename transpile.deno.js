@@ -1,7 +1,8 @@
 import fs from 'fs'
 import path from 'path'
 
-const empty = x => fs.readdirSync(x).forEach(f => fs.unlinkSync(path.join(x, f)))
+const std = 'https://deno.land/std@0.132.0/'
+    , empty = x => fs.readdirSync(x).forEach(f => fs.unlinkSync(path.join(x, f)))
     , ensureEmpty = x => !fs.existsSync(x) ? fs.mkdirSync(x) : empty(x)
     , root = 'deno'
     , src = path.join(root, 'src')
@@ -49,21 +50,14 @@ function transpile(x, name, folder) {
            .replace(/\nexec\(/g, '\nawait exec(')
            .replace('{ spawnSync }', '{ spawn }')
     }
-
-    if (name === 'index.js') {
-      // Ignore tests that use node create stream functions not supported in deno yet
-      x = x.replace(/(t\('Copy from file works)/, 'n$1')
-           .replace(/(t\('Copy from abort works)/, 'n$1')
-           .replace(/(t\('Large object)/, 'n$1')
-    }
   }
 
   const buffer = x.includes('Buffer')
-    ? 'import { Buffer } from \'https://deno.land/std@0.120.0/node/buffer.ts\'\n'
+    ? 'import { Buffer } from \'' + std + 'node/buffer.ts\'\n'
     : ''
 
   const process = x.includes('process.')
-    ? 'import process from \'https://deno.land/std@0.120.0/node/process.ts\'\n'
+    ? 'import process from \'' + std + 'node/process.ts\'\n'
     : ''
 
   const timers = x.includes('setImmediate')
@@ -71,11 +65,14 @@ function transpile(x, name, folder) {
     : ''
 
   const hmac = x.includes('createHmac')
-    ? 'import { HmacSha256 } from \'https://deno.land/std@0.120.0/hash/sha256.ts\'\n'
+    ? 'import { HmacSha256 } from \'' + std + 'hash/sha256.ts\'\n'
     : ''
 
   return hmac + buffer + process + timers + x
-    .replace(/setTimeout\((.*)\)\.unref\(\)/g, '(window.timer = setTimeout($1), Deno.unrefTimer(window.timer), window.timer)')
+    .replace(
+      /setTimeout\((.*)\)\.unref\(\)/g,
+      '(window.timer = setTimeout($1), Deno.unrefTimer(window.timer), window.timer)'
+    )
     .replace(
       'crypto.createHmac(\'sha256\', key).update(x).digest()',
       'Buffer.from(new HmacSha256(key).update(x).digest())'
@@ -87,5 +84,5 @@ function transpile(x, name, folder) {
     .replace(/.setKeepAlive\([^)]+\)/g, '')
     .replace(/import net from 'net'/, 'import { net } from \'../polyfills.js\'')
     .replace(/import tls from 'tls'/, 'import { tls } from \'../polyfills.js\'')
-    .replace(/ from '([a-z_]+)'/g, ' from \'https://deno.land/std@0.120.0/node/$1.ts\'')
+    .replace(/ from '([a-z_]+)'/g, ' from \'' + std + 'node/$1.ts\'')
 }

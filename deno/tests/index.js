@@ -1,12 +1,12 @@
-import { Buffer } from 'https://deno.land/std@0.120.0/node/buffer.ts'
+import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
 /* eslint no-console: 0 */
 
 import { exec } from './bootstrap.js'
 
 import { t, nt, ot } from './test.js' // eslint-disable-line
 import { net } from '../polyfills.js'
-import fs from 'https://deno.land/std@0.120.0/node/fs.ts'
-import crypto from 'https://deno.land/std@0.120.0/node/crypto.ts'
+import fs from 'https://deno.land/std@0.132.0/node/fs.ts'
+import crypto from 'https://deno.land/std@0.132.0/node/crypto.ts'
 
 import postgres from '../src/index.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))
@@ -1632,7 +1632,7 @@ t('Copy write as first works', async() => {
   ]
 })
 
-nt('Copy from file works', async() => {
+t('Copy from file works', async() => {
   await sql`create table test (x int, y int, z int)`
   await new Promise(async r => fs
     .createReadStream(rel('copy.csv'))
@@ -1662,7 +1662,7 @@ t('Copy from works in transaction', async() => {
   ]
 })
 
-nt('Copy from abort works', async() => {
+t('Copy from abort works', async() => {
   const sql = postgres(options)
   const readable = fs.createReadStream(rel('copy.csv'))
 
@@ -1827,7 +1827,7 @@ t('Describe a statement without columns', async() => {
   ]
 })
 
-nt('Large object', async() => {
+t('Large object', async() => {
   const file = rel('index.js')
       , md5 = crypto.createHash('md5').update(fs.readFileSync(file)).digest('hex')
 
