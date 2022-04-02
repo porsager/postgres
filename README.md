@@ -622,6 +622,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   onnotice             : fn,            // Defaults to console.log
   onparameter          : fn,            // (key, value) when server param change
   debug                : fn,            // Is called with (connection, query, params, types)
+  socket               : fn,            // fn returning custom socket to use
   transform            : {
     column             : fn,            // Transforms incoming column names
     value              : fn,            // Transforms incoming row values
@@ -766,6 +767,31 @@ const [custom] = sql`
 
 // custom = { name: 'wat', rect: { x: 13, y: 37, width: 42, height: 80 } }
 
+```
+
+### Custom socket
+
+Easily do in-process ssh tunneling to your database by providing a custom socket for Postgres.js to use. The function (optionally async) must return a socket-like duplex stream.
+
+Here's a sample using [ssh2](https://github.com/mscdex/ssh2)
+
+```js
+import ssh2 from 'ssh2'
+
+const sql = postgres({
+  ...options,
+  socket: ({ hostname, port }) => new Promise((resolve, reject) => {
+    const ssh = new ssh2.Client()
+    ssh
+    .on('error', reject)
+    .on('ready', () => 
+      ssh.forwardOut('127.0.0.1', 12345, hostname, port, 
+        (err, socket) => err ? reject(err) : resolve(socket)
+      )
+    )
+    .connect(sshOptions)
+  })
+})
 ```
 
 ## Teardown / Cleanup

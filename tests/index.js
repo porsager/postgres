@@ -1954,3 +1954,24 @@ t('Ensure reconnect after max_lifetime with transactions', { timeout: 5000 }, as
 
   return [true, true]
 })
+
+t('Custom socket works', {}, async() => {
+  let result
+  const sql = postgres({
+    socket: () => new Promise((resolve, reject) => {
+      const socket = net.Socket()
+      socket.connect(5432)
+      socket.once('data', x => result = x[0])
+      socket.on('error', reject)
+      socket.on('connect', () => resolve(socket))
+    }),
+    idle_timeout
+  })
+
+  await sql`select 1`
+
+  return [
+    result,
+    82
+  ]
+})
