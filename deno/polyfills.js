@@ -28,12 +28,13 @@ export const net = {
     const socket = {
       error,
       success,
-      connect: (...xs) => {
+      connect: (port, hostname) => {
         socket.closed = false
         socket.raw = null
-        xs.length === 1
-          ? Deno.connect({ transport: 'unix', path: xs[0] }).then(success, error)
-          : Deno.connect({ transport: 'tcp', port: socket.port = xs[0], hostname: socket.hostname = xs[1] }).then(success, error)
+        typeof port === 'string'
+          ? Deno.connect({ transport: 'unix', path: socket.path = port }).then(success, error)
+          : Deno.connect({ transport: 'tcp', port: socket.port = port, hostname: socket.hostname = hostname || 'localhost' }).then(success, error) // eslint-disable-line
+        return socket
       },
       pause: () => {
         paused = new Promise(r => resume = r)

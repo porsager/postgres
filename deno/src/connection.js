@@ -77,7 +77,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       , lifeTimer = timer(end, options.max_lifetime)
       , connectTimer = timer(connectTimedOut, options.connect_timeout)
 
-  let socket = createSocket()
+  let socket = null
     , result = new Result()
     , incoming = Buffer.alloc(0)
     , needsTypes = options.fetch_types
@@ -125,15 +125,27 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   return connection
 
-  function createSocket() {
-    const x = net.Socket()
+  async function createSocket() {
+    let x
+    try {
+      x = options.socket
+        ? (await Promise.resolve(options.socket(options)))
+        : net.Socket()
+    } catch (e) {
+      error(e)
+      return
+    }
     x.on('error', error)
     x.on('close', closed)
     x.on('drain', drain)
     return x
   }
 
-  function cancel({ pid, secret }, resolve, reject) {
+  async function cancel({ pid, secret }, resolve, reject) {
+    socket || (socket = await createSocket())
+    if (!socket)
+      return
+
     socket.removeAllListeners()
     socket = net.Socket()
     socket.on('connect', () => socket.write(b().i32(16).i32(80877102).i32(pid).i32(secret).end(16)))
@@ -327,10 +339,19 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     }
   }
 
-  function connect() {
+  async function connect() {
     terminated = false
     backendParameters = {}
+    socket || (socket = await createSocket())
+
+    if (!socket)
+      return
+
     connectTimer.start()
+
+    if (options.socket)
+      return ssl ? secure() : connected()
+
     socket.on('connect', ssl ? secure : connected)
 
     if (options.path)
@@ -352,7 +373,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       statementCount = 1
       lifeTimer.start()
       socket.on('data', data)
-      socket
+      socket.setKeepAlive && socket
       const s = StartupMessage()
       write(s)
     } catch (err) {
@@ -400,13 +421,15 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       error(Errors.connection('CONNECTION_DESTROYED', options))
 
     clearImmediate(nextWriteTimer)
-    socket.removeListener('data', data)
-    socket.removeListener('connect', connected)
-    socket.readyState !== 'closed' && socket.end(b().X().end())
+    if (socket) {
+      socket.removeListener('data', data)
+      socket.removeListener('connect', connected)
+      socket.readyState !== 'closed' && socket.end(b().X().end())
+    }
     ended && (ended(), ending = ended = null)
   }
 
-  function closed(hadError) {
+  async function closed(hadError) {
     incoming = Buffer.alloc(0)
     remaining = 0
     incomings = null
@@ -419,7 +442,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
     if (socket.encrypted) {
       socket.removeAllListeners()
-      socket = createSocket()
+      socket = null
     }
 
     if (initial)

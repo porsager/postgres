@@ -398,6 +398,7 @@ function parseOptions(a, b) {
     connection      : Object.assign({ application_name: 'postgres.js' }, o.connection),
     target_session_attrs: tsa(o, url, env),
     debug           : o.debug,
+    socket          : o.socket,
     fetch_types     : 'fetch_types' in o ? o.fetch_types : true,
     parameters      : {},
     shared          : { retries: 0, typeArrayMap: {} },

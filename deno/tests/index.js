@@ -692,7 +692,7 @@ t('listen reconnects after connection error', { timeout: 3 }, async() => {
   await delay(1000)
 
   await sql.notify('test', 'b')
-  await delay(50)
+  await delay(200)
   sql.end()
 
   return ['ab', xs.join('')]
@@ -1761,7 +1761,7 @@ t('Cancel running query works', async() => {
   return ['57014', error.code]
 })
 
-t('Cancel piped query works', async() => {
+t('Cancel piped query works', { timeout: 1 }, async() => {
   await sql`select 1`
   const last = sql`select pg_sleep(0.2)`.execute()
   const query = sql`select pg_sleep(2) as dig`
@@ -1954,4 +1954,25 @@ t('Ensure reconnect after max_lifetime with transactions', { timeout: 5000 }, as
   while (x++ < 10) await sql.begin(sql => sql`select 1 as x`)
 
   return [true, true]
+})
+
+t('Custom socket works', {}, async() => {
+  let result
+  const sql = postgres({
+    socket: () => new Promise((resolve, reject) => {
+      const socket = net.Socket()
+      socket.connect(5432)
+      socket.once('data', x => result = x[0])
+      socket.on('error', reject)
+      socket.on('connect', () => resolve(socket))
+    }),
+    idle_timeout
+  })
+
+  await sql`select 1`
+
+  return [
+    result,
+    82
+  ]
 })
