@@ -821,12 +821,14 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   function CopyInResponse() {
     stream = new Stream.Writable({
+      autoDestroy: true,
       write(chunk, encoding, callback) {
         socket.write(b().d().raw(chunk).end(), callback)
       },
       destroy(error, callback) {
         callback(error)
         socket.write(b().f().str(error + b.N).end())
+        stream = null
       },
       final(callback) {
         socket.write(b().c().end())
@@ -846,6 +848,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   /* c8 ignore next 3 */
   function CopyBothResponse() {
     stream = new Stream.Duplex({
+      autoDestroy: true,
       read() { socket.resume() },
       /* c8 ignore next 11 */
       write(chunk, encoding, callback) {
@@ -854,6 +857,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       destroy(error, callback) {
         callback(error)
         socket.write(b().f().str(error + b.N).end())
+        stream = null
       },
       final(callback) {
         socket.write(b().c().end())

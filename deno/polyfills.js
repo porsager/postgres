@@ -28,8 +28,8 @@ export const net = {
     const socket = {
       error,
       success,
+      readyState: 'closed',
       connect: (port, hostname) => {
-        socket.closed = false
         socket.raw = null
         typeof port === 'string'
           ? Deno.connect({ transport: 'unix', path: socket.path = port }).then(success, error)
@@ -79,6 +79,7 @@ export const net = {
 
     async function success(raw) {
       const encrypted = socket.encrypted
+      socket.readyState = 'open'
       socket.raw = raw
       socket.encrypted
         ? call(socket.events.secureConnect)
@@ -88,7 +89,7 @@ export const net = {
       let result
 
       try {
-        while ((result = !socket.closed && await raw.read(b))) {
+        while ((result = socket.readyState === 'open' && await raw.read(b))) {
           call(socket.events.data, Buffer.from(b.subarray(0, result)))
           if (!encrypted && socket.break && (socket.break = false, b[0] === 83))
             return socket.break = false
@@ -115,11 +116,11 @@ export const net = {
 
     function closed() {
       socket.break = socket.encrypted = false
-      if (socket.closed)
+      if (socket.readyState !== 'open')
         return
 
       call(socket.events.close)
-      socket.closed = true
+      socket.readyState = 'closed'
     }
 
     function error(err) {

@@ -66,7 +66,7 @@ export default function Subscribe(postgres, options) {
 
     stream.on('data', data)
     stream.on('error', (error) => {
-      console.error('Logical Replication Error - Reconnecting', error)
+      console.error('Logical Replication Error - Reconnecting', error) // eslint-disable-line
       sql.end()
     })
 

@@ -17,8 +17,8 @@
     "build:deno": "node transpile.deno.js",
     "test": "npm run test:esm && npm run test:cjs && npm run test:deno",
     "test:esm": "node tests/index.js",
-    "test:cjs": "npm run build:cjs && pushd cjs/tests && node index.js && popd",
-    "test:deno": "npm run build:deno && pushd deno/tests && deno run --unstable --allow-all --unsafely-ignore-certificate-errors index.js && popd",
+    "test:cjs": "npm run build:cjs && cd cjs/tests && node index.js && cd ../../",
+    "test:deno": "npm run build:deno && cd deno/tests && deno run --unstable --allow-all --unsafely-ignore-certificate-errors index.js && cd ../../",
     "lint": "eslint src && eslint tests",
     "prepare": "npm run build",
     "prepublishOnly": "npm run lint"

@@ -1,6 +1,5 @@
 import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
-/* eslint no-console: 0 */
-
+import process from 'https://deno.land/std@0.132.0/node/process.ts'
 import { exec } from './bootstrap.js'
 
 import { t, nt, ot } from './test.js' // eslint-disable-line
@@ -667,18 +666,19 @@ t('listen and notify with upper case', async() => {
 
 t('listen reconnects', { timeout: 2 }, async() => {
   const sql = postgres(options)
-      , xs = []
+      , resolvers = {}
+      , a = new Promise(r => resolvers.a = r)
+      , b = new Promise(r => resolvers.b = r)
 
-  const { state: { pid } } = await sql.listen('test', x => xs.push(x))
-  await delay(200)
+  const { state: { pid } } = await sql.listen('test', x => x in resolvers && resolvers[x]())
   await sql.notify('test', 'a')
-  await sql`select pg_terminate_backend(${ pid }::int)`
-  await delay(200)
+  await a
+  await sql`select pg_terminate_backend(${ pid })`
+  await delay(50)
   await sql.notify('test', 'b')
-  await delay(200)
+  await b
   sql.end()
-
-  return ['ab', xs.join('')]
+  return [true, true]
 })
 
 
@@ -688,7 +688,7 @@ t('listen reconnects after connection error', { timeout: 3 }, async() => {
 
   const { state: { pid } } = await sql.listen('test', x => xs.push(x))
   await sql.notify('test', 'a')
-  await sql`select pg_terminate_backend(${ pid }::int)`
+  await sql`select pg_terminate_backend(${ pid })`
   await delay(1000)
 
   await sql.notify('test', 'b')
@@ -705,7 +705,7 @@ t('listen result reports correct connection state after reconnection', async() =
   const result = await sql.listen('test', x => xs.push(x))
   const initialPid = result.state.pid
   await sql.notify('test', 'a')
-  await sql`select pg_terminate_backend(${ initialPid }::int)`
+  await sql`select pg_terminate_backend(${ initialPid })`
   await delay(50)
   sql.end()
 
@@ -853,7 +853,7 @@ t('Connection errors are caught using begin()', {
 }, async() => {
   let error
   try {
-    const sql = postgres({ host: 'wat', port: 1337 })
+    const sql = postgres({ host: 'localhost', port: 1 })
 
     await sql.begin(async(sql) => {
       await sql`insert into test (label, value) values (${1}, ${2})`
@@ -864,8 +864,8 @@ t('Connection errors are caught using begin()', {
 
   return [
     true,
-    error.code === 'ENOTFOUND' ||
-    error.message === 'failed to lookup address information: nodename nor servname provided, or not known'
+    error.code === 'ECONNREFUSED' ||
+    error.message === 'Connection refused (os error 61)'
   ]
 })
 
@@ -1017,8 +1017,8 @@ t('throws correct error when authentication fails', async() => {
 
 t('notice works', async() => {
   let notice
-  const log = console.log
-  console.log = function(x) {
+  const log = console.log // eslint-disable-line
+  console.log = function(x) { // eslint-disable-line
     notice = x
   }
 
@@ -1027,7 +1027,7 @@ t('notice works', async() => {
   await sql`create table if not exists users()`
   await sql`create table if not exists users()`
 
-  console.log = log
+  console.log = log // eslint-disable-line
 
   return ['NOTICE', notice.severity]
 })
@@ -1253,7 +1253,7 @@ t('Transform columns from', async() => {
 t('Unix socket', async() => {
   const sql = postgres({
     ...options,
-    host: '/tmp'
+    host: process.env.PGSOCKET || '/tmp' // eslint-disable-line
   })
 
   return [1, (await sql`select 1 as x`)[0].x]
@@ -1379,7 +1379,7 @@ t('requests works after single connect_timeout', async() => {
   const sql = postgres({
     ...options,
     ...login_scram,
-    connect_timeout: { valueOf() { return first ? (first = false, 0.001) : 1 } }
+    connect_timeout: { valueOf() { return first ? (first = false, 0.0001) : 1 } }
   })
 
   return [
@@ -1539,19 +1539,22 @@ t('Multiple hosts', {
       , sql = postgres('postgres://localhost:5432,localhost:5433', { idle_timeout, max: 1 })
       , result = []
 
+  const id1 = (await s1`select system_identifier as x from pg_control_system()`)[0].x
+  const id2 = (await s2`select system_identifier as x from pg_control_system()`)[0].x
+
   const x1 = await sql`select 1`
-  result.push((await sql`select setting as x from pg_settings where name = 'port'`)[0].x)
+  result.push((await sql`select system_identifier as x from pg_control_system()`)[0].x)
   await s1`select pg_terminate_backend(${ x1.state.pid }::int)`
   await delay(100)
 
   const x2 = await sql`select 1`
-  result.push((await sql`select setting as x from pg_settings where name = 'port'`)[0].x)
+  result.push((await sql`select system_identifier as x from pg_control_system()`)[0].x)
   await s2`select pg_terminate_backend(${ x2.state.pid }::int)`
   await delay(100)
 
-  result.push((await sql`select setting as x from pg_settings where name = 'port'`)[0].x)
+  result.push((await sql`select system_identifier as x from pg_control_system()`)[0].x)
 
-  return ['5432,5433,5432', result.join(',')]
+  return [[id1, id2, id1].join(','), result.join(',')]
 })
 
 t('Escaping supports schemas and tables', async() => {
@@ -1763,9 +1766,9 @@ t('Cancel running query works', async() => {
 
 t('Cancel piped query works', { timeout: 1 }, async() => {
   await sql`select 1`
-  const last = sql`select pg_sleep(0.2)`.execute()
+  const last = sql`select pg_sleep(0.3)`.execute()
   const query = sql`select pg_sleep(2) as dig`
-  setTimeout(() => query.cancel(), 100)
+  setTimeout(() => query.cancel(), 10)
   const error = await query.catch(x => x)
   await last
   return ['57014', error.code]
@@ -1774,7 +1777,7 @@ t('Cancel piped query works', { timeout: 1 }, async() => {
 t('Cancel queued query works', async() => {
   const tx = sql.begin(sql => sql`select pg_sleep(0.2) as hej, 'hejsa'`)
   const query = sql`select pg_sleep(2) as nej`
-  setTimeout(() => query.cancel(), 50)
+  setTimeout(() => query.cancel(), 100)
   const error = await query.catch(x => x)
   await tx
   return ['57014', error.code]
@@ -1943,7 +1946,7 @@ t('Prevent premature end of connection in transaction', async() => {
   ]
 })
 
-t('Ensure reconnect after max_lifetime with transactions', { timeout: 5000 }, async() => {
+t('Ensure reconnect after max_lifetime with transactions', { timeout: 5 }, async() => {
   const sql = postgres({
     max_lifetime: 0.01,
     idle_timeout,
@@ -1976,3 +1979,5 @@ t('Custom socket works', {}, async() => {
     82
   ]
 })
+
+;window.addEventListener("unload", () => Deno.exit(process.exitCode))
