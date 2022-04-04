@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.3] - 4 Apr 2022
+- Run tests with github actions  b536d0d
+- Add custom socket option - fixes #284  5413f0c
+- Fix sql function overload type inference (#294)  3c4e90a
+- Update deno std to 0.132 and enable last tests  50762d4
+- Send proper client-encoding - Fixes #288  e5b8554
+
 ## [3.0.2] - 31 Mar 2022
 - Fix BigInt handling  36a70df
 - Fix unsubscribing  (#300)  b6c597f
