@@ -1471,7 +1471,7 @@ t('does not prepare unsafe query by default', async() => {
   return [false, result.some(x => x.name = result.statement.name)]
 })
 
-t('Recreate prepared statements on transformAssignedExpr error', async() => {
+t('Recreate prepared statements on transformAssignedExpr error', { timeout: 1 }, async() => {
   const insert = () => sql`insert into test (name) values (${ '1' }) returning name`
   await sql`create table test (name text)`
   await insert()
@@ -1768,7 +1768,7 @@ t('Cancel piped query works', { timeout: 1 }, async() => {
   await sql`select 1`
   const last = sql`select pg_sleep(0.3)`.execute()
   const query = sql`select pg_sleep(2) as dig`
-  setTimeout(() => query.cancel(), 10)
+  setTimeout(() => query.cancel(), 100)
   const error = await query.catch(x => x)
   await last
   return ['57014', error.code]
