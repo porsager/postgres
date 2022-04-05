@@ -1977,3 +1977,14 @@ t('Custom socket works', {}, async() => {
     82
   ]
 })
+
+t('Ensure drain only dequeues if ready', async() => {
+  const sql = postgres(options)
+
+  const res = await Promise.all([
+    sql.unsafe('SELECT 0+$1 --' + '.'.repeat(100000), [1]),
+    sql.unsafe('SELECT 0+$1+$2+$3', [1, 2, 3])
+  ])
+
+  return [res.length, 2]
+})

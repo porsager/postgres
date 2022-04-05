@@ -302,7 +302,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   /* c8 ignore next 3 */
   function drain() {
-    onopen(connection)
+    !query && onopen(connection)
   }
 
   function data(x) {
