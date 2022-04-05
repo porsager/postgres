@@ -1,5 +1,8 @@
 # Changelog
 
+## [3.0.4] - 5 Apr 2022
+- Ensure drain only dequeues if ready - fixes #303  2e5f017
+
 ## [3.0.3] - 4 Apr 2022
 - Run tests with github actions  b536d0d
 - Add custom socket option - fixes #284  5413f0c
