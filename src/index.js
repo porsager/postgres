@@ -139,7 +139,9 @@ function Postgres(a, b) {
     }
   }
 
-  async function listen(name, fn) {
+  async function listen(name, fn, onlisten) {
+    const listener = { fn, onlisten }
+
     const sql = listen.sql || (listen.sql = Postgres({
       ...options,
       max: 1,
@@ -147,26 +149,28 @@ function Postgres(a, b) {
       max_lifetime: null,
       fetch_types: false,
       onclose() {
-        Object.entries(listen.channels).forEach(([channel, { listeners }]) => {
-          delete listen.channels[channel]
-          Promise.all(listeners.map(fn => listen(channel, fn).catch(() => { /* noop */ })))
+        Object.entries(listen.channels).forEach(([name, { listeners }]) => {
+          delete listen.channels[name]
+          Promise.all(listeners.map(l => listen(name, l.fn, l.onlisten).catch(() => { /* noop */ })))
         })
       },
       onnotify(c, x) {
-        c in listen.channels && listen.channels[c].listeners.forEach(fn => fn(x))
+        c in listen.channels && listen.channels[c].listeners.forEach(l => l.fn(x))
       }
     }))
 
     const channels = listen.channels || (listen.channels = {})
         , exists = name in channels
-        , channel = exists ? channels[name] : (channels[name] = { listeners: [fn] })
+        , channel = exists ? channels[name] : (channels[name] = { listeners: [listener] })
 
     if (exists) {
-      channel.listeners.push(fn)
+      channel.listeners.push(listener)
+      listener.onlisten && listener.onlisten()
       return Promise.resolve({ ...channel.result, unlisten })
     }
 
     channel.result = await sql`listen ${ sql(name) }`
+    listener.onlisten && listener.onlisten()
     channel.result.unlisten = unlisten
 
     return channel.result
@@ -175,7 +179,7 @@ function Postgres(a, b) {
       if (name in channels === false)
         return
 
-      channel.listeners = channel.listeners.filter(x => x !== fn)
+      channel.listeners = channel.listeners.filter(x => x !== listener)
       if (channels[name].listeners.length)
         return
 
