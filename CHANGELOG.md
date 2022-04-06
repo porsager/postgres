@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.0.5] - 6 Apr 2022
+- Add optional onlisten function to listen  04569f9
+- Fix dynamic in() helper after insert - fixes #305  f1ebe2f
+- Ensure drain only dequeues if ready - fixes #303  2e5f017
+
 ## [3.0.4] - 5 Apr 2022
 - Ensure drain only dequeues if ready - fixes #303  2e5f017
 
