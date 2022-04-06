@@ -672,7 +672,13 @@ t('listen reconnects', { timeout: 2 }, async() => {
       , a = new Promise(r => resolvers.a = r)
       , b = new Promise(r => resolvers.b = r)
 
-  const { state: { pid } } = await sql.listen('test', x => x in resolvers && resolvers[x]())
+  let connects = 0
+
+  const { state: { pid } } = await sql.listen(
+    'test',
+    x => x in resolvers && resolvers[x](),
+    () => connects++
+  )
   await sql.notify('test', 'a')
   await a
   await sql`select pg_terminate_backend(${ pid })`
@@ -680,7 +686,7 @@ t('listen reconnects', { timeout: 2 }, async() => {
   await sql.notify('test', 'b')
   await b
   sql.end()
-  return [true, true]
+  return [connects, 2]
 })
 
 t('listen result reports correct connection state after reconnection', async() => {
@@ -1545,12 +1551,12 @@ t('Multiple hosts', {
   const x1 = await sql`select 1`
   result.push((await sql`select system_identifier as x from pg_control_system()`)[0].x)
   await s1`select pg_terminate_backend(${ x1.state.pid }::int)`
-  await delay(10)
+  await delay(50)
 
   const x2 = await sql`select 1`
   result.push((await sql`select system_identifier as x from pg_control_system()`)[0].x)
   await s2`select pg_terminate_backend(${ x2.state.pid }::int)`
-  await delay(10)
+  await delay(50)
 
   result.push((await sql`select system_identifier as x from pg_control_system()`)[0].x)
 
@@ -1764,20 +1770,22 @@ t('Cancel running query', async() => {
   return ['57014', error.code]
 })
 
-t('Cancel piped query', { timeout: 1 }, async() => {
+t('Cancel piped query', async() => {
   await sql`select 1`
-  const last = sql`select pg_sleep(0.1)`.execute()
+  const last = sql`select pg_sleep(0.05)`.execute()
   const query = sql`select pg_sleep(2) as dig`
-  setTimeout(() => query.cancel(), 50)
+  setTimeout(() => query.cancel(), 10)
   const error = await query.catch(x => x)
   await last
   return ['57014', error.code]
 })
 
 t('Cancel queued query', async() => {
-  const tx = sql.begin(sql => sql`select pg_sleep(0.2) as hej, 'hejsa'`)
   const query = sql`select pg_sleep(2) as nej`
-  setTimeout(() => query.cancel(), 100)
+  const tx = sql.begin(sql => (
+    query.cancel(),
+    sql`select pg_sleep(0.1) as hej, 'hejsa'`
+  ))
   const error = await query.catch(x => x)
   await tx
   return ['57014', error.code]

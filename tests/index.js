@@ -1781,9 +1781,11 @@ t('Cancel piped query', async() => {
 })
 
 t('Cancel queued query', async() => {
-  const tx = sql.begin(sql => sql`select pg_sleep(0.2) as hej, 'hejsa'`)
   const query = sql`select pg_sleep(2) as nej`
-  setTimeout(() => query.cancel(), 100)
+  const tx = sql.begin(sql => (
+    query.cancel(),
+    sql`select pg_sleep(0.1) as hej, 'hejsa'`
+  ))
   const error = await query.catch(x => x)
   await tx
   return ['57014', error.code]

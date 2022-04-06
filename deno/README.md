@@ -515,9 +515,10 @@ Do note that you can often achieve the same result using [`WITH` queries (Common
 
 ## Listen & notify
 
-When you call `.listen`, a dedicated connection will be created to ensure that you receive notifications in real-time. This connection will be used for any further calls to `.listen`.
+When you call `.listen`, a dedicated connection will be created to ensure that you receive notifications instantly. This connection will be used for any further calls to `.listen`. The connection will automatically reconnect according to a backoff reconnection pattern to not overload the database server.
 
-`.listen` returns a promise which resolves once the `LISTEN` query to Postgres completes, or if there is already a listener active.
+### Listen `await sql.listen(channel, onnotify, [onlisten]) -> { state }`
+`.listen` takes the channel name, a function to handle each notify, and an optional function to run every time listen is registered and ready (happens on initial connect and reconnects). It returns a promise which resolves once the `LISTEN` query to Postgres completes, or if there is already a listener active.
 
 ```js
 await sql.listen('news', payload => {
@@ -526,6 +527,20 @@ await sql.listen('news', payload => {
 })
 ```
 
+The optional `onlisten` method is great to use for a very simply queue mechanism:
+
+```js
+await sql.listen(
+  'jobs', 
+  (x) => run(JSON.parse(x)),
+  ( ) => sql`select unfinished_jobs()`.forEach(run)
+)
+
+function run(job) {
+  // And here you do the work you please
+}
+```
+### Notify `await sql.notify(channel, payload) -> Result[]`
 Notify can be done as usual in SQL, or by using the `sql.notify` method.
 ```js
 sql.notify('news', JSON.stringify({ no: 'this', is: 'news' }))

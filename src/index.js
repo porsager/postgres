@@ -199,7 +199,7 @@ function Postgres(a, b) {
       , connection
 
     try {
-      await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute })
+      await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
       return await scope(connection, fn)
     } catch (error) {
       throw error
