@@ -145,7 +145,7 @@ const builders = Object.entries({
     ).join(',') + ')values' +
     valuesBuilder(Array.isArray(first) ? first : [first], parameters, types, transform, columns)
   }
-}).map(([x, fn]) => ([new RegExp('(^|[\\s(])' + x, 'i'), fn]))
+}).map(([x, fn]) => ([new RegExp('(^|[\\s(])' + x + '($|[\\s(])', 'i'), fn]))
 
 function notTagged() {
   throw Errors.generic('NOT_TAGGED_CALL', 'Query not called as a tagged template literal')

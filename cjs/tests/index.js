@@ -893,6 +893,21 @@ t('dynamic insert pluck', async() => {
   return [null, (await sql`insert into test ${ sql(x, 'a') } returning *`)[0].b, await sql`drop table test`]
 })
 
+t('dynamic in after insert', async() => {
+  await sql`create table test (a int, b text)`
+  const [{ x }] = await sql`
+    with x as (
+      insert into test values (1, 'hej')
+      returning *
+    )
+    select 1 in ${ sql([1, 2, 3]) } as x from x
+  `
+  return [
+    true, x,
+    await sql`drop table test`
+  ]
+})
+
 t('array insert', async() => {
   await sql`create table test (a int, b int)`
   return [2, (await sql`insert into test (a, b) values ${ sql([1, 2]) } returning *`)[0].b, await sql`drop table test`]
