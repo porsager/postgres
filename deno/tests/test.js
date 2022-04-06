@@ -61,7 +61,6 @@ async function test(o, name, options, fn) {
 }
 
 function exit() {
-  console.log('')
   let success = true
   Object.values(tests).every((x) => {
     if (x.succeeded)
@@ -81,7 +80,7 @@ function exit() {
     : ignored
       ? console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's', '\n'))
       : success
-        ? console.log('All good')
+        ? console.log('🎉')
         : console.error('⚠️', 'Not good')
 
   !process.exitCode && (!success || only || ignored) && (process.exitCode = 1)

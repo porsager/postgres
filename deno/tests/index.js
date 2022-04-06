@@ -410,9 +410,9 @@ t('Parallel connections using scram-sha-256', {
 }, async() => {
   const sql = postgres({ ...options, ...login_scram })
   return [true, (await Promise.all([
-    sql`select true as x, pg_sleep(0.2)`,
-    sql`select true as x, pg_sleep(0.2)`,
-    sql`select true as x, pg_sleep(0.2)`
+    sql`select true as x, pg_sleep(0.01)`,
+    sql`select true as x, pg_sleep(0.01)`,
+    sql`select true as x, pg_sleep(0.01)`
   ]))[0][0].x]
 })
 
@@ -601,15 +601,17 @@ t('unsafe simple', async() => {
 
 t('listen and notify', async() => {
   const sql = postgres(options)
-      , channel = 'hello'
+  const channel = 'hello'
+  const result = await new Promise(async r => {
+    await sql.listen(channel, r)
+    sql.notify(channel, 'works')
+  })
 
-  return ['world', await new Promise((resolve, reject) =>
-    sql.listen(channel, resolve)
-    .then(() => sql.notify(channel, 'world'))
-    .then(() => delay(20))
-    .catch(reject)
-    .then(sql.end)
-  )]
+  return [
+    'works',
+    result,
+    sql.end()
+  ]
 })
 
 t('double listen', async() => {
@@ -638,24 +640,26 @@ t('double listen', async() => {
 
 t('listen and notify with weird name', async() => {
   const sql = postgres(options)
-      , channel = 'wat-;ø§'
+  const channel = 'wat-;ø§'
+  const result = await new Promise(async r => {
+    await sql.listen(channel, r)
+    sql.notify(channel, 'works')
+  })
 
-  return ['world', await new Promise((resolve, reject) =>
-    sql.listen(channel, resolve)
-    .then(() => sql.notify(channel, 'world'))
-    .catch(reject)
-    .then(() => delay(20))
-    .then(sql.end)
-  )]
+  return [
+    'works',
+    result,
+    sql.end()
+  ]
 })
 
 t('listen and notify with upper case', async() => {
   const sql = postgres(options)
-  let result
-
-  await sql.listen('withUpperChar', x => result = x)
-  sql.notify('withUpperChar', 'works')
-  await delay(50)
+  const channel = 'withUpperChar'
+  const result = await new Promise(async r => {
+    await sql.listen(channel, r)
+    sql.notify(channel, 'works')
+  })
 
   return [
     'works',
@@ -674,28 +678,11 @@ t('listen reconnects', { timeout: 2 }, async() => {
   await sql.notify('test', 'a')
   await a
   await sql`select pg_terminate_backend(${ pid })`
-  await delay(50)
+  await delay(100)
   await sql.notify('test', 'b')
   await b
   sql.end()
   return [true, true]
-})
-
-
-t('listen reconnects after connection error', { timeout: 3 }, async() => {
-  const sql = postgres()
-      , xs = []
-
-  const { state: { pid } } = await sql.listen('test', x => xs.push(x))
-  await sql.notify('test', 'a')
-  await sql`select pg_terminate_backend(${ pid })`
-  await delay(1000)
-
-  await sql.notify('test', 'b')
-  await delay(200)
-  sql.end()
-
-  return ['ab', xs.join('')]
 })
 
 t('listen result reports correct connection state after reconnection', async() => {
@@ -1030,7 +1017,7 @@ t('throws correct error when authentication fails', async() => {
   return ['28P01', await sql`select 1`.catch(e => e.code)]
 })
 
-t('notice works', async() => {
+t('notice', async() => {
   let notice
   const log = console.log // eslint-disable-line
   console.log = function(x) { // eslint-disable-line
@@ -1047,7 +1034,7 @@ t('notice works', async() => {
   return ['NOTICE', notice.severity]
 })
 
-t('notice hook works', async() => {
+t('notice hook', async() => {
   let notice
   const sql = postgres({
     ...options,
@@ -1073,7 +1060,7 @@ t('bytea serializes and parses', async() => {
   ]
 })
 
-t('forEach works', async() => {
+t('forEach', async() => {
   let result
   await sql`select 1 as x`.forEach(({ x }) => result = x)
   return [1, result]
@@ -1083,7 +1070,7 @@ t('forEach returns empty array', async() => {
   return [0, (await sql`select 1 as x`.forEach(() => { /* noop */ })).length]
 })
 
-t('Cursor works', async() => {
+t('Cursor', async() => {
   const order = []
   await sql`select 1 as x union select 2 as x`.cursor(async([x]) => {
     order.push(x.x + 'a')
@@ -1093,7 +1080,7 @@ t('Cursor works', async() => {
   return ['1a1b2a2b', order.join('')]
 })
 
-t('Unsafe cursor works', async() => {
+t('Unsafe cursor', async() => {
   const order = []
   await sql.unsafe('select 1 as x union select 2 as x').cursor(async([x]) => {
     order.push(x.x + 'a')
@@ -1103,7 +1090,7 @@ t('Unsafe cursor works', async() => {
   return ['1a1b2a2b', order.join('')]
 })
 
-t('Cursor custom n works', async() => {
+t('Cursor custom n', async() => {
   const order = []
   await sql`select * from generate_series(1,20)`.cursor(10, async(x) => {
     order.push(x.length)
@@ -1111,7 +1098,7 @@ t('Cursor custom n works', async() => {
   return ['10,10', order.join(',')]
 })
 
-t('Cursor custom with rest n works', async() => {
+t('Cursor custom with rest n', async() => {
   const order = []
   await sql`select * from generate_series(1,20)`.cursor(11, async(x) => {
     order.push(x.length)
@@ -1119,7 +1106,7 @@ t('Cursor custom with rest n works', async() => {
   return ['11,9', order.join(',')]
 })
 
-t('Cursor custom with less results than batch size works', async() => {
+t('Cursor custom with less results than batch size', async() => {
   const order = []
   await sql`select * from generate_series(1,20)`.cursor(21, async(x) => {
     order.push(x.length)
@@ -1127,7 +1114,7 @@ t('Cursor custom with less results than batch size works', async() => {
   return ['20', order.join(',')]
 })
 
-t('Cursor cancel works', async() => {
+t('Cursor cancel', async() => {
   let result
   await sql`select * from generate_series(1,10) as x`.cursor(async([{ x }]) => {
     result = x
@@ -1136,7 +1123,7 @@ t('Cursor cancel works', async() => {
   return [1, result]
 })
 
-t('Cursor throw works', async() => {
+t('Cursor throw', async() => {
   const order = []
   await sql`select 1 as x union select 2 as x`.cursor(async([x]) => {
     order.push(x.x + 'a')
@@ -1146,7 +1133,7 @@ t('Cursor throw works', async() => {
   return ['1aerr', order.join('')]
 })
 
-t('Cursor error works', async() => [
+t('Cursor error', async() => [
   '42601',
   await sql`wat`.cursor(() => { /* noop */ }).catch((err) => err.code)
 ])
@@ -1156,11 +1143,11 @@ t('Multiple Cursors', { timeout: 2 }, async() => {
   await sql.begin(async sql => [
     await sql`select 1 as cursor, x from generate_series(1,4) as x`.cursor(async([row]) => {
       result.push(row.x)
-      await new Promise(r => setTimeout(r, 200))
+      await new Promise(r => setTimeout(r, 20))
     }),
     await sql`select 2 as cursor, x from generate_series(101,104) as x`.cursor(async([row]) => {
       result.push(row.x)
-      await new Promise(r => setTimeout(r, 100))
+      await new Promise(r => setTimeout(r, 10))
     })
   ])
 
@@ -1171,7 +1158,7 @@ t('Cursor as async iterator', async() => {
   const order = []
   for await (const [x] of sql`select generate_series(1,2) as x;`.cursor()) {
     order.push(x.x + 'a')
-    await delay(100)
+    await delay(10)
     order.push(x.x + 'b')
   }
 
@@ -1190,17 +1177,17 @@ t('Cursor as async iterator with break', async() => {
   return ['1a1b', order.join('')]
 })
 
-t('Async Iterator Unsafe cursor works', async() => {
+t('Async Iterator Unsafe cursor', async() => {
   const order = []
   for await (const [x] of sql.unsafe('select 1 as x union select 2 as x').cursor()) {
     order.push(x.x + 'a')
-    await delay(100)
+    await delay(10)
     order.push(x.x + 'b')
   }
   return ['1a1b2a2b', order.join('')]
 })
 
-t('Async Iterator Cursor custom n works', async() => {
+t('Async Iterator Cursor custom n', async() => {
   const order = []
   for await (const x of sql`select * from generate_series(1,20)`.cursor(10))
     order.push(x.length)
@@ -1208,7 +1195,7 @@ t('Async Iterator Cursor custom n works', async() => {
   return ['10,10', order.join(',')]
 })
 
-t('Async Iterator Cursor custom with rest n works', async() => {
+t('Async Iterator Cursor custom with rest n', async() => {
   const order = []
   for await (const x of sql`select * from generate_series(1,20)`.cursor(11))
     order.push(x.length)
@@ -1216,7 +1203,7 @@ t('Async Iterator Cursor custom with rest n works', async() => {
   return ['11,9', order.join(',')]
 })
 
-t('Async Iterator Cursor custom with less results than batch size works', async() => {
+t('Async Iterator Cursor custom with less results than batch size', async() => {
   const order = []
   for await (const x of sql`select * from generate_series(1,20)`.cursor(21))
     order.push(x.length)
@@ -1278,7 +1265,7 @@ t('Big result', async() => {
   return [100000, (await sql`select * from generate_series(1, 100000)`).count]
 })
 
-t('Debug works', async() => {
+t('Debug', async() => {
   let result
   const sql = postgres({
     ...options,
@@ -1363,7 +1350,7 @@ t('Query and parameters are enumerable if debug is set', async() => {
   ]
 })
 
-t('connect_timeout works', { timeout: 20 }, async() => {
+t('connect_timeout', { timeout: 20 }, async() => {
   const connect_timeout = 0.2
   const server = net.createServer()
   server.listen()
@@ -1547,7 +1534,7 @@ t('Catches query format errors', async() => [
 ])
 
 t('Multiple hosts', {
-  timeout: 10
+  timeout: 1
 }, async() => {
   const s1 = postgres({ idle_timeout })
       , s2 = postgres({ idle_timeout, port: 5433 })
@@ -1560,12 +1547,12 @@ t('Multiple hosts', {
   const x1 = await sql`select 1`
   result.push((await sql`select system_identifier as x from pg_control_system()`)[0].x)
   await s1`select pg_terminate_backend(${ x1.state.pid }::int)`
-  await delay(100)
+  await delay(10)
 
   const x2 = await sql`select 1`
   result.push((await sql`select system_identifier as x from pg_control_system()`)[0].x)
   await s2`select pg_terminate_backend(${ x2.state.pid }::int)`
-  await delay(100)
+  await delay(10)
 
   result.push((await sql`select system_identifier as x from pg_control_system()`)[0].x)
 
@@ -1600,7 +1587,7 @@ t('Raw method returns values unparsed as Buffer', async() => {
   ]
 })
 
-t('Copy read works', async() => {
+t('Copy read', async() => {
   const result = []
 
   await sql`create table test (x int)`
@@ -1616,7 +1603,7 @@ t('Copy read works', async() => {
   ]
 })
 
-t('Copy write works', { timeout: 2 }, async() => {
+t('Copy write', { timeout: 2 }, async() => {
   await sql`create table test (x int)`
   const writable = await sql`copy test from stdin`.writable()
 
@@ -1633,7 +1620,7 @@ t('Copy write works', { timeout: 2 }, async() => {
   ]
 })
 
-t('Copy write as first works', async() => {
+t('Copy write as first', async() => {
   await sql`create table test (x int)`
   const first = postgres(options)
   const writable = await first`COPY test FROM STDIN WITH(FORMAT csv, HEADER false, DELIMITER ',')`.writable()
@@ -1650,7 +1637,7 @@ t('Copy write as first works', async() => {
   ]
 })
 
-t('Copy from file works', async() => {
+t('Copy from file', async() => {
   await sql`create table test (x int, y int, z int)`
   await new Promise(async r => fs
     .createReadStream(rel('copy.csv'))
@@ -1680,7 +1667,7 @@ t('Copy from works in transaction', async() => {
   ]
 })
 
-t('Copy from abort works', async() => {
+t('Copy from abort', async() => {
   const sql = postgres(options)
   const readable = fs.createReadStream(rel('copy.csv'))
 
@@ -1750,10 +1737,10 @@ t('subscribe', { timeout: 2 }, async() => {
   await sql`insert into test (name) values ('Murray')`
   await sql`update test set name = 'Rothbard'`
   await sql`delete from test`
-  await delay(100)
+  await delay(10)
   await unsubscribe()
   await sql`insert into test (name) values ('Oh noes')`
-  await delay(100)
+  await delay(10)
   return [
     'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
     result.join(','),
@@ -1763,7 +1750,7 @@ t('subscribe', { timeout: 2 }, async() => {
   ]
 })
 
-t('Execute works', async() => {
+t('Execute', async() => {
   const result = await new Promise((resolve) => {
     const sql = postgres({ ...options, fetch_types: false, debug:(id, query) => resolve(query) })
     sql`select 1`.execute()
@@ -1772,24 +1759,24 @@ t('Execute works', async() => {
   return [result, 'select 1']
 })
 
-t('Cancel running query works', async() => {
+t('Cancel running query', async() => {
   const query = sql`select pg_sleep(2)`
   setTimeout(() => query.cancel(), 50)
   const error = await query.catch(x => x)
   return ['57014', error.code]
 })
 
-t('Cancel piped query works', { timeout: 1 }, async() => {
+t('Cancel piped query', { timeout: 1 }, async() => {
   await sql`select 1`
-  const last = sql`select pg_sleep(0.3)`.execute()
+  const last = sql`select pg_sleep(0.1)`.execute()
   const query = sql`select pg_sleep(2) as dig`
-  setTimeout(() => query.cancel(), 100)
+  setTimeout(() => query.cancel(), 50)
   const error = await query.catch(x => x)
   await last
   return ['57014', error.code]
 })
 
-t('Cancel queued query works', async() => {
+t('Cancel queued query', async() => {
   const tx = sql.begin(sql => sql`select pg_sleep(0.2) as hej, 'hejsa'`)
   const query = sql`select pg_sleep(2) as nej`
   setTimeout(() => query.cancel(), 100)
@@ -1946,10 +1933,10 @@ t('Catches type parse errors in transactions', async() => {
 })
 
 t('Prevent premature end of connection in transaction', async() => {
-  const sql = postgres({ max_lifetime: 0.1, idle_timeout })
+  const sql = postgres({ max_lifetime: 0.01, idle_timeout })
   const result = await sql.begin(async sql => {
     await sql`select 1`
-    await delay(200)
+    await delay(20)
     await sql`select 1`
     return 'yay'
   })
@@ -1974,7 +1961,7 @@ t('Ensure reconnect after max_lifetime with transactions', { timeout: 5 }, async
   return [true, true]
 })
 
-t('Custom socket works', {}, async() => {
+t('Custom socket', {}, async() => {
   let result
   const sql = postgres({
     socket: () => new Promise((resolve, reject) => {
