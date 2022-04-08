@@ -686,6 +686,23 @@ Connections are created lazily once a query is created. This means that simply d
 
 > No connection will be made until a query is made.
 
+For example:
+
+```js
+const sql = postgres() // no connections are opened
+
+await sql`...` // one connection is now opened
+await sql`...` // previous opened connection is reused
+
+// two connections are opened now
+await Promise.all([
+  sql`...`,
+  sql`...`
+])
+```
+
+> When there are high amount of concurrent queries, `postgres` will open as many connections as needed up until `max` number of connections is reached. By default `max` is 10. This can be changed by setting `max` in the `postgres()` call. Example - `postgres('connectionURL', { max: 20 })`.
+
 This means that we get a much simpler story for error handling and reconnections. Queries will be sent over the wire immediately on the next available connection in the pool. Connections are automatically taken out of the pool if you start a transaction using `sql.begin()`, and automatically returned to the pool once your transaction is done.
 
 Any query which was already sent over the wire will be rejected if the connection is lost. It'll automatically defer to the error handling you have for that query, and since connections are lazy it'll automatically try to reconnect the next time a query is made. The benefit of this is no weird generic "onerror" handler that tries to get things back to normal, and also simpler application code since you don't have to handle errors out of context.
