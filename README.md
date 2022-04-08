@@ -522,14 +522,13 @@ Do note that you can often achieve the same result using [`WITH` queries (Common
 
 `postgres.js` comes with a number of built-in data transformation functions that can be used to transform the data returned from a query or when inserting data. They are available under `transformation` option in the `postgres()` function connection options.
 
-Like - `postgres('connectionURL', {transformation: {...}})`
+Like - `postgres('connectionURL', { transformation: {...} })`
 
 ### Parameters
 * `to`: The function to transform the outgoing query column name to, i.e ``SELECT ${ sql('aName') }` to `SELECT a_name` when using `postgres.toCamel`.
 * `from`: The function to transform the incoming query result column name to, see example below.
 
 > Both parameters are optional, if not provided, the default transformation function will be used.
-
 
 Built in transformation functions are:
 * For camelCase - `postgres.toCamel` and `postgres.fromCamel`
@@ -539,12 +538,11 @@ Built in transformation functions are:
 These functions can be passed in as options when calling `postgres()`. For example -
 ```js
 // this will tranform the column names to camel case back and forth
-
 (async function () {
-	const sql = postgres('connectionURL', { transform: { column: { to: postgres.fromCamel, from: postgres.toCamel } }});
+  const sql = postgres('connectionURL', { transform: { column: { to: postgres.fromCamel, from: postgres.toCamel } }});
   await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER, b_test TEXT)`;
   await sql`INSERT INTO camel_case ${ sql([{ aTest: 1, bTest: 1 }]) }`
-	const data = await sql`SELECT ${ sql('aTest', 'bTest') } FROM camel_case`;
+  const data = await sql`SELECT ${ sql('aTest', 'bTest') } FROM camel_case`;
   console.log(data) // [ { aTest: 1, bTest: '1' } ]
   process.exit(1)
 })();
