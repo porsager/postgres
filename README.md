@@ -68,7 +68,7 @@ async function insertUser({ name, age }) {
 * [Building queries](#building-queries)
 * [Advanced query methods](#advanced-query-methods)
 * [Transactions](#transactions)
-- [Data Transformation](#data-transformation)
+* [Data Transformation](#data-transformation)
 * [Listen & notify](#listen--notify)
 * [Realtime subscribe](#realtime-subscribe)
 * [Numbers, bigint, numeric](#numbers-bigint-numeric)
