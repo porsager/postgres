@@ -68,6 +68,7 @@ async function insertUser({ name, age }) {
 * [Building queries](#building-queries)
 * [Advanced query methods](#advanced-query-methods)
 * [Transactions](#transactions)
+- [Data Transformation](#data-transformation)
 * [Listen & notify](#listen--notify)
 * [Realtime subscribe](#realtime-subscribe)
 * [Numbers, bigint, numeric](#numbers-bigint-numeric)
@@ -516,6 +517,40 @@ sql.begin('read write', async sql => {
 ```
 
 Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
+
+## Data Transformation
+
+`postgres.js` comes with a number of built-in data transformation functions that can be used to transform the data returned from a query or when inserting data. They are available under `transformation` option in the `postgres()` function connection options.
+
+Like - `postgres('connectionURL', {transformation: {...}})`
+
+### Parameters
+* `to`: The function to transform the outgoing query column name to, i.e `SELECT aName` to `SELECT a_name` when using `postgres.toCamel`.
+* `from`: The function to transform the incoming query column name to, i.e `SELECT a_name` to `SELECT aName` when using `postgres.fromCamel`.
+
+> Both parameters are optional, if not provided, the default transformation function will be used.
+
+
+Built in transformation functions are:
+* For camelCase - `postgres.toCamel` and `postgres.fromCamel`
+* For PascalCase - `postgres.toPascal` and `postgres.fromPascal`
+* For Kebab-Case - `postgres.toKebab` and `postgres.fromKebab`
+
+These functions can be passed in as options when calling `postgres()`. For example -
+```js
+// this will tranform the column names to camel case back and forth
+
+(async function () {
+	const sql = postgres('connectionURL', { transform: { column: { to: postgres.fromCamel, from: postgres.toCamel } }});
+  await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER, b_test TEXT)`;
+  await sql`INSERT INTO camel_case ${ sql([{ aTest: 1, bTest: 1 }]) }`
+	const data = await sql`SELECT ${ sql('aTest', 'bTest') } FROM camel_case`;
+  console.log(data) // [ { aTest: 1, bTest: '1' } ]
+  process.exit(1)
+})();
+```
+
+> Note that if a column name is originally registered as snake_case in the database then to tranform it from camelCase to snake_case when querying, the column camelCase name must be put in `sql('columnName')` as it's done in the above example.
 
 ## Listen & notify
 
