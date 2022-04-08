@@ -550,7 +550,7 @@ These functions can be passed in as options when calling `postgres()`. For examp
 })();
 ```
 
-> Note that if a column name is originally registered as snake_case in the database then to tranform it from camelCase to snake_case when querying, the column camelCase name must be put in `sql('columnName')` as it's done in the above example.
+> Note that if a column name is originally registered as snake_case in the database then to tranform it from camelCase to snake_case when querying or inserting, the column camelCase name must be put in `sql('columnName')` as it's done in the above example.
 
 ## Listen & notify
 
