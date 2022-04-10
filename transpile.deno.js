@@ -13,7 +13,11 @@ ensureEmpty(src)
 ensureEmpty(types)
 ensureEmpty(tests)
 
-fs.writeFileSync(path.join(types, 'index.d.ts'), fs.readFileSync(path.join('types', 'index.d.ts')))
+fs.writeFileSync(
+  path.join(types, 'index.d.ts'),
+  transpile(fs.readFileSync(path.join('types', 'index.d.ts'), 'utf8'), 'index.d.ts', 'types')
+)
+
 fs.writeFileSync(
   path.join(root, 'README.md'),
   fs.readFileSync('README.md', 'utf8')
@@ -54,6 +58,10 @@ function transpile(x, name, folder) {
       x += '\n;window.addEventListener("unload", () => Deno.exit(process.exitCode))'
   }
 
+  const stream = x.includes('import(\'node:stream\')')
+    ? 'import { Readable, Writable } from \'' + std + 'node/stream.ts\'\n'
+    : ''
+
   const buffer = x.includes('Buffer')
     ? 'import { Buffer } from \'' + std + 'node/buffer.ts\'\n'
     : ''
@@ -70,7 +78,7 @@ function transpile(x, name, folder) {
     ? 'import { HmacSha256 } from \'' + std + 'hash/sha256.ts\'\n'
     : ''
 
-  return hmac + buffer + process + timers + x
+  return hmac + buffer + process + stream + timers + x
     .replace(
       /setTimeout\((.*)\)\.unref\(\)/g,
       '(window.timer = setTimeout($1), Deno.unrefTimer(window.timer), window.timer)'
@@ -84,6 +92,7 @@ function transpile(x, name, folder) {
       '(query.writable.push({ chunk }), callback())'
     )
     .replace(/.setKeepAlive\([^)]+\)/g, '')
+    .replace(/import\('node:stream'\)\./g, '')
     .replace(/import net from 'net'/, 'import { net } from \'../polyfills.js\'')
     .replace(/import tls from 'tls'/, 'import { tls } from \'../polyfills.js\'')
     .replace(/ from '([a-z_]+)'/g, ' from \'' + std + 'node/$1.ts\'')
