@@ -961,6 +961,15 @@ t('dynamic select array', async() => {
   return ['yay', (await sql`select ${ sql(['a', 'b']) } from test`)[0].b, await sql`drop table test`]
 })
 
+t('dynamic returning array', async() => {
+  await sql`create table test (a int, b text)`
+  return [
+    'yay',
+    (await sql`insert into test (a, b) values (42, 'yay') returning ${ sql(['a', 'b']) }`)[0].b,
+    await sql`drop table test`
+  ]
+})
+
 t('dynamic select args', async() => {
   await sql`create table test (a int, b text)`
   await sql`insert into test (a, b) values (42, 'yay')`

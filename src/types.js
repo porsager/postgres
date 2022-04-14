@@ -110,32 +110,34 @@ function values(first, rest, parameters, types, transform) {
   return valuesBuilder(multi ? first : [first], parameters, types, transform, columns)
 }
 
+function select(first, rest, parameters, types, transform) {
+  typeof first === 'string' && (first = [first].concat(rest))
+  if (Array.isArray(first))
+    return first.map(x => escapeIdentifier(transform.column.to ? transform.column.to(x) : x)).join(',')
+
+  let value
+  const columns = rest.length ? rest.flat() : Object.keys(first)
+  return columns.map(x => {
+    value = first[x]
+    return (
+      value instanceof Query ? value.strings[0] :
+      value instanceof Identifier ? value.value :
+      handleValue(value, parameters, types)
+    ) + ' as ' + escapeIdentifier(transform.column.to ? transform.column.to(x) : x)
+  }).join(',')
+}
+
 const builders = Object.entries({
   values,
   in: values,
+  select,
+  returning: select,
 
   update(first, rest, parameters, types, transform) {
     return (rest.length ? rest.flat() : Object.keys(first)).map(x =>
       escapeIdentifier(transform.column.to ? transform.column.to(x) : x) +
       '=' + handleValue(first[x], parameters, types)
     )
-  },
-
-  select(first, rest, parameters, types, transform) {
-    typeof first === 'string' && (first = [first].concat(rest))
-    if (Array.isArray(first))
-      return first.map(x => escapeIdentifier(transform.column.to ? transform.column.to(x) : x)).join(',')
-
-    let value
-    const columns = rest.length ? rest.flat() : Object.keys(first)
-    return columns.map(x => {
-      value = first[x]
-      return (
-        value instanceof Query ? value.strings[0] :
-        value instanceof Identifier ? value.value :
-        handleValue(value, parameters, types)
-      ) + ' as ' + escapeIdentifier(transform.column.to ? transform.column.to(x) : x)
-    }).join(',')
   },
 
   insert(first, rest, parameters, types, transform) {
