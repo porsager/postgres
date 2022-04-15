@@ -1,5 +1,6 @@
 import { HmacSha256 } from 'https://deno.land/std@0.132.0/hash/sha256.ts'
 import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
+import process from 'https://deno.land/std@0.132.0/node/process.ts'
 import { setImmediate, clearImmediate } from '../polyfills.js'
 import { net } from '../polyfills.js'
 import { tls } from '../polyfills.js'
@@ -362,7 +363,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function reconnect() {
-    setTimeout(connect, closedDate ? closedDate + delay - Date.now() : 0)
+    setTimeout(connect, closedDate ? closedDate + delay - Number(process.hrtime.bigint() / 1000000n) : 0)
   }
 
   function connected() {
@@ -449,7 +450,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return reconnect()
 
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
-    closedDate = Date.now()
+    closedDate = Number(process.hrtime.bigint() / 1000000n)
     hadError && options.shared.retries++
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
     onclose(connection)

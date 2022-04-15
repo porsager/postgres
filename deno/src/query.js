@@ -118,6 +118,7 @@ export class Query extends Promise {
 
   forEach(fn) {
     this.forEachFn = fn
+    this.handle()
     return this
   }
 
