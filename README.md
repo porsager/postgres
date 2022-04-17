@@ -525,7 +525,7 @@ Do note that you can often achieve the same result using [`WITH` queries (Common
 Like - `postgres('connectionURL', { transformation: {...} })`
 
 ### Parameters
-* `to`: The function to transform the outgoing query column name to, i.e ``SELECT ${ sql('aName') }` to `SELECT a_name` when using `postgres.toCamel`.
+* `to`: The function to transform the outgoing query column name to, i.e `SELECT ${ sql('aName') }` to `SELECT a_name` when using `postgres.toCamel`.
 * `from`: The function to transform the incoming query result column name to, see example below.
 
 > Both parameters are optional, if not provided, the default transformation function will be used.
