@@ -130,7 +130,7 @@ const xs = await sql`
 
 ### Query parameters
 
-Parameters are automatically extracted and handled by the database so that SQL injection isn't possible. No special handling is necessary, simply use tagged template literals as usual. **Dynamic queries and query building can be seen in the [next section]()**. // todo
+Parameters are automatically extracted and handled by the database so that SQL injection isn't possible. No special handling is necessary, simply use tagged template literals as usual.
 
 ```js
 const name = 'Mur'
