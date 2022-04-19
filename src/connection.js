@@ -420,7 +420,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (socket) {
       socket.removeListener('data', data)
       socket.removeListener('connect', connected)
-      socket.readyState !== 'closed' && socket.end(b().X().end())
+      socket.readyState === 'open' && socket.end(b().X().end())
     }
     ended && (ended(), ending = ended = null)
   }
