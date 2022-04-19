@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.0.6] - 19 Apr 2022
+- Properly close connections in Deno  cbc6a75
+- Only write end message if socket is open  13950af
+- Improve query cancellation  01c2c68
+- Use monotonically increasing time for timeout - fixes #316  9d7a21d
+- Add support for dynamic columns with `returning` - fixes #317  04644c0
+- Fix type errors in TypeScript deno projects (#313)  822fb21
+- Execute forEach instantly  44e9fbe
+
 ## [3.0.5] - 6 Apr 2022
 - Fix transaction execution timing  28bb0b3
 - Add optional onlisten function to listen  1dc2fd2
