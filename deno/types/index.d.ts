@@ -433,12 +433,12 @@ declare namespace postgres {
     writable(options?: {
       highWaterMark?: number,
       start?: number
-    }): Promise<Writable>;
+    }): Promise<import('node:stream').Writable>;
     readable(options?: {
       highWaterMark?: number,
       start?: number,
       end?: number
-    }): Promise<Readable>;
+    }): Promise<import('node:stream').Readable>;
 
     close(): Promise<void>;
     tell(): Promise<void>;
@@ -518,8 +518,8 @@ declare namespace postgres {
   type RowList<T extends readonly any[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
 
   interface PendingQueryModifiers<TRow extends readonly any[]> {
-    readable(): Readable;
-    writable(): Writable;
+    readable(): import('node:stream').Readable;
+    writable(): import('node:stream').Writable;
 
     execute(): this;
     cancel(): void;

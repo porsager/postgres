@@ -1776,16 +1776,16 @@ t('Execute', async() => {
 
 t('Cancel running query', async() => {
   const query = sql`select pg_sleep(2)`
-  setTimeout(() => query.cancel(), 50)
+  setTimeout(() => query.cancel(), 200)
   const error = await query.catch(x => x)
   return ['57014', error.code]
 })
 
 t('Cancel piped query', async() => {
   await sql`select 1`
-  const last = sql`select pg_sleep(0.05)`.execute()
+  const last = sql`select pg_sleep(0.2)`.execute()
   const query = sql`select pg_sleep(2) as dig`
-  setTimeout(() => query.cancel(), 10)
+  setTimeout(() => query.cancel(), 100)
   const error = await query.catch(x => x)
   await last
   return ['57014', error.code]
