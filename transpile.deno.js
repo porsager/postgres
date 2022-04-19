@@ -80,10 +80,6 @@ function transpile(x, name, folder) {
 
   return hmac + buffer + process + stream + timers + x
     .replace(
-      /setTimeout\((.*)\)\.unref\(\)/g,
-      '(window.timer = setTimeout($1), Deno.unrefTimer(window.timer), window.timer)'
-    )
-    .replace(
       'crypto.createHmac(\'sha256\', key).update(x).digest()',
       'Buffer.from(new HmacSha256(key).update(x).digest())'
     )
@@ -92,7 +88,6 @@ function transpile(x, name, folder) {
       '(query.writable.push({ chunk }), callback())'
     )
     .replace(/.setKeepAlive\([^)]+\)/g, '')
-    .replace(/import\('node:stream'\)\./g, '')
     .replace(/import net from 'net'/, 'import { net } from \'../polyfills.js\'')
     .replace(/import tls from 'tls'/, 'import { tls } from \'../polyfills.js\'')
     .replace(/ from '([a-z_]+)'/g, ' from \'' + std + 'node/$1.ts\'')

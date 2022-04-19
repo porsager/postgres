@@ -1011,7 +1011,7 @@ function timer(fn, seconds) {
     },
     start() {
       timer && clearTimeout(timer)
-      timer = setTimeout(done, seconds * 1000, arguments).unref()
+      timer = setTimeout(done, seconds * 1000, arguments)
     }
   }
 
