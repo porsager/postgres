@@ -75,6 +75,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       , connectTimer = timer(connectTimedOut, options.connect_timeout)
 
   let socket = null
+    , cancelMessage
     , result = new Result()
     , incoming = Buffer.alloc(0)
     , needsTypes = options.fetch_types
@@ -139,16 +140,14 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   async function cancel({ pid, secret }, resolve, reject) {
-    socket || (socket = await createSocket())
-    if (!socket)
-      return
-
-    socket.removeAllListeners()
-    socket = net.Socket()
-    socket.on('connect', () => socket.write(b().i32(16).i32(80877102).i32(pid).i32(secret).end(16)))
-    socket.once('error', reject)
-    socket.once('close', resolve)
-    connect()
+    try {
+      cancelMessage = b().i32(16).i32(80877102).i32(pid).i32(secret).end(16)
+      await connect()
+      socket.once('error', reject)
+      socket.once('close', resolve)
+    } catch (error) {
+      reject(error)
+    }
   }
 
   function execute(q) {
@@ -955,7 +954,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function StartupMessage() {
-    return b().inc(4).i16(3).z(2).str(
+    return cancelMessage || b().inc(4).i16(3).z(2).str(
       Object.entries(Object.assign({
         user,
         database,
