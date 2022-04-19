@@ -28,9 +28,10 @@ export const net = {
     const socket = {
       error,
       success,
-      readyState: 'closed',
+      readyState: 'open',
       connect: (port, hostname) => {
         socket.raw = null
+        socket.readyState = 'connecting'
         typeof port === 'string'
           ? Deno.connect({ transport: 'unix', path: socket.path = port }).then(success, error)
           : Deno.connect({ transport: 'tcp', port: socket.port = port, hostname: socket.hostname = hostname || 'localhost' }).then(success, error) // eslint-disable-line
@@ -72,15 +73,21 @@ export const net = {
         return false
       },
       destroy: () => close(true),
-      end: close
+      end: (x) => {
+        x && socket.write(x)
+        close()
+      }
     }
 
     return socket
 
     async function success(raw) {
+      if (socket.readyState !== 'connecting')
+        return raw.close()
+
       const encrypted = socket.encrypted
-      socket.readyState = 'open'
       socket.raw = raw
+      socket.readyState = 'open'
       socket.encrypted
         ? call(socket.events.secureConnect)
         : call(socket.events.connect)
@@ -115,10 +122,10 @@ export const net = {
     }
 
     function closed() {
-      socket.break = socket.encrypted = false
-      if (socket.readyState !== 'open')
+      if (socket.readyState === 'closed')
         return
 
+      socket.break = socket.encrypted = false
       call(socket.events.close)
       socket.readyState = 'closed'
     }
@@ -139,6 +146,7 @@ export const net = {
 export const tls = {
   connect({ socket, ...options }) {
     socket.encrypted = true
+    socket.readyState = 'connecting'
     Deno.startTls(socket.raw, { hostname: socket.hostname, ...options })
       .then(socket.success, socket.error)
     socket.raw = null
