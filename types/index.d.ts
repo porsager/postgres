@@ -1,3 +1,5 @@
+import { Readable, Writable } from 'node:stream'
+
 /**
  * Establish a connection to a PostgreSQL server.
  * @param options Connection options - default to the same as psql
@@ -430,12 +432,12 @@ declare namespace postgres {
     writable(options?: {
       highWaterMark?: number,
       start?: number
-    }): Promise<import('node:stream').Writable>;
+    }): Promise<Writable>;
     readable(options?: {
       highWaterMark?: number,
       start?: number,
       end?: number
-    }): Promise<import('node:stream').Readable>;
+    }): Promise<Readable>;
 
     close(): Promise<void>;
     tell(): Promise<void>;
@@ -515,8 +517,8 @@ declare namespace postgres {
   type RowList<T extends readonly any[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
 
   interface PendingQueryModifiers<TRow extends readonly any[]> {
-    readable(): import('node:stream').Readable;
-    writable(): import('node:stream').Writable;
+    readable(): Readable;
+    writable(): Writable;
 
     execute(): this;
     cancel(): void;
