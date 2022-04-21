@@ -319,6 +319,16 @@ t('Undefined values throws', async() => {
   return ['UNDEFINED_VALUE', error]
 })
 
+t('Transform undefined', async() => {
+  const sql = postgres({ transform: { undefined: null } })
+  return [null, (await sql`select ${ undefined } as x`)[0].x]
+})
+
+t('Transform undefined in array', async() => {
+  const sql = postgres({ transform: { undefined: null } })
+  return [null, (await sql`select * from (values ${ sql([undefined, undefined]) }) as x(x, y)`)[0].y]
+})
+
 t('Null sets to null', async() =>
   [null, (await sql`select ${ null } as x`)[0].x]
 )

@@ -73,10 +73,16 @@ export class Builder extends NotTagged {
   }
 }
 
-export function handleValue(x, parameters, types) {
-  const value = x instanceof Parameter ? x.value : x
-  if (value === undefined)
-    throw Errors.generic('UNDEFINED_VALUE', 'Undefined values are not allowed')
+export function handleValue(x, parameters, types, options) {
+  let value = x instanceof Parameter ? x.value : x
+  if (value === undefined) {
+    x instanceof Parameter
+      ? x.value = options.transform.undefined
+      : value = x = options.transform.undefined
+
+    if (value === undefined)
+      throw Errors.generic('UNDEFINED_VALUE', 'Undefined values are not allowed')
+  }
 
   return '$' + (types.push(
     x instanceof Parameter

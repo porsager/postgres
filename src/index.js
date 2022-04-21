@@ -397,7 +397,7 @@ function parseOptions(a, b) {
     onnotify        : o.onnotify,
     onclose         : o.onclose,
     onparameter     : o.onparameter,
-    transform       : parseTransform(o.transform || {}),
+    transform       : parseTransform(o.transform || { undefined: undefined }),
     connection      : Object.assign({ application_name: 'postgres.js' }, o.connection),
     target_session_attrs: tsa(o, url, env),
     debug           : o.debug,
@@ -429,6 +429,7 @@ function max_lifetime() {
 
 function parseTransform(x) {
   return {
+    undefined: x.undefined,
     column: {
       from: typeof x.column === 'function' ? x.column : x.column && x.column.from,
       to: x.column && x.column.to
