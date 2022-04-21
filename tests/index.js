@@ -2007,3 +2007,32 @@ t('Ensure drain only dequeues if ready', async() => {
 
   return [res.length, 2]
 })
+
+t('Supports fragments as dynamic parameters', async() => {
+  await sql`create table test (a int, b bool)`
+  await sql`insert into test values(1, true)`
+  await sql`insert into test ${
+    sql({
+      a: 2,
+      b: sql`exists(select 1 from test where b = ${ true })`
+    })
+  }`
+
+  return [
+    '1,t2,t',
+    (await sql`select * from test`.raw()).join(''),
+    await sql`drop table test`
+  ]
+})
+
+t('Supports nested fragments with parameters', async() => {
+  await sql`create table test ${
+    sql`(${ sql('a') } ${ sql`int` })`
+  }`
+  await sql`insert into test values(1)`
+  return [
+    1,
+    (await sql`select a from test`)[0].a,
+    await sql`drop table test`
+  ]
+})
