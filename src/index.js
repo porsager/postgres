@@ -42,7 +42,7 @@ export default Postgres
 
 function Postgres(a, b) {
   const options = parseOptions(a, b)
-      , subscribe = Subscribe(Postgres, { ...options })
+      , subscribe = options.no_subscribe || Subscribe(Postgres, { ...options })
 
   let ending = false
 

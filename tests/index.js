@@ -320,12 +320,12 @@ t('Undefined values throws', async() => {
 })
 
 t('Transform undefined', async() => {
-  const sql = postgres({ transform: { undefined: null } })
+  const sql = postgres({ ...options, transform: { undefined: null } })
   return [null, (await sql`select ${ undefined } as x`)[0].x]
 })
 
 t('Transform undefined in array', async() => {
-  const sql = postgres({ transform: { undefined: null } })
+  const sql = postgres({ ...options, transform: { undefined: null } })
   return [null, (await sql`select * from (values ${ sql([undefined, undefined]) }) as x(x, y)`)[0].y]
 })
 
@@ -1771,6 +1771,47 @@ t('subscribe', { timeout: 2 }, async() => {
   return [
     'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
     result.join(','),
+    await sql`drop table test`,
+    await sql`drop publication alltables`,
+    await sql.end()
+  ]
+})
+
+t('subscribe reconnects and calls onsubscribe', { timeout: 4 }, async() => {
+  const sql = postgres({
+    database: 'postgres_js_test',
+    publications: 'alltables',
+    fetch_types: false
+  })
+
+  await sql.unsafe('create publication alltables for all tables')
+
+  const result = []
+  let onsubscribes = 0
+
+  const { unsubscribe, sql: subscribeSql } = await sql.subscribe(
+    '*',
+    (row, { command, old }) => result.push(command, row.name || row.id, old && old.name),
+    () => onsubscribes++
+  )
+
+  await sql`
+    create table test (
+      id serial primary key,
+      name text
+    )
+  `
+
+  await sql`insert into test (name) values ('Murray')`
+  await delay(10)
+  await subscribeSql.close()
+  await delay(500)
+  await sql`delete from test`
+  await delay(10)
+  await unsubscribe()
+  return [
+    '2insert,Murray,,delete,1,',
+    onsubscribes + result.join(','),
     await sql`drop table test`,
     await sql`drop publication alltables`,
     await sql.end()

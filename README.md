@@ -607,8 +607,15 @@ CREATE PUBLICATION alltables FOR ALL TABLES
 ```js
 const sql = postgres({ publications: 'alltables' })
 
-const { unsubscribe } = await sql.subscribe('insert:events', (row, { command, relation, key, old }) =>
-  // tell about new event row over eg. websockets or do something else
+const { unsubscribe } = await sql.subscribe(
+  'insert:events', 
+  function(row, { command, relation, key, old }) => {
+    // Callback function for each row change
+    // tell about new event row over eg. websockets or do something else
+  },
+  function onsubscribe() => {
+    // Callback on initial connect and potential reconnects
+  }
 )
 ```
 
