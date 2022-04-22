@@ -319,6 +319,16 @@ t('Undefined values throws', async() => {
   return ['UNDEFINED_VALUE', error]
 })
 
+t('Transform undefined', async() => {
+  const sql = postgres({ ...options, transform: { undefined: null } })
+  return [null, (await sql`select ${ undefined } as x`)[0].x]
+})
+
+t('Transform undefined in array', async() => {
+  const sql = postgres({ ...options, transform: { undefined: null } })
+  return [null, (await sql`select * from (values ${ sql([undefined, undefined]) }) as x(x, y)`)[0].y]
+})
+
 t('Null sets to null', async() =>
   [null, (await sql`select ${ null } as x`)[0].x]
 )
@@ -1600,6 +1610,10 @@ t('Raw method returns values unparsed as Buffer', async() => {
   ]
 })
 
+t('Array returns rows as arrays of columns', async() => {
+  return [(await sql`select 1`.values())[0][0], 1]
+})
+
 t('Copy read', async() => {
   const result = []
 
@@ -1757,6 +1771,47 @@ t('subscribe', { timeout: 2 }, async() => {
   return [
     'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
     result.join(','),
+    await sql`drop table test`,
+    await sql`drop publication alltables`,
+    await sql.end()
+  ]
+})
+
+t('subscribe reconnects and calls onsubscribe', { timeout: 4 }, async() => {
+  const sql = postgres({
+    database: 'postgres_js_test',
+    publications: 'alltables',
+    fetch_types: false
+  })
+
+  await sql.unsafe('create publication alltables for all tables')
+
+  const result = []
+  let onsubscribes = 0
+
+  const { unsubscribe, sql: subscribeSql } = await sql.subscribe(
+    '*',
+    (row, { command, old }) => result.push(command, row.name || row.id, old && old.name),
+    () => onsubscribes++
+  )
+
+  await sql`
+    create table test (
+      id serial primary key,
+      name text
+    )
+  `
+
+  await sql`insert into test (name) values ('Murray')`
+  await delay(10)
+  await subscribeSql.close()
+  await delay(500)
+  await sql`delete from test`
+  await delay(10)
+  await unsubscribe()
+  return [
+    '2insert,Murray,,delete,1,',
+    onsubscribes + result.join(','),
     await sql`drop table test`,
     await sql`drop publication alltables`,
     await sql.end()
@@ -2006,4 +2061,33 @@ t('Ensure drain only dequeues if ready', async() => {
   ])
 
   return [res.length, 2]
+})
+
+t('Supports fragments as dynamic parameters', async() => {
+  await sql`create table test (a int, b bool)`
+  await sql`insert into test values(1, true)`
+  await sql`insert into test ${
+    sql({
+      a: 2,
+      b: sql`exists(select 1 from test where b = ${ true })`
+    })
+  }`
+
+  return [
+    '1,t2,t',
+    (await sql`select * from test`.raw()).join(''),
+    await sql`drop table test`
+  ]
+})
+
+t('Supports nested fragments with parameters', async() => {
+  await sql`create table test ${
+    sql`(${ sql('a') } ${ sql`int` })`
+  }`
+  await sql`insert into test values(1)`
+  return [
+    1,
+    (await sql`select a from test`)[0].a,
+    await sql`drop table test`
+  ]
 })

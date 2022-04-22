@@ -64,19 +64,25 @@ const Builder = module.exports.Builder = class Builder extends NotTagged {
     this.rest = rest
   }
 
-  build(before, parameters, types, transform) {
+  build(before, parameters, types, options) {
     const keyword = builders.map(([x, fn]) => ({ fn, i: before.search(x) })).sort((a, b) => a.i - b.i).pop()
     if (keyword.i === -1)
       throw new Error('Could not infer helper mode')
 
-    return keyword.fn(this.first, this.rest, parameters, types, transform)
+    return keyword.fn(this.first, this.rest, parameters, types, options)
   }
 }
 
-module.exports.handleValue = handleValue;function handleValue(x, parameters, types) {
-  const value = x instanceof Parameter ? x.value : x
-  if (value === undefined)
-    throw Errors.generic('UNDEFINED_VALUE', 'Undefined values are not allowed')
+module.exports.handleValue = handleValue;function handleValue(x, parameters, types, options) {
+  let value = x instanceof Parameter ? x.value : x
+  if (value === undefined) {
+    x instanceof Parameter
+      ? x.value = options.transform.undefined
+      : value = x = options.transform.undefined
+
+    if (value === undefined)
+      throw Errors.generic('UNDEFINED_VALUE', 'Undefined values are not allowed')
+  }
 
   return '$' + (types.push(
     x instanceof Parameter
@@ -90,40 +96,59 @@ module.exports.handleValue = handleValue;function handleValue(x, parameters, typ
 
 const defaultHandlers = typeHandlers(types)
 
-function valuesBuilder(first, parameters, types, transform, columns) {
+module.exports.stringify = stringify;function stringify(q, string, value, parameters, types, options) { // eslint-disable-line
+  for (let i = 1; i < q.strings.length; i++) {
+    string += (
+      value instanceof Query ? fragment(value, parameters, types) :
+      value instanceof Identifier ? value.value :
+      value instanceof Builder ? value.build(string, parameters, types, options) :
+      handleValue(value, parameters, types, options)
+    ) + q.strings[i]
+    value = q.args[i]
+  }
+
+  return string
+}
+
+function fragment(q, parameters, types) {
+  q.fragment = true
+  return stringify(q, q.strings[0], q.args[0], parameters, types)
+}
+
+function valuesBuilder(first, parameters, types, columns, options) {
   let value
   return first.map(row =>
     '(' + columns.map(column => {
       value = row[column]
       return (
-        value instanceof Query ? value.strings[0] :
+        value instanceof Query ? fragment(value, parameters, types) :
         value instanceof Identifier ? value.value :
-        handleValue(value, parameters, types)
+        handleValue(value, parameters, types, options)
       )
     }).join(',') + ')'
   ).join(',')
 }
 
-function values(first, rest, parameters, types, transform) {
+function values(first, rest, parameters, types, options) {
   const multi = Array.isArray(first[0])
   const columns = rest.length ? rest.flat() : Object.keys(multi ? first[0] : first)
-  return valuesBuilder(multi ? first : [first], parameters, types, transform, columns)
+  return valuesBuilder(multi ? first : [first], parameters, types, columns, options)
 }
 
-function select(first, rest, parameters, types, transform) {
+function select(first, rest, parameters, types, options) {
   typeof first === 'string' && (first = [first].concat(rest))
   if (Array.isArray(first))
-    return first.map(x => escapeIdentifier(transform.column.to ? transform.column.to(x) : x)).join(',')
+    return first.map(x => escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x)).join(',')
 
   let value
   const columns = rest.length ? rest.flat() : Object.keys(first)
   return columns.map(x => {
     value = first[x]
     return (
-      value instanceof Query ? value.strings[0] :
+      value instanceof Query ? fragment(value, parameters, types) :
       value instanceof Identifier ? value.value :
-      handleValue(value, parameters, types)
-    ) + ' as ' + escapeIdentifier(transform.column.to ? transform.column.to(x) : x)
+      handleValue(value, parameters, types, options)
+    ) + ' as ' + escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x)
   }).join(',')
 }
 
@@ -133,19 +158,19 @@ const builders = Object.entries({
   select,
   returning: select,
 
-  update(first, rest, parameters, types, transform) {
+  update(first, rest, parameters, types, options) {
     return (rest.length ? rest.flat() : Object.keys(first)).map(x =>
-      escapeIdentifier(transform.column.to ? transform.column.to(x) : x) +
-      '=' + handleValue(first[x], parameters, types)
+      escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x) +
+      '=' + handleValue(first[x], parameters, types, options)
     )
   },
 
-  insert(first, rest, parameters, types, transform) {
+  insert(first, rest, parameters, types, options) {
     const columns = rest.length ? rest.flat() : Object.keys(Array.isArray(first) ? first[0] : first)
     return '(' + columns.map(x =>
-      escapeIdentifier(transform.column.to ? transform.column.to(x) : x)
+      escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x)
     ).join(',') + ')values' +
-    valuesBuilder(Array.isArray(first) ? first : [first], parameters, types, transform, columns)
+    valuesBuilder(Array.isArray(first) ? first : [first], parameters, types, columns, options)
   }
 }).map(([x, fn]) => ([new RegExp('(^|[\\s(])' + x + '($|[\\s(])', 'i'), fn]))
 

@@ -1,58 +1,89 @@
+const noop = () => { /* noop */ }
+
 module.exports = Subscribe;function Subscribe(postgres, options) {
-  const listeners = new Map()
+  const subscribers = new Map()
+      , slot = 'postgresjs_' + Math.random().toString(36).slice(2)
+      , state = {}
 
   let connection
+    , stream
+    , ended = false
 
-  return async function subscribe(event, fn) {
-    event = parseEvent(event)
-
-    options.max = 1
-    options.onclose = onclose
-    options.fetch_types = false
-    options.connection = {
+  const sql = subscribe.sql = postgres({
+    ...options,
+    max: 1,
+    fetch_types: false,
+    idle_timeout: null,
+    max_lifetime: null,
+    connection: {
       ...options.connection,
       replication: 'database'
-    }
+    },
+    onclose: async function() {
+      if (ended)
+        return
+      stream = null
+      state.pid = state.secret = undefined
+      !ended && connected(await init(sql, slot, options.publications))
+      subscribers.forEach(event => event.forEach(({ onsubscribe }) => onsubscribe()))
+    },
+    no_subscribe: true
+  })
 
-    let stream
-      , ended = false
+  const end = sql.end
+      , close = sql.close
 
-    const sql = postgres(options)
-        , slot = 'postgresjs_' + Math.random().toString(36).slice(2)
-        , end = sql.end
+  sql.end = async() => {
+    ended = true
+    stream && (await new Promise(r => (stream.once('end', r), stream.end())))
+    return end()
+  }
 
-    sql.end = async() => {
-      ended = true
-      stream && (await new Promise(r => (stream.once('end', r), stream.end())))
-      return end()
-    }
+  sql.close = async() => {
+    stream && (await new Promise(r => (stream.once('end', r), stream.end())))
+    return close()
+  }
 
-    !connection && (subscribe.sql = sql, connection = init(sql, slot, options.publications))
+  return subscribe
 
-    const fns = listeners.has(event)
-      ? listeners.get(event).add(fn)
-      : listeners.set(event, new Set([fn])).get(event)
+  async function subscribe(event, fn, onsubscribe = noop) {
+    event = parseEvent(event)
+
+    if (!connection)
+      connection = init(sql, slot, options.publications)
+
+    const subscriber = { fn, onsubscribe }
+    const fns = subscribers.has(event)
+      ? subscribers.get(event).add(subscriber)
+      : subscribers.set(event, new Set([subscriber])).get(event)
 
     const unsubscribe = () => {
-      fns.delete(fn)
-      fns.size === 0 && listeners.delete(event)
+      fns.delete(subscriber)
+      fns.size === 0 && subscribers.delete(event)
     }
 
-    return connection.then(x => (stream = x, { unsubscribe }))
+    return connection.then(x => {
+      connected(x)
+      onsubscribe()
+      return { unsubscribe, state, sql }
+    })
+  }
 
-    async function onclose() {
-      stream = null
-      !ended && (stream = await init(sql, slot, options.publications))
-    }
+  function connected(x) {
+    stream = x.stream
+    state.pid = x.state.pid
+    state.secret = x.state.secret
   }
 
   async function init(sql, slot, publications) {
     if (!publications)
       throw new Error('Missing publication names')
 
-    const [x] = await sql.unsafe(
+    const xs = await sql.unsafe(
       `CREATE_REPLICATION_SLOT ${ slot } TEMPORARY LOGICAL pgoutput NOEXPORT_SNAPSHOT`
     )
+
+    const [x] = xs
 
     const stream = await sql.unsafe(
       `START_REPLICATION SLOT ${ slot } LOGICAL ${
@@ -65,12 +96,10 @@ module.exports = Subscribe;function Subscribe(postgres, options) {
     }
 
     stream.on('data', data)
-    stream.on('error', (error) => {
-      console.error('Logical Replication Error - Reconnecting', error) // eslint-disable-line
-      sql.end()
-    })
+    stream.on('error', sql.close)
+    stream.on('close', sql.close)
 
-    return stream
+    return { stream, state: xs.state }
 
     function data(x) {
       if (x[0] === 0x77)
@@ -99,7 +128,7 @@ module.exports = Subscribe;function Subscribe(postgres, options) {
   }
 
   function call(x, a, b) {
-    listeners.has(x) && listeners.get(x).forEach(fn => fn(a, b, x))
+    subscribers.has(x) && subscribers.get(x).forEach(({ fn }) => fn(a, b, x))
   }
 }
 

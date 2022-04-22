@@ -127,6 +127,11 @@ export class Query extends Promise {
     return this
   }
 
+  values() {
+    this.isRaw = 'values'
+    return this
+  }
+
   async handle() {
     !this.executed && (this.executed = true) && await 1 && this.handler(this)
   }

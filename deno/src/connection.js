@@ -7,7 +7,7 @@ import { tls } from '../polyfills.js'
 import crypto from 'https://deno.land/std@0.132.0/node/crypto.ts'
 import Stream from 'https://deno.land/std@0.132.0/node/stream.ts'
 
-import { Identifier, Builder, handleValue, arrayParser, arraySerializer } from './types.js'
+import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
 import { Errors } from './errors.js'
 import Result from './result.js'
 import Queue from './queue.js'
@@ -222,9 +222,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     const parameters = []
         , types = []
 
-    const string = stringify(q, q.strings[0], q.args[0], parameters, types)
+    const string = stringify(q, q.strings[0], q.args[0], parameters, types, options)
 
-    !q.tagged && q.args.forEach(x => handleValue(x, parameters, types))
+    !q.tagged && q.args.forEach(x => handleValue(x, parameters, types, options))
 
     q.prepare = options.prepare && ('prepare' in q.options ? q.options.prepare : true)
     q.string = string
@@ -238,25 +238,6 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       : { string, types, name: q.prepare ? statementId + statementCount++ : '' }
 
     typeof options.debug === 'function' && options.debug(id, string, parameters, types)
-  }
-
-  function stringify(q, string, value, parameters, types) {
-    for (let i = 1; i < q.strings.length; i++) {
-      string += (
-        value instanceof Query ? fragment(string, value, parameters, types) :
-        value instanceof Identifier ? value.value :
-        value instanceof Builder ? value.build(string, parameters, types, options.transform) :
-        handleValue(value, parameters, types)
-      ) + q.strings[i]
-      value = q.args[i]
-    }
-
-    return string
-  }
-
-  function fragment(string, q, parameters, types) {
-    q.fragment = true
-    return stringify(q, q.strings[0], q.args[0], parameters, types)
   }
 
   function write(x, fn) {
@@ -501,7 +482,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
       value = length === -1
         ? null
-        : query.isRaw
+        : query.isRaw === true
           ? x.slice(index, index += length)
           : column.parser === undefined
             ? x.toString('utf8', index, index += length)
@@ -510,7 +491,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
               : column.parser(x.toString('utf8', index, index += length))
 
       query.isRaw
-        ? (row[i] = value)
+        ? (row[i] = query.isRaw === true
+          ? value
+          : transform.value.from ? transform.value.from(value) : value)
         : (row[column.name] = transform.value.from ? transform.value.from(value) : value)
     }
 
