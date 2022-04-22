@@ -71,6 +71,7 @@ function Postgres(a, b) {
     listen,
     notify,
     begin,
+    close,
     end
   })
 
@@ -323,6 +324,10 @@ function Postgres(a, b) {
         subscribe.sql ? subscribe.sql.end({ timeout: 0 }) : []
       ))
     ]).then(() => clearTimeout(timer))
+  }
+
+  async function close() {
+    await Promise.all(connections.map(c => c.end()))
   }
 
   async function destroy(resolve) {
