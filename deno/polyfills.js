@@ -108,7 +108,7 @@ export const net = {
       }
 
       if (!socket.encrypted || encrypted)
-        close()
+        closed()
     }
 
     function close() {
@@ -118,7 +118,6 @@ export const net = {
         if (e instanceof Deno.errors.BadResource === false)
           call(socket.events.error, e)
       }
-      closed()
     }
 
     function closed() {
@@ -126,8 +125,8 @@ export const net = {
         return
 
       socket.break = socket.encrypted = false
-      call(socket.events.close)
       socket.readyState = 'closed'
+      call(socket.events.close)
     }
 
     function error(err) {
