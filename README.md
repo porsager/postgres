@@ -325,7 +325,7 @@ select "id" from "users"
 
 ## Advanced query methods
 
-### .cursor()
+### Cursors
 
 #### ```await sql``.cursor([rows = 1], [fn])```
 
@@ -380,7 +380,7 @@ await sql`
 })
 ```
 
-### .forEach()
+### Instant iteration
 
 #### ```await sql``.forEach(fn)```
 
@@ -395,7 +395,7 @@ await sql`
 // No more rows
 ```
 
-### describe
+### Query Descriptions
 #### ```await sql``.describe([rows = 1], fn) -> Result[]```
 
 Rather than executing a given query, `.describe` will return information utilized in the query process. This information can include the query identifier, column types, etc.
@@ -416,10 +416,10 @@ Using `.raw` will return rows as an array with `Buffer` values for each column, 
 
 This can be useful for specific performance/transformation reasons. The column definitions are still included on the result array, plus access to parsers for each column.
 
-### File
+### Queries in Files
 #### `await sql.file(path, [args], [options]) -> Result[]`
 
-Using a `.sql` file for a query is also supported with optional parameters to use if the file includes `$1, $2, etc`
+Using a file for a query is also supported with optional parameters to use if the file includes `$1, $2, etc`
 
 ```js
 const result = await sql.file('query.sql', ['Murray', 68])
@@ -527,9 +527,9 @@ Do note that you can often achieve the same result using [`WITH` queries (Common
 
 ## Data Transformation
 
-`postgres.js` comes with a number of built-in data transformation functions that can be used to transform the data returned from a query or when inserting data. They are available under `transformation` option in the `postgres()` function connection options.
+Postgres.js comes with a number of built-in data transformation functions that can be used to transform the data returned from a query or when inserting data. They are available under `transform` option in the `postgres()` function connection options.
 
-Like - `postgres('connectionURL', { transformation: {...} })`
+Like - `postgres('connectionURL', { transform: {...} })`
 
 ### Parameters
 * `to`: The function to transform the outgoing query column name to, i.e `SELECT ${ sql('aName') }` to `SELECT a_name` when using `postgres.toCamel`.
@@ -555,7 +555,7 @@ These functions can be passed in as options when calling `postgres()`. For examp
 })();
 ```
 
-> Note that if a column name is originally registered as snake_case in the database then to tranform it from camelCase to snake_case when querying or inserting, the column camelCase name must be put in `sql('columnName')` as it's done in the above example.
+> Note that if a column name is originally registered as snake_case in the database then to tranform it from camelCase to snake_case when querying or inserting, the column camelCase name must be put in `sql('columnName')` as it's done in the above example, Postgres.js does not rewrite anything inside the static parts of the tagged templates.
 
 ## Listen & notify
 
@@ -686,6 +686,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   debug                : fn,            // Is called with (connection, query, params, types)
   socket               : fn,            // fn returning custom socket to use
   transform            : {
+    undefined          : undefined,     // Transforms undefined values (eg. to null)
     column             : fn,            // Transforms incoming column names
     value              : fn,            // Transforms incoming row values
     row                : fn             // Transforms entire rows
@@ -1006,4 +1007,4 @@ A really big thank you to [@JAForbes](https://twitter.com/jmsfbs) who introduced
 
 Thanks to [@ACXgit](https://twitter.com/andreacoiutti) for initial tests and dogfooding.
 
-Also thanks to [Ryan Dahl](http://github.com/ry) for letting me have the `postgres` npm package name.
+Also thanks to [Ryan Dahl](https://github.com/ry) for letting me have the `postgres` npm package name.
