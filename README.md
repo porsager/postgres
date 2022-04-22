@@ -401,13 +401,20 @@ await sql`
 Rather than executing a given query, `.describe` will return information utilized in the query process. This information can include the query identifier, column types, etc.
 
 This is useful for debugging and analyzing your Postgres queries. Furthermore, **`.describe` will give you access to the final generated query string that would be executed.**
+ 
+### Rows as Array of Values
+#### ```sql``.values()```
 
-### Raw
-#### ```sql``.raw()```
-
-Using `.raw()` will return rows as an array with `Buffer` values for each column, instead of objects.
+Using `.values` will return rows as an array of values for each column, instead of objects.
 
 This can be useful to receive identically named columns, or for specific performance/transformation reasons. The column definitions are still included on the result array, plus access to parsers for each column.
+
+### Rows as Raw Array of Buffers
+#### ```sql``.raw()```
+
+Using `.raw` will return rows as an array with `Buffer` values for each column, instead of objects.
+
+This can be useful for specific performance/transformation reasons. The column definitions are still included on the result array, plus access to parsers for each column.
 
 ### File
 #### `await sql.file(path, [args], [options]) -> Result[]`

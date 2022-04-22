@@ -478,7 +478,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
       value = length === -1
         ? null
-        : query.isRaw
+        : query.isRaw === true
           ? x.slice(index, index += length)
           : column.parser === undefined
             ? x.toString('utf8', index, index += length)
@@ -487,7 +487,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
               : column.parser(x.toString('utf8', index, index += length))
 
       query.isRaw
-        ? (row[i] = value)
+        ? (row[i] = query.isRaw === true
+          ? value
+          : transform.value.from ? transform.value.from(value) : value)
         : (row[column.name] = transform.value.from ? transform.value.from(value) : value)
     }
 

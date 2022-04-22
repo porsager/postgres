@@ -1610,6 +1610,10 @@ t('Raw method returns values unparsed as Buffer', async() => {
   ]
 })
 
+t('Array returns rows as arrays of columns', async() => {
+  return [(await sql`select 1`.values())[0][0], 1]
+})
+
 t('Copy read', async() => {
   const result = []
 
