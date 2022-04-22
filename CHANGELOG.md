@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.1.0] - 22 Apr 2022
+- Add close method to close but not end connections forever  94fea8f
+- Add .values() method to return rows as arrays of values  56873c2
+- Support transform.undefined - fixes #314  eab71e5
+- Support nested fragments values and dynamics - fixes #326  86445ca
+- Fix deno close sequence  f76af24
+- Fix subscribe reconnect and add onsubscribe method - fixes #315  5097345
+- Deno ts fix - fixes #327  50403a1
+
 ## [3.0.6] - 19 Apr 2022
 - Properly close connections in Deno  cbc6a75
 - Only write end message if socket is open  13950af
