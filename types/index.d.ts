@@ -456,7 +456,8 @@ declare namespace postgres {
     | number
     | string
     | Date
-    | Uint8Array;
+    | Uint8Array
+    | bigint;
 
   type SerializableParameter = never
     | Serializable
