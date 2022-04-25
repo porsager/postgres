@@ -207,7 +207,7 @@ function Postgres(a, b) {
     }
 
     async function scope(c, fn, name) {
-      const sql = Sql(handler, true)
+      const sql = Sql(handler)
       sql.savepoint = savepoint
       let uncaughtError
       name && await sql`savepoint ${ sql(name) }`
