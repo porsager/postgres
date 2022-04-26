@@ -1000,6 +1000,7 @@ Postgres.js doesn't come with any migration solution since it's way out of scope
 
 - https://github.com/porsager/postgres-shift
 - https://github.com/lukeed/ley
+- https://github.com/JAForbes/pgmg
 
 ## Thank you
 
