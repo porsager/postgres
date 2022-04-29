@@ -112,7 +112,7 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
    */
   publications: string
   onclose: (connId: number) => void;
-  backoff: boolean | ((attemptNum:number) => number);
+  backoff: boolean | ((attemptNum: number) => number);
   max_lifetime: number | null;
   keep_alive: number | null;
 }
@@ -157,7 +157,7 @@ type Keys = string
 
 type SerializableObject<T, K extends any[]> =
   number extends K['length'] ? {} :
-  Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.SerializableParameter>
+  (Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.SerializableParameter | postgres.JSONValue> & Record<string, any>)
 
 type First<T, K extends any[]> =
   // Tagged template string call
@@ -167,9 +167,9 @@ type First<T, K extends any[]> =
   // Dynamic values helper (depth 2)
   T extends readonly any[][] ? postgres.EscapableArray[] :
   // Insert/update helper (depth 2)
-  T extends (object & infer R)[] ? SerializableObject<R, K>[] :
-  // Dynamic values helper (depth 1)
-  T extends readonly any[] ? postgres.EscapableArray :
+  T extends readonly (object & infer R)[] ? (R extends postgres.SerializableParameter ? readonly postgres.SerializableParameter[] : readonly SerializableObject<R, K>[]) :
+  // Dynamic values/ANY helper (depth 1)
+  T extends readonly any[] ? (readonly postgres.SerializableParameter[]) :
   // Insert/update helper (depth 1)
   T extends object ? SerializableObject<T, K> :
   // Unexpected type
@@ -179,7 +179,7 @@ type Rest<T> =
   T extends TemplateStringsArray ? never : // force fallback to the tagged template function overload
   T extends string ? string[] :
   T extends readonly any[][] ? [] :
-  T extends (object & infer R)[] ? (Keys & keyof R)[] :
+  T extends readonly (object & infer R)[] ? (Keys & keyof R)[] :
   T extends readonly any[] ? [] :
   T extends object ? (Keys & keyof T)[] :
   any
@@ -454,10 +454,10 @@ declare namespace postgres {
     | null
     | boolean
     | number
+    | bigint // weak: require the `postgres.BigInt` type
     | string
     | Date
-    | Uint8Array
-    | bigint;
+    | Uint8Array;
 
   type SerializableParameter = never
     | Serializable
@@ -465,6 +465,20 @@ declare namespace postgres {
     | Parameter<any>
     | ArrayParameter
     | readonly SerializableParameter[];
+
+  type JSONValue = // using a dedicated type to detect symbols, bigints, and other non serializable types
+    | null
+    | string
+    | number
+    | Date // serialized as `string`
+    | JSONValue[]
+    | { toJSON(): any } // `toJSON` called by `JSON.stringify`; not typing the return type, typings is strict enough anyway
+    | {
+      [prop: string | number]:
+      | undefined
+      | JSONValue
+      | ((...args: any) => any) // serialized as `undefined`
+    };
 
   interface Row {
     [column: string]: any;
@@ -574,7 +588,7 @@ declare namespace postgres {
      * @param parameters Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends readonly any[] = Row[]>(template: TemplateStringsArray, ...parameters: (SerializableParameter | PendingQuery<any>)[]): PendingQuery<AsRowList<T>>;
+    <T extends readonly object[] = Row[]>(template: TemplateStringsArray, ...parameters: (SerializableParameter | PendingQuery<any>)[]): PendingQuery<AsRowList<T>>;
 
     CLOSE: {};
     END: this['CLOSE'];
@@ -604,7 +618,7 @@ declare namespace postgres {
     array<T extends SerializableParameter[] = SerializableParameter[]>(value: T, type?: number): ArrayParameter<T>;
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
-    json(value: any): Parameter;
+    json(value: JSONValue): Parameter;
   }
 
   interface UnsafeQueryOptions {
