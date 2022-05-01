@@ -354,7 +354,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       statementCount = 1
       lifeTimer.start()
       socket.on('data', data)
-      socket.setKeepAlive && socket
+      keep_alive != null && socket.setKeepAlive(true)
       const s = StartupMessage()
       write(s)
     } catch (err) {
@@ -533,7 +533,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return
     }
 
-    while (sent.length && (query = sent.shift()) && (query.active = true) && query.cancelled)
+    while (sent.length && (query = sent.shift()) && (query.active = true, query.cancelled))
       Connection(options).cancel(query.state, query.cancelled.resolve, query.cancelled.reject)
 
     if (query)

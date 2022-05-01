@@ -25,7 +25,7 @@ export default function Subscribe(postgres, options) {
         return
       stream = null
       state.pid = state.secret = undefined
-      !ended && connected(await init(sql, slot, options.publications))
+      connected(await init(sql, slot, options.publications))
       subscribers.forEach(event => event.forEach(({ onsubscribe }) => onsubscribe()))
     },
     no_subscribe: true
@@ -213,7 +213,7 @@ function parse(x, state, parsers, handle) {
       old && (i = tuples(x, old, key ? relation.keys : relation.columns, i += 3))
 
       const row = {}
-      i = tuples(x, row, relation.columns, i += 3)
+      i = tuples(x, row, relation.columns, i + 3)
 
       handle(row, {
         command: 'update',

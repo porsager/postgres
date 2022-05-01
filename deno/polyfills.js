@@ -24,11 +24,16 @@ export const net = {
   Socket() {
     let paused
       , resume
+      , keepAlive
 
     const socket = {
       error,
       success,
       readyState: 'open',
+      setKeepAlive: x => {
+        keepAlive = x
+        socket.raw && socket.raw.setKeepAlive && socket.raw.setKeepAlive(x)
+      },
       connect: (port, hostname) => {
         socket.raw = null
         socket.readyState = 'connecting'
@@ -72,7 +77,7 @@ export const net = {
           })
         return false
       },
-      destroy: () => close(true),
+      destroy: () => close(),
       end: (x) => {
         x && socket.write(x)
         close()
@@ -87,6 +92,7 @@ export const net = {
 
       const encrypted = socket.encrypted
       socket.raw = raw
+      keepAlive != null && raw.setKeepAlive(keepAlive)
       socket.readyState = 'open'
       socket.encrypted
         ? call(socket.events.secureConnect)

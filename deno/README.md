@@ -605,11 +605,11 @@ const sql = postgres({ publications: 'alltables' })
 
 const { unsubscribe } = await sql.subscribe(
   'insert:events', 
-  function(row, { command, relation, key, old }) => {
+  (row, { command, relation, key, old }) => {
     // Callback function for each row change
     // tell about new event row over eg. websockets or do something else
   },
-  function onsubscribe() => {
+  () => {
     // Callback on initial connect and potential reconnects
   }
 )
@@ -856,12 +856,12 @@ import ssh2 from 'ssh2'
 
 const sql = postgres({
   ...options,
-  socket: ({ hostname, port }) => new Promise((resolve, reject) => {
+  socket: ({ host: [host], port: [port] }) => new Promise((resolve, reject) => {
     const ssh = new ssh2.Client()
     ssh
     .on('error', reject)
     .on('ready', () => 
-      ssh.forwardOut('127.0.0.1', 12345, hostname, port, 
+      ssh.forwardOut('127.0.0.1', 12345, host, port, 
         (err, socket) => err ? reject(err) : resolve(socket)
       )
     )
@@ -996,6 +996,7 @@ Postgres.js doesn't come with any migration solution since it's way out of scope
 
 - https://github.com/porsager/postgres-shift
 - https://github.com/lukeed/ley
+- https://github.com/JAForbes/pgmg
 
 ## Thank you
 

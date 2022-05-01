@@ -376,7 +376,7 @@ function parseOptions(a, b) {
 
   const env = process.env // eslint-disable-line
       , o = (typeof a === 'string' ? b : a) || {}
-      , { url, multihost } = parseUrl(a, env)
+      , { url, multihost } = parseUrl(a)
       , query = url.searchParams
       , host = o.hostname || o.host || multihost || url.hostname || env.PGHOST || 'localhost'
       , port = o.port || url.port || env.PGPORT || 5432

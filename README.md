@@ -860,12 +860,12 @@ import ssh2 from 'ssh2'
 
 const sql = postgres({
   ...options,
-  socket: ({ hostname, port }) => new Promise((resolve, reject) => {
+  socket: ({ host: [host], port: [port] }) => new Promise((resolve, reject) => {
     const ssh = new ssh2.Client()
     ssh
     .on('error', reject)
     .on('ready', () => 
-      ssh.forwardOut('127.0.0.1', 12345, hostname, port, 
+      ssh.forwardOut('127.0.0.1', 12345, host, port, 
         (err, socket) => err ? reject(err) : resolve(socket)
       )
     )
