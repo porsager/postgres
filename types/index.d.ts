@@ -5,19 +5,25 @@ import { Readable, Writable } from 'node:stream'
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends JSToPostgresTypeMap>(options?: postgres.Options<T>): postgres.Sql<JSToPostgresTypeMap extends T ? {} : T>
+declare function postgres<T extends PostgresTypeList>(options?: postgres.Options<T>): postgres.Sql<PostgresTypeList extends T ? {} : { [type in keyof T]: T[type] extends {
+  serialize: (value: infer R) => any,
+  parse: (raw: any) => infer R
+} ? R : never }>
 /**
  * Establish a connection to a PostgreSQL server.
  * @param url Connection string used for authentication
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends JSToPostgresTypeMap>(url: string, options?: postgres.Options<T>): postgres.Sql<JSToPostgresTypeMap extends T ? {} : T>
+declare function postgres<T extends PostgresTypeList>(url: string, options?: postgres.Options<T>): postgres.Sql<PostgresTypeList extends T ? {} : { [type in keyof T]: T[type] extends {
+  serialize: (value: infer R) => any,
+  parse: (raw: any) => infer R
+} ? R : never }>
 
 /**
  * Connection options of Postgres.
  */
-interface BaseOptions<T extends JSToPostgresTypeMap> {
+interface BaseOptions<T extends PostgresTypeList> {
   /** Postgres ip address[s] or domain name[s] */
   host: string | string[];
   /** Postgres server[s] port[s] */
@@ -54,8 +60,8 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
    * @default process.env['PGCONNECT_TIMEOUT']
    */
   connect_timeout: number;
-  /** Array of custom types; see more below */
-  types: PostgresTypeList<T>;
+  /** Array of custom types; see more in the README */
+  types: T;
   /**
    * Enables prepare mode.
    * @default true
@@ -117,11 +123,9 @@ interface BaseOptions<T extends JSToPostgresTypeMap> {
   keep_alive: number | null;
 }
 
-type PostgresTypeList<T> = {
-  [name in keyof T]: T[name] extends (...args: any) => postgres.SerializableParameter
-  ? postgres.PostgresType<T[name]>
-  : postgres.PostgresType<(...args: any) => postgres.SerializableParameter>;
-};
+interface PostgresTypeList {
+  [name: string]: postgres.PostgresType;
+}
 
 interface JSToPostgresTypeMap {
   [name: string]: unknown;
@@ -260,13 +264,13 @@ declare namespace postgres {
    */
   function fromKebab(str: string): string;
 
-  const BigInt: PostgresType<(number: bigint) => string>;
+  const BigInt: PostgresType<bigint>;
 
-  interface PostgresType<T extends (...args: any[]) => unknown> {
+  interface PostgresType<T = any> {
     to: number;
     from: number[];
-    serialize: T;
-    parse: (raw: string) => unknown;
+    serialize: (value: T) => unknown;
+    parse: (raw: any) => T;
   }
 
   interface ConnectionParameters {
@@ -279,7 +283,7 @@ declare namespace postgres {
     [name: string]: string;
   }
 
-  interface Options<T extends JSToPostgresTypeMap> extends Partial<BaseOptions<T>> {
+  interface Options<T extends PostgresTypeList> extends Partial<BaseOptions<T>> {
     /** @inheritdoc */
     host?: string;
     /** @inheritdoc */
@@ -311,7 +315,7 @@ declare namespace postgres {
     timeout?: Options<T>['idle_timeout'];
   }
 
-  interface ParsedOptions<T extends JSToPostgresTypeMap> extends BaseOptions<T> {
+  interface ParsedOptions<T extends JSToPostgresTypeMap> extends BaseOptions<{ [name in keyof T]: PostgresType<T[name]> }> {
     /** @inheritdoc */
     host: string[];
     /** @inheritdoc */
@@ -320,8 +324,8 @@ declare namespace postgres {
     pass: null;
     /** @inheritdoc */
     transform: Transform;
-    serializers: Record<number, (...args: any) => SerializableParameter>;
-    parsers: Record<number, (value: string) => unknown>;
+    serializers: Record<number, (value: any) => unknown>;
+    parsers: Record<number, (value: any) => unknown>;
   }
 
   interface Transform {
@@ -596,10 +600,9 @@ declare namespace postgres {
 
     options: ParsedOptions<TTypes>;
     parameters: ConnectionParameters;
-    types: {
-      [name in keyof TTypes]: TTypes[name] extends (...args: any) => any
-      ? (...args: Parameters<TTypes[name]>) => postgres.Parameter<ReturnType<TTypes[name]>>
-      : (...args: any) => postgres.Parameter<any>;
+    types: this['typed'];
+    typed: (<T>(value: T, oid: number) => Parameter<T>) & {
+      [name in keyof TTypes]: (value: TTypes[name]) => postgres.Parameter<TTypes[name]>
     };
 
     unsafe<T extends any[] = (Row & Iterable<Row>)[]>(query: string, parameters?: SerializableParameter[], queryOptions?: UnsafeQueryOptions): PendingQuery<AsRowList<T>>;
