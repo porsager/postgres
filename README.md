@@ -72,6 +72,7 @@ async function insertUser({ name, age }) {
 * [Listen & notify](#listen--notify)
 * [Realtime subscribe](#realtime-subscribe)
 * [Numbers, bigint, numeric](#numbers-bigint-numeric)
+* [Result Array](#result-array)
 * [Connection details](#connection-details)
 * [Custom Types](#custom-types)
 * [Teardown / Cleanup](#teardown--cleanup)
@@ -661,6 +662,46 @@ const sql = postgres({
 
 There is currently no guaranteed way to handle `numeric` / `decimal` types in native Javascript. **These [and similar] types will be returned as a `string`**. The best way in this case is to use  [custom types](#custom-types).
 
+## Result Array
+
+The `Result` Array returned from queries is a custom array allowing for easy destructuring or passing on directly to JSON.stringify or general Array usage. It includes the following properties.
+
+### .count
+
+The `count` property is the number of affected rows returned by the database. This is usefull for insert, update and delete operations to know the number of rows since .length will be 0 in these cases if not using `RETURNING ...`.
+
+### .command
+
+The `command` run by the query - eg. one of `SELECT`, `UPDATE`, `INSERT`, `DELETE`
+
+### .columns
+
+The `columns` returned by the query useful to determine types, or map to the result values when using `.values()`
+
+```js
+{
+  name  : String,    // Column name,
+  type  : oid,       // PostgreSQL oid column type
+  parser: Function   // The function used by Postgres.js for parsing
+}
+```
+
+### .statement
+
+The `statement` contains information about the statement implicitly created by Postgres.js.
+
+```js
+{
+  name    : String,  // The auto generated statement name
+  string  : String,  // The actual query string executed
+  types   : [oid],   // An array of oid expected as input parameters
+  columns : [Column] // Array of columns - same as Result.columns
+}
+```
+
+### .state
+
+This is the state `{ pid, secret }` of the connection that executed the query.
 
 ## Connection details
 
