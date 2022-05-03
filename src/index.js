@@ -473,9 +473,8 @@ function parseUrl(url) {
     return { url: { searchParams: new Map() } }
 
   let host = url
-  host = host.slice(host.indexOf('://') + 3)
-  host = host.split(/[?/]/)[0]
-  host = host.slice(host.indexOf('@') + 1)
+  host = host.slice(host.indexOf('://') + 3).split(/[?/]/)[0]
+  host = decodeURIComponent(host.slice(host.indexOf('@') + 1))
 
   return {
     url: new URL(url.replace(host, host.split(',')[0])),
