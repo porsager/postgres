@@ -451,7 +451,7 @@ await pipeline(userStream, query);
 
 ```js
 const { pipeline } = require('stream/promises')
-const { createWriteStream } = require('fs');
+const { createWriteStream } = require('fs')
 
 const query = await sql`copy users (name, age) to stdin`.readable()
 await pipeline(query, createWriteStream('output.tsv'))
