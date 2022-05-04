@@ -612,6 +612,10 @@ t('unsafe simple', async() => {
   return [1, (await sql.unsafe('select 1 as x'))[0].x]
 })
 
+t('unsafe simple includes columns', async() => {
+  return ['x', (await sql.unsafe('select 1 as x').values()).columns[0].name]
+})
+
 t('listen and notify', async() => {
   const sql = postgres(options)
   const channel = 'hello'
