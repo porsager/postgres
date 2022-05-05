@@ -268,7 +268,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       socket,
       ...(ssl === 'require' || ssl === 'allow' || ssl === 'prefer'
         ? { rejectUnauthorized: false }
-        : ssl
+        : ssl === 'verify-full'
+        ? {}
+        : typeof ssl === 'object'
+        ? ssl
+        : {}
       )
     })
     socket.on('secureConnect', connected)
