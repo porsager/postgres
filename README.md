@@ -426,6 +426,54 @@ Using a file for a query is also supported with optional parameters to use if th
 const result = await sql.file('query.sql', ['Murray', 68])
 ```
 
+### Rows as Streams
+
+Postgres.js supports [`copy ...`](https://www.postgresql.org/docs/14/sql-copy.html) queries, which are exposed as [Node.js streams](https://nodejs.org/api/stream.html).
+
+> **NOTE** This is a low-level API which does not provide any type safety. To make this work, you must match your [`copy query` parameters](https://www.postgresql.org/docs/14/sql-copy.html) correctly to your [Node.js stream read or write](https://nodejs.org/api/stream.html) code. Ensure [Node.js stream backpressure](https://nodejs.org/en/docs/guides/backpressuring-in-streams/) is handled correctly to avoid memory exhaustion.
+
+#### ```await sql`copy ... from stdin` -> Writable```
+
+```js
+const { pipeline } = require('stream/promises')
+
+// Stream of users with the default tab delimitated cells and new-line delimitated rows
+const userStream = Readable.from([
+  'Murray\t68\n',
+  'Walter\t80\n'
+])
+
+const query = await sql`copy users (name, age) from stdin`.writable()
+await pipeline(userStream, query);
+```
+
+#### ```await sql`copy ... to stdin` -> Readable```
+
+##### stream pipeline
+```js
+const { pipeline } = require('stream/promises')
+const { createWriteStream } = require('fs')
+
+const readableStream = await sql`copy users (name, age) to stdin`.readable()
+await pipeline(readableStream, createWriteStream('output.tsv'))
+// output.tsv content: `Murray\t68\nWalter\t80\n`
+```
+
+##### for await...of
+```js
+const readableStream = await sql`
+  copy (
+    select name, age 
+    from users 
+    where age = 68
+  ) to stdin
+`.readable()
+for await (const chunk of readableStream) {
+  // chunk.toString() === `Murray\t68\n`
+}
+```
+
+
 ### Canceling Queries in Progress
 
 Postgres.js supports, [canceling queries in progress](https://www.postgresql.org/docs/7.1/protocol-protocol.html#AEN39000). It works by opening a new connection with a protocol level startup message to cancel the current query running on a specific connection. That means there is no guarantee that the query will be canceled, and due to the possible race conditions it might even result in canceling another query. This is fine for long running queries, but in the case of high load and fast queries it might be better to simply ignore results instead of canceling.
