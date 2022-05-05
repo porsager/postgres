@@ -426,13 +426,11 @@ Using a file for a query is also supported with optional parameters to use if th
 const result = await sql.file('query.sql', ['Murray', 68])
 ```
 
-### Rows as Streams
+### Copy to/from as Streams
 
-Postgres.js supports [`copy ...`](https://www.postgresql.org/docs/14/sql-copy.html) queries, which are exposed as [Node.js streams](https://nodejs.org/api/stream.html).
+Postgres.js supports [`COPY ...`](https://www.postgresql.org/docs/14/sql-copy.html) queries, which are exposed as [Node.js streams](https://nodejs.org/api/stream.html).
 
-> **NOTE** This is a low-level API which does not provide any type safety. To make this work, you must match your [`copy query` parameters](https://www.postgresql.org/docs/14/sql-copy.html) correctly to your [Node.js stream read or write](https://nodejs.org/api/stream.html) code. Ensure [Node.js stream backpressure](https://nodejs.org/en/docs/guides/backpressuring-in-streams/) is handled correctly to avoid memory exhaustion.
-
-#### ```await sql`copy ... from stdin` -> Writable```
+#### ```await sql`copy ... from stdin`.writable() -> Writable```
 
 ```js
 const { pipeline } = require('stream/promises')
@@ -447,32 +445,33 @@ const query = await sql`copy users (name, age) from stdin`.writable()
 await pipeline(userStream, query);
 ```
 
-#### ```await sql`copy ... to stdin` -> Readable```
+#### ```await sql`copy ... to stdout`.readable() -> Readable```
 
-##### stream pipeline
+##### Using Stream Pipeline
 ```js
 const { pipeline } = require('stream/promises')
 const { createWriteStream } = require('fs')
 
-const readableStream = await sql`copy users (name, age) to stdin`.readable()
+const readableStream = await sql`copy users (name, age) to stdout`.readable()
 await pipeline(readableStream, createWriteStream('output.tsv'))
 // output.tsv content: `Murray\t68\nWalter\t80\n`
 ```
 
-##### for await...of
+##### Using `for await...of`
 ```js
 const readableStream = await sql`
   copy (
     select name, age 
     from users 
     where age = 68
-  ) to stdin
+  ) to stdout
 `.readable()
 for await (const chunk of readableStream) {
   // chunk.toString() === `Murray\t68\n`
 }
 ```
 
+> **NOTE** This is a low-level API which does not provide any type safety. To make this work, you must match your [`copy query` parameters](https://www.postgresql.org/docs/14/sql-copy.html) correctly to your [Node.js stream read or write](https://nodejs.org/api/stream.html) code. Ensure [Node.js stream backpressure](https://nodejs.org/en/docs/guides/backpressuring-in-streams/) is handled correctly to avoid memory exhaustion.
 
 ### Canceling Queries in Progress
 
