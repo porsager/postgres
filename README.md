@@ -341,7 +341,7 @@ await sql`
 `.cursor(async([row]) => {
   // row = { x: 1 }
   await http.request('https://example.com/wat', { row })
-}
+})
 ```
 
 ##### for await...of
@@ -366,7 +366,7 @@ await sql`
   await Promise.all(rows.map(row =>
     http.request('https://example.com/wat', { row })
   ))
-}
+})
 ```
 
 If an error is thrown inside the callback function no more rows will be requested and the outer promise will reject with the thrown error.
