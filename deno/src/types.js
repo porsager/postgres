@@ -100,6 +100,7 @@ const defaultHandlers = typeHandlers(types)
 export function stringify(q, string, value, parameters, types, options) { // eslint-disable-line
   for (let i = 1; i < q.strings.length; i++) {
     string += (
+      value && value[0] instanceof Query ? value.reduce((acc, x) => acc + ' ' + fragment(x, parameters, types), '') :
       value instanceof Query ? fragment(value, parameters, types) :
       value instanceof Identifier ? value.value :
       value instanceof Builder ? value.build(string, parameters, types, options) :

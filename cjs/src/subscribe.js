@@ -212,7 +212,7 @@ function parse(x, state, parsers, handle) {
       old && (i = tuples(x, old, key ? relation.keys : relation.columns, i += 3))
 
       const row = {}
-      i = tuples(x, row, relation.columns, i + 3)
+      tuples(x, row, relation.columns, i + 3)
 
       handle(row, {
         command: 'update',

@@ -13,7 +13,7 @@ const tests = {}
 const nt = module.exports.nt = () => ignored++
 const ot = module.exports.ot = (...rest) => (only = true, test(true, ...rest))
 const t = module.exports.t = (...rest) => test(false, ...rest)
-t.timeout = 0.5
+t.timeout = 1
 
 async function test(o, name, options, fn) {
   typeof options !== 'object' && (fn = options, options = {})

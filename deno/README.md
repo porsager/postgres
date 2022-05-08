@@ -68,6 +68,7 @@ async function insertUser({ name, age }) {
 * [Listen & notify](#listen--notify)
 * [Realtime subscribe](#realtime-subscribe)
 * [Numbers, bigint, numeric](#numbers-bigint-numeric)
+* [Result Array](#result-array)
 * [Connection details](#connection-details)
 * [Custom Types](#custom-types)
 * [Teardown / Cleanup](#teardown--cleanup)
@@ -336,7 +337,7 @@ await sql`
 `.cursor(async([row]) => {
   // row = { x: 1 }
   await http.request('https://example.com/wat', { row })
-}
+})
 ```
 
 ##### for await...of
@@ -361,7 +362,7 @@ await sql`
   await Promise.all(rows.map(row =>
     http.request('https://example.com/wat', { row })
   ))
-}
+})
 ```
 
 If an error is thrown inside the callback function no more rows will be requested and the outer promise will reject with the thrown error.
@@ -420,6 +421,53 @@ Using a file for a query is also supported with optional parameters to use if th
 ```js
 const result = await sql.file('query.sql', ['Murray', 68])
 ```
+
+### Copy to/from as Streams
+
+Postgres.js supports [`COPY ...`](https://www.postgresql.org/docs/14/sql-copy.html) queries, which are exposed as [Node.js streams](https://nodejs.org/api/stream.html).
+
+#### ```await sql`copy ... from stdin`.writable() -> Writable```
+
+```js
+import { pipeline } from 'node:stream/promises'
+
+// Stream of users with the default tab delimitated cells and new-line delimitated rows
+const userStream = Readable.from([
+  'Murray\t68\n',
+  'Walter\t80\n'
+])
+
+const query = await sql`copy users (name, age) from stdin`.writable()
+await pipeline(userStream, query);
+```
+
+#### ```await sql`copy ... to stdout`.readable() -> Readable```
+
+##### Using Stream Pipeline
+```js
+import { pipeline } from 'node:stream/promises'
+import { createWriteStream } from 'node:fs'
+
+const readableStream = await sql`copy users (name, age) to stdout`.readable()
+await pipeline(readableStream, createWriteStream('output.tsv'))
+// output.tsv content: `Murray\t68\nWalter\t80\n`
+```
+
+##### Using `for await...of`
+```js
+const readableStream = await sql`
+  copy (
+    select name, age 
+    from users 
+    where age = 68
+  ) to stdout
+`.readable()
+for await (const chunk of readableStream) {
+  // chunk.toString() === `Murray\t68\n`
+}
+```
+
+> **NOTE** This is a low-level API which does not provide any type safety. To make this work, you must match your [`copy query` parameters](https://www.postgresql.org/docs/14/sql-copy.html) correctly to your [Node.js stream read or write](https://nodejs.org/api/stream.html) code. Ensure [Node.js stream backpressure](https://nodejs.org/en/docs/guides/backpressuring-in-streams/) is handled correctly to avoid memory exhaustion.
 
 ### Canceling Queries in Progress
 
@@ -657,6 +705,46 @@ const sql = postgres({
 
 There is currently no guaranteed way to handle `numeric` / `decimal` types in native Javascript. **These [and similar] types will be returned as a `string`**. The best way in this case is to use  [custom types](#custom-types).
 
+## Result Array
+
+The `Result` Array returned from queries is a custom array allowing for easy destructuring or passing on directly to JSON.stringify or general Array usage. It includes the following properties.
+
+### .count
+
+The `count` property is the number of affected rows returned by the database. This is usefull for insert, update and delete operations to know the number of rows since .length will be 0 in these cases if not using `RETURNING ...`.
+
+### .command
+
+The `command` run by the query - eg. one of `SELECT`, `UPDATE`, `INSERT`, `DELETE`
+
+### .columns
+
+The `columns` returned by the query useful to determine types, or map to the result values when using `.values()`
+
+```js
+{
+  name  : String,    // Column name,
+  type  : oid,       // PostgreSQL oid column type
+  parser: Function   // The function used by Postgres.js for parsing
+}
+```
+
+### .statement
+
+The `statement` contains information about the statement implicitly created by Postgres.js.
+
+```js
+{
+  name    : String,  // The auto generated statement name
+  string  : String,  // The actual query string executed
+  types   : [oid],   // An array of oid expected as input parameters
+  columns : [Column] // Array of columns - same as Result.columns
+}
+```
+
+### .state
+
+This is the state `{ pid, secret }` of the connection that executed the query.
 
 ## Connection details
 
@@ -675,7 +763,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   max_lifetime         : null,          // Max lifetime in seconds (more info below)
   idle_timeout         : 0,             // Idle connection timeout in seconds
   connect_timeout      : 30,            // Connect timeout in seconds
-  no_prepare           : false,         // No automatic creation of prepared statements
+  prepare              : true,          // Automatic creation of prepared statements
   types                : [],            // Array of custom types, see more below
   onnotice             : fn,            // Defaults to console.log
   onparameter          : fn,            // (key, value) when server param change
