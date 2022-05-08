@@ -433,7 +433,7 @@ Postgres.js supports [`COPY ...`](https://www.postgresql.org/docs/14/sql-copy.ht
 #### ```await sql`copy ... from stdin`.writable() -> Writable```
 
 ```js
-const { pipeline } = require('stream/promises')
+import { pipeline } from 'node:stream/promises'
 
 // Stream of users with the default tab delimitated cells and new-line delimitated rows
 const userStream = Readable.from([
@@ -449,8 +449,8 @@ await pipeline(userStream, query);
 
 ##### Using Stream Pipeline
 ```js
-const { pipeline } = require('stream/promises')
-const { createWriteStream } = require('fs')
+import { pipeline } from 'node:stream/promises'
+import { createWriteStream } from 'node:fs'
 
 const readableStream = await sql`copy users (name, age) to stdout`.readable()
 await pipeline(readableStream, createWriteStream('output.tsv'))
