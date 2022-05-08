@@ -784,8 +784,8 @@ t('has server parameters', async() => {
 
 t('big query body', async() => {
   await sql`create table test (x int)`
-  return [1000, (await sql`insert into test ${
-    sql([...Array(1000).keys()].map(x => ({ x })))
+  return [50000, (await sql`insert into test ${
+    sql([...Array(50000).keys()].map(x => ({ x })))
   }`).count, await sql`drop table test`]
 })
 
