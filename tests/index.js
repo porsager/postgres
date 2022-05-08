@@ -1816,7 +1816,7 @@ t('subscribe reconnects and calls onsubscribe', { timeout: 4 }, async() => {
   await subscribeSql.close()
   await delay(500)
   await sql`delete from test`
-  await delay(10)
+  await delay(100)
   await unsubscribe()
   return [
     '2insert,Murray,,delete,1,',
