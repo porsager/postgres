@@ -2100,3 +2100,14 @@ t('Supports nested fragments with parameters', async() => {
     await sql`drop table test`
   ]
 })
+
+t('Supports arrays of fragments', async() => {
+  const [{ x }] = await sql`
+    ${ [sql`select`, sql`1`, sql`as`, sql`x`] }
+  `
+
+  return [
+    1,
+    x
+  ]
+})
