@@ -96,14 +96,14 @@ export function handleValue(x, parameters, types, options) {
 
 const defaultHandlers = typeHandlers(types)
 
-export function stringify(q, string, value, parameters, types, options) { // eslint-disable-line
+export function stringify(q, string, value, parameters, types, o) { // eslint-disable-line
   for (let i = 1; i < q.strings.length; i++) {
     string += (
-      value && value[0] instanceof Query ? value.reduce((acc, x) => acc + ' ' + fragment(x, parameters, types), '') :
-      value instanceof Query ? fragment(value, parameters, types) :
+      value && value[0] instanceof Query ? value.reduce((acc, x) => acc + ' ' + fragment(x, parameters, types, o), '') :
+      value instanceof Query ? fragment(value, parameters, types, o) :
       value instanceof Identifier ? value.value :
-      value instanceof Builder ? value.build(string, parameters, types, options) :
-      handleValue(value, parameters, types, options)
+      value instanceof Builder ? value.build(string, parameters, types, o) :
+      handleValue(value, parameters, types, o)
     ) + q.strings[i]
     value = q.args[i]
   }
@@ -111,9 +111,9 @@ export function stringify(q, string, value, parameters, types, options) { // esl
   return string
 }
 
-function fragment(q, parameters, types) {
+function fragment(q, parameters, types, options) {
   q.fragment = true
-  return stringify(q, q.strings[0], q.args[0], parameters, types)
+  return stringify(q, q.strings[0], q.args[0], parameters, types, options)
 }
 
 function valuesBuilder(first, parameters, types, columns, options) {
