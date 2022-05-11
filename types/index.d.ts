@@ -41,10 +41,10 @@ interface BaseOptions<T extends PostgresTypeList> {
    */
   user: string;
   /**
-   * true, prefer, require or tls.connect options
+   * How to deal with ssl (can be a tls.connect option object)
    * @default false
   */
-  ssl: 'require' | 'allow' | 'prefer' | boolean | object;
+  ssl: 'require' | 'allow' | 'prefer' | 'verify-full' | boolean | object;
   /**
    * Max number of connections
    * @default 10
