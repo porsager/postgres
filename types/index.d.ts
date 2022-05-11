@@ -159,17 +159,17 @@ type UnwrapPromiseArray<T> = T extends any[] ? {
 
 type Keys = string
 
-type SerializableObject<T, K extends any[]> =
+type SerializableObject<T, K extends readonly any[]> =
   number extends K['length'] ? {} :
   (Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.SerializableParameter | postgres.JSONValue> & Record<string, any>)
 
-type First<T, K extends any[]> =
+type First<T, K extends readonly any[]> =
   // Tagged template string call
   T extends TemplateStringsArray ? TemplateStringsArray :
   // Identifiers helper
   T extends string ? string :
   // Dynamic values helper (depth 2)
-  T extends readonly any[][] ? postgres.EscapableArray[] :
+  T extends readonly any[][] ? readonly postgres.EscapableArray[] :
   // Insert/update helper (depth 2)
   T extends readonly (object & infer R)[] ? (R extends postgres.SerializableParameter ? readonly postgres.SerializableParameter[] : readonly SerializableObject<R, K>[]) :
   // Dynamic values/ANY helper (depth 1)
@@ -181,14 +181,14 @@ type First<T, K extends any[]> =
 
 type Rest<T> =
   T extends TemplateStringsArray ? never : // force fallback to the tagged template function overload
-  T extends string ? string[] :
-  T extends readonly any[][] ? [] :
-  T extends readonly (object & infer R)[] ? (Keys & keyof R)[] :
-  T extends readonly any[] ? [] :
-  T extends object ? (Keys & keyof T)[] :
+  T extends string ? readonly string[] :
+  T extends readonly any[][] ? readonly [] :
+  T extends readonly (object & infer R)[] ? readonly (Keys & keyof R)[] :
+  T extends readonly any[] ? readonly [] :
+  T extends object ? readonly (Keys & keyof T)[] :
   any
 
-type Return<T, K extends any[]> =
+type Return<T, K extends readonly any[]> =
   [T] extends [TemplateStringsArray] ?
   [unknown] extends [T] ? postgres.Helper<T, K> : // ensure no `PendingQuery` with `any` types
   [TemplateStringsArray] extends [T] ? postgres.PendingQuery<postgres.Row[]> :
@@ -475,10 +475,10 @@ declare namespace postgres {
     | string
     | number
     | Date // serialized as `string`
-    | JSONValue[]
+    | readonly JSONValue[]
     | { toJSON(): any } // `toJSON` called by `JSON.stringify`; not typing the return type, typings is strict enough anyway
     | {
-      [prop: string | number]:
+      readonly [prop: string | number]:
       | undefined
       | JSONValue
       | ((...args: any) => any) // serialized as `undefined`
@@ -572,7 +572,7 @@ declare namespace postgres {
     unlisten(): Promise<void>
   }
 
-  interface Helper<T, U extends any[] = T[]> extends NotAPromise {
+  interface Helper<T, U extends readonly any[] = T[]> extends NotAPromise {
     first: T;
     rest: U;
   }
@@ -592,7 +592,7 @@ declare namespace postgres {
      * @param parameters Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends readonly object[] = Row[]>(template: TemplateStringsArray, ...parameters: (SerializableParameter | PendingQuery<any>)[]): PendingQuery<AsRowList<T>>;
+    <T extends readonly object[] = Row[]>(template: TemplateStringsArray, ...parameters: readonly (SerializableParameter | PendingQuery<any>)[]): PendingQuery<AsRowList<T>>;
 
     CLOSE: {};
     END: this['CLOSE'];
