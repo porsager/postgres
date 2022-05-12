@@ -611,7 +611,7 @@ declare namespace postgres {
     listen(channel: string, onnotify: (value: string) => void, onlisten?: () => void): ListenRequest;
     notify(channel: string, payload: string): PendingRequest;
 
-    subscribe(event: string, cb: (row: Row | null, info: ReplicationEvent) => void): Promise<SubscriptionHandle>;
+    subscribe(event: string, cb: (row: Row | null, info: ReplicationEvent) => void, onsubscribe?: () => void): Promise<SubscriptionHandle>;
 
     largeObject(oid?: number, /** @default 0x00020000 | 0x00040000 */ mode?: number): Promise<LargeObject>;
 
