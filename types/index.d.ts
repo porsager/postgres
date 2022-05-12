@@ -159,11 +159,11 @@ type UnwrapPromiseArray<T> = T extends any[] ? {
 
 type Keys = string
 
-type SerializableObject<T, K extends readonly any[]> =
+type SerializableObject<T, K extends readonly any[], TT> =
   number extends K['length'] ? {} :
-  (Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.SerializableParameter | postgres.JSONValue> & Record<string, any>)
+  (Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.SerializableParameter<TT> | postgres.JSONValue> & Record<string, any>)
 
-type First<T, K extends readonly any[]> =
+type First<T, K extends readonly any[], TT> =
   // Tagged template string call
   T extends TemplateStringsArray ? TemplateStringsArray :
   // Identifiers helper
@@ -171,11 +171,11 @@ type First<T, K extends readonly any[]> =
   // Dynamic values helper (depth 2)
   T extends readonly any[][] ? readonly postgres.EscapableArray[] :
   // Insert/update helper (depth 2)
-  T extends readonly (object & infer R)[] ? (R extends postgres.SerializableParameter ? readonly postgres.SerializableParameter[] : readonly SerializableObject<R, K>[]) :
+  T extends readonly (object & infer R)[] ? (R extends postgres.SerializableParameter<TT> ? readonly postgres.SerializableParameter<TT>[] : readonly SerializableObject<R, K, TT>[]) :
   // Dynamic values/ANY helper (depth 1)
-  T extends readonly any[] ? (readonly postgres.SerializableParameter[]) :
+  T extends readonly any[] ? (readonly postgres.SerializableParameter<TT>[]) :
   // Insert/update helper (depth 1)
-  T extends object ? SerializableObject<T, K> :
+  T extends object ? SerializableObject<T, K, TT> :
   // Unexpected type
   never
 
@@ -365,7 +365,7 @@ declare namespace postgres {
     raw: T | null;
   }
 
-  interface ArrayParameter<T extends SerializableParameter[] = SerializableParameter[]> extends Parameter<T | T[]> {
+  interface ArrayParameter<T extends readonly any[] = readonly any[]> extends Parameter<T | T[]> {
     array: true;
   }
 
@@ -458,17 +458,17 @@ declare namespace postgres {
     | null
     | boolean
     | number
-    | bigint // weak: require the `postgres.BigInt` type
     | string
     | Date
     | Uint8Array;
 
-  type SerializableParameter = never
+  type SerializableParameter<T = never> = never
+    | T
     | Serializable
     | Helper<any>
     | Parameter<any>
     | ArrayParameter
-    | readonly SerializableParameter[];
+    | readonly SerializableParameter<T>[];
 
   type JSONValue = // using a dedicated type to detect symbols, bigints, and other non serializable types
     | null
@@ -584,7 +584,7 @@ declare namespace postgres {
      * @param rest Other optional arguments, depending on the helper type
      * @returns An helper object usable as tagged template parameter in sql queries
      */
-    <T, K extends Rest<T>>(first: T & First<T, K>, ...rest: K): Return<T, K>;
+    <T, K extends Rest<T>>(first: T & First<T, K, TTypes[keyof TTypes]>, ...rest: K): Return<T, K>;
 
     /**
      * Execute the SQL query passed as a template string. Can only be used as template string tag.
@@ -592,7 +592,7 @@ declare namespace postgres {
      * @param parameters Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends readonly (object | undefined)[] = Row[]>(template: TemplateStringsArray, ...parameters: readonly (SerializableParameter | PendingQuery<any>)[]): PendingQuery<AsRowList<T>>;
+    <T extends readonly (object | undefined)[] = Row[]>(template: TemplateStringsArray, ...parameters: readonly (SerializableParameter<TTypes[keyof TTypes]> | PendingQuery<any>)[]): PendingQuery<AsRowList<T>>;
 
     CLOSE: {};
     END: this['CLOSE'];
@@ -605,7 +605,7 @@ declare namespace postgres {
       [name in keyof TTypes]: (value: TTypes[name]) => postgres.Parameter<TTypes[name]>
     };
 
-    unsafe<T extends any[] = (Row & Iterable<Row>)[]>(query: string, parameters?: SerializableParameter[], queryOptions?: UnsafeQueryOptions): PendingQuery<AsRowList<T>>;
+    unsafe<T extends any[] = (Row & Iterable<Row>)[]>(query: string, parameters?: SerializableParameter<TTypes[keyof TTypes]>[], queryOptions?: UnsafeQueryOptions): PendingQuery<AsRowList<T>>;
     end(options?: { timeout?: number }): Promise<void>;
 
     listen(channel: string, onnotify: (value: string) => void, onlisten?: () => void): ListenRequest;
@@ -618,9 +618,9 @@ declare namespace postgres {
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 
-    array<T extends SerializableParameter[] = SerializableParameter[]>(value: T, type?: number): ArrayParameter<T>;
+    array<T extends SerializableParameter<TTypes[keyof TTypes]>[] = SerializableParameter<TTypes[keyof TTypes]>[]>(value: T, type?: number): ArrayParameter<T>;
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
-    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: SerializableParameter[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
+    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: SerializableParameter<TTypes[keyof TTypes]>[], options?: { cache?: boolean }): PendingQuery<AsRowList<T>>;
     json(value: JSONValue): Parameter;
   }
 
