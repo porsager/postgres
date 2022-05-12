@@ -272,7 +272,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       socket,
       ...(ssl === 'require' || ssl === 'allow' || ssl === 'prefer'
         ? { rejectUnauthorized: false }
-        : ssl
+        : ssl === 'verify-full'
+        ? {}
+        : typeof ssl === 'object'
+        ? ssl
+        : {}
       )
     })
     socket.on('secureConnect', connected)
@@ -569,7 +573,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return errored(Errors.generic('UNSAFE_TRANSACTION', 'Only use sql.begin or max: 1'))
 
     if (query.options.simple)
-      return
+      return BindComplete()
 
     if (query.cursorFn) {
       result.count && query.cursorFn(result)

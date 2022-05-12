@@ -612,6 +612,10 @@ t('unsafe simple', async() => {
   return [1, (await sql.unsafe('select 1 as x'))[0].x]
 })
 
+t('unsafe simple includes columns', async() => {
+  return ['x', (await sql.unsafe('select 1 as x').values()).columns[0].name]
+})
+
 t('listen and notify', async() => {
   const sql = postgres(options)
   const channel = 'hello'
@@ -780,8 +784,8 @@ t('has server parameters', async() => {
 
 t('big query body', async() => {
   await sql`create table test (x int)`
-  return [1000, (await sql`insert into test ${
-    sql([...Array(1000).keys()].map(x => ({ x })))
+  return [50000, (await sql`insert into test ${
+    sql([...Array(50000).keys()].map(x => ({ x })))
   }`).count, await sql`drop table test`]
 })
 
@@ -1812,7 +1816,7 @@ t('subscribe reconnects and calls onsubscribe', { timeout: 4 }, async() => {
   await subscribeSql.close()
   await delay(500)
   await sql`delete from test`
-  await delay(10)
+  await delay(100)
   await unsubscribe()
   return [
     '2insert,Murray,,delete,1,',
@@ -2094,5 +2098,16 @@ t('Supports nested fragments with parameters', async() => {
     1,
     (await sql`select a from test`)[0].a,
     await sql`drop table test`
+  ]
+})
+
+t('Supports arrays of fragments', async() => {
+  const [{ x }] = await sql`
+    ${ [sql`select`, sql`1`, sql`as`, sql`x`] }
+  `
+
+  return [
+    1,
+    x
   ]
 })

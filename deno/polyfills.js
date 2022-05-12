@@ -69,12 +69,14 @@ export const net = {
         socket.events[x] = socket.events[x].filter(x => x !== fn && x.once !== fn)
       },
       write: (x, cb) => {
-        socket.raw.write(x)
-          .then(() => (cb && cb(null)))
-          .catch(err => {
-            cb && cb()
-            call(socket.events.error, err)
-          })
+        socket.raw.write(x).then(l => {
+          l < x.length
+            ? socket.write(x.slice(l), cb)
+            : (cb && cb(null))
+        }).catch(err => {
+          cb && cb()
+          call(socket.events.error, err)
+        })
         return false
       },
       destroy: () => close(),

@@ -767,7 +767,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   max_lifetime         : null,          // Max lifetime in seconds (more info below)
   idle_timeout         : 0,             // Idle connection timeout in seconds
   connect_timeout      : 30,            // Connect timeout in seconds
-  no_prepare           : false,         // No automatic creation of prepared statements
+  prepare              : true,          // Automatic creation of prepared statements
   types                : [],            // Array of custom types, see more below
   onnotice             : fn,            // Defaults to console.log
   onparameter          : fn,            // (key, value) when server param change

@@ -377,44 +377,62 @@ function parseOptions(a, b) {
   const env = process.env // eslint-disable-line
       , o = (typeof a === 'string' ? b : a) || {}
       , { url, multihost } = parseUrl(a)
-      , query = url.searchParams
+      , query = [...url.searchParams].reduce((a, [b, c]) => (a[b] = c, a), {})
       , host = o.hostname || o.host || multihost || url.hostname || env.PGHOST || 'localhost'
       , port = o.port || url.port || env.PGPORT || 5432
       , user = o.user || o.username || url.username || env.PGUSERNAME || env.PGUSER || osUsername()
 
-  return Object.assign({
+  o.no_prepare && (o.prepare = false)
+  query.sslmode && (query.ssl = query.sslmode, delete query.sslmode)
+  'timeout' in o && (console.log('The timeout option is deprecated, use idle_timeout instead'), o.idle_timeout = o.timeout) // eslint-disable-line
+
+  const defaults = {
+    max             : 10,
+    ssl             : false,
+    idle_timeout    : null,
+    connect_timeout : 30,
+    max_lifetime    : max_lifetime,
+    max_pipeline    : 100,
+    backoff         : backoff,
+    keep_alive      : 60,
+    prepare         : true,
+    debug           : false,
+    fetch_types     : true,
+    publications    : 'alltables'
+  }
+
+  return {
     host            : Array.isArray(host) ? host : host.split(',').map(x => x.split(':')[0]),
     port            : Array.isArray(port) ? port : host.split(',').map(x => parseInt(x.split(':')[1] || port)),
     path            : o.path || host.indexOf('/') > -1 && host + '/.s.PGSQL.' + port,
     database        : o.database || o.db || (url.pathname || '').slice(1) || env.PGDATABASE || user,
     user            : user,
     pass            : o.pass || o.password || url.password || env.PGPASSWORD || '',
-    max             : o.max || query.get('max') || 10,
+    ...Object.entries(defaults).reduce((acc, [k, d]) =>
+      (acc[k] = k in o ? o[k] : k in query
+        ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
+        : env['PG' + k.toUpperCase()] || d,
+      acc
+      ),
+      {}
+    ),
+    connection      : {
+      application_name: 'postgres.js',
+      ...o.connection,
+      ...Object.entries(query).reduce((acc, [k, v]) => (k in defaults || (acc[k] = v), acc), {})
+    },
     types           : o.types || {},
-    ssl             : o.ssl || parseSSL(query.get('sslmode') || query.get('ssl')) || false,
-    idle_timeout    : o.idle_timeout || query.get('idle_timeout') || env.PGIDLE_TIMEOUT || warn(o.timeout),
-    connect_timeout : o.connect_timeout || query.get('connect_timeout') || env.PGCONNECT_TIMEOUT || 30,
-    max_lifetime    : o.max_lifetime || url.max_lifetime || max_lifetime,
-    max_pipeline    : o.max_pipeline || url.max_pipeline || 100,
-    backoff         : o.backoff || url.backoff || backoff,
-    keep_alive      : o.keep_alive || url.keep_alive || 60,
-    prepare         : 'prepare' in o ? o.prepare : 'no_prepare' in o ? !o.no_prepare : true,
+    target_session_attrs: tsa(o, url, env),
     onnotice        : o.onnotice,
     onnotify        : o.onnotify,
     onclose         : o.onclose,
     onparameter     : o.onparameter,
-    transform       : parseTransform(o.transform || { undefined: undefined }),
-    connection      : Object.assign({ application_name: 'postgres.js' }, o.connection),
-    target_session_attrs: tsa(o, url, env),
-    debug           : o.debug,
     socket          : o.socket,
-    fetch_types     : 'fetch_types' in o ? o.fetch_types : true,
+    transform       : parseTransform(o.transform || { undefined: undefined }),
     parameters      : {},
     shared          : { retries: 0, typeArrayMap: {} },
-    publications    : o.publications || query.get('publications') || 'alltables'
-  },
-    mergeUserTypes(o.types)
-  )
+    ...mergeUserTypes(o.types)
+  }
 }
 
 function tsa(o, url, env) {
@@ -451,28 +469,18 @@ function parseTransform(x) {
   }
 }
 
-function parseSSL(x) {
-  return x !== 'disable' && x !== 'false' && x
-}
-
 function parseUrl(url) {
   if (typeof url !== 'string')
     return { url: { searchParams: new Map() } }
 
   let host = url
-  host = host.slice(host.indexOf('://') + 3)
-  host = host.split(/[?/]/)[0]
-  host = host.slice(host.indexOf('@') + 1)
+  host = host.slice(host.indexOf('://') + 3).split(/[?/]/)[0]
+  host = decodeURIComponent(host.slice(host.indexOf('@') + 1))
 
   return {
     url: new URL(url.replace(host, host.split(',')[0])),
     multihost: host.indexOf(',') > -1 && host
   }
-}
-
-function warn(x) {
-  typeof x !== 'undefined' && console.log('The timeout option is deprecated, use idle_timeout instead') // eslint-disable-line
-  return x
 }
 
 function osUsername() {
