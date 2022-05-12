@@ -608,7 +608,7 @@ declare namespace postgres {
     unsafe<T extends any[] = (Row & Iterable<Row>)[]>(query: string, parameters?: SerializableParameter[], queryOptions?: UnsafeQueryOptions): PendingQuery<AsRowList<T>>;
     end(options?: { timeout?: number }): Promise<void>;
 
-    listen(channel: string, cb: (value: string) => void): ListenRequest;
+    listen(channel: string, onnotify: (value: string) => void, onlisten?: () => void): ListenRequest;
     notify(channel: string, payload: string): PendingRequest;
 
     subscribe(event: string, cb: (row: Row | null, info: ReplicationEvent) => void): Promise<SubscriptionHandle>;
