@@ -78,6 +78,9 @@ interface BaseOptions<T extends PostgresTypeList> {
   debug: boolean | ((connection: number, query: string, parameters: any[], paramTypes: any[]) => void);
   /** Transform hooks */
   transform: {
+    /** Transforms outcoming undefined values */
+    undefined?: any
+
     /** Transforms incoming and outgoing column names */
     column?: ((column: string) => string) | {
       /** SQL to JS */
@@ -329,6 +332,9 @@ declare namespace postgres {
   }
 
   interface Transform {
+    /** Transforms outcoming undefined values */
+    undefined: any
+
     /** Transforms incoming column names */
     column: {
       from: ((column: string) => string) | undefined;
