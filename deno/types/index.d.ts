@@ -80,6 +80,9 @@ interface BaseOptions<T extends PostgresTypeList> {
   debug: boolean | ((connection: number, query: string, parameters: any[], paramTypes: any[]) => void);
   /** Transform hooks */
   transform: {
+    /** Transforms outcoming undefined values */
+    undefined?: any
+
     /** Transforms incoming and outgoing column names */
     column?: ((column: string) => string) | {
       /** SQL to JS */
@@ -331,6 +334,9 @@ declare namespace postgres {
   }
 
   interface Transform {
+    /** Transforms outcoming undefined values */
+    undefined: any
+
     /** Transforms incoming column names */
     column: {
       from: ((column: string) => string) | undefined;
@@ -613,7 +619,7 @@ declare namespace postgres {
     listen(channel: string, onnotify: (value: string) => void, onlisten?: () => void): ListenRequest;
     notify(channel: string, payload: string): PendingRequest;
 
-    subscribe(event: string, cb: (row: Row | null, info: ReplicationEvent) => void): Promise<SubscriptionHandle>;
+    subscribe(event: string, cb: (row: Row | null, info: ReplicationEvent) => void, onsubscribe?: () => void): Promise<SubscriptionHandle>;
 
     largeObject(oid?: number, /** @default 0x00020000 | 0x00040000 */ mode?: number): Promise<LargeObject>;
 
