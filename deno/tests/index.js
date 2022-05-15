@@ -2126,4 +2126,21 @@ t('Supports arrays of fragments', async() => {
   ]
 })
 
+t('Does not try rollback when commit errors', async() => {
+  let notice = null
+  const sql = postgres({ ...options, onnotice: x => notice = x })
+  await sql`create table test(x int constraint test_constraint unique deferrable initially deferred)`
+
+  await sql.begin('isolation level serializable', async sql => {
+    await sql`insert into test values(1)`
+    await sql`insert into test values(1)`
+  }).catch(e => e)
+
+  return [
+    notice,
+    null,
+    await sql`drop table test`
+  ]
+})
+
 ;window.addEventListener("unload", () => Deno.exit(process.exitCode))
