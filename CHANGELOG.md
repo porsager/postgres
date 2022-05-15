@@ -1,6 +1,25 @@
 # Changelog
 
-## [3.1.0] - 22 Apr 2022
+## v3.2.0 - 15 May 2022
+- Add `sslmode=verify-full` support  e67da29
+- Add support for array of fragments  342bf55
+- Add uri decode of host in url - fixes #346 1adc113
+- Add passing of rest url params to connection (ootb support cockroach urls)  41ed84f
+- Fix Deno partial writes  452a30d
+- Fix `as` dynamic helper  3300c40
+- Fix some nested fragments usage  9bfa902
+- Fix missing columns on `Result` when using simple protocol - fixes #350  1e2e298
+- Fix fragments in transactions - fixes #333  75914c7
+
+#### Typescript related
+- Upgrade/fix types (#357)  1e6d312
+- Add optional `onlisten` callback to `listen()` on TypeScript (#360)  6b749b2
+- Add implicit custom type inference (#361)  28512bf
+- Fix and improve sql() helper types (#338)  c1de3d8
+- Fix update query type def for `.writable()` and `.readable()` to return promises (#347)  51269ce
+- Add bigint to typescript Serializable - fixes #330  f1e41c3
+
+## v3.1.0 - 22 Apr 2022
 - Add close method to close but not end connections forever  94fea8f
 - Add .values() method to return rows as arrays of values  56873c2
 - Support transform.undefined - fixes #314  eab71e5
@@ -9,7 +28,7 @@
 - Fix subscribe reconnect and add onsubscribe method - fixes #315  5097345
 - Deno ts fix - fixes #327  50403a1
 
-## [3.0.6] - 19 Apr 2022
+## v3.0.6 - 19 Apr 2022
 - Properly close connections in Deno  cbc6a75
 - Only write end message if socket is open  13950af
 - Improve query cancellation  01c2c68
@@ -18,27 +37,27 @@
 - Fix type errors in TypeScript deno projects (#313)  822fb21
 - Execute forEach instantly  44e9fbe
 
-## [3.0.5] - 6 Apr 2022
+## v3.0.5 - 6 Apr 2022
 - Fix transaction execution timing  28bb0b3
 - Add optional onlisten function to listen  1dc2fd2
 - Fix dynamic in helper after insert #305  4d63a59
 
-## [3.0.4] - 5 Apr 2022
+## v3.0.4 - 5 Apr 2022
 - Ensure drain only dequeues if ready - fixes #303  2e5f017
 
-## [3.0.3] - 4 Apr 2022
+## v3.0.3 - 4 Apr 2022
 - Run tests with github actions  b536d0d
 - Add custom socket option - fixes #284  5413f0c
 - Fix sql function overload type inference (#294)  3c4e90a
 - Update deno std to 0.132 and enable last tests  50762d4
 - Send proper client-encoding - Fixes #288  e5b8554
 
-## [3.0.2] - 31 Mar 2022
+## v3.0.2 - 31 Mar 2022
 - Fix BigInt handling  36a70df
 - Fix unsubscribing  (#300)  b6c597f
 - Parse update properly with identity full - Fixes #296  3ed11e7
 
-## [3.0.1] - 30 Mar 2022
+## v3.0.1 - 30 Mar 2022
  - Improve connection queue handling + fix leak cee1a57
  - Use publications option - fixes #295 b5ceecc
  - Throw proper query error if destroyed e148a0a
@@ -48,7 +67,7 @@
  - Disable fetch_types for Subscribe options 72e0cdb
  - Update TypeScript types with v3 changes (#293) db05836
 
-## [3.0.0] - 24 Mar 2022
+## v3.0.0 - 24 Mar 2022
 This is a complete rewrite to better support all the features that I was trying to get into v2. There are a few breaking changes from v2 beta, which some (myself included) was using in production, so I'm skipping a stable v2 release and going straight to v3.
 
 Here are some of the new things available, but check the updated docs.
@@ -82,7 +101,7 @@ Here are some of the new things available, but check the updated docs.
 - Default to 10 connections instead of number of CPUs
 - Numbers that cannot be safely cast to JS Number are returned as string. This happens for eg, `select count(*)` because `count()` returns a 64 bit integer (int8), so if you know your `count()` won't be too big for a js number just cast in your query to int4 like `select count(*)::int`
 
-## [1.0.2] - 21 Jan 2020
+## v1.0.2 - 21 Jan 2020
 
 - Fix standard postgres user env var (#20)  cce5ad7
 - Ensure url or options is not falsy  bc549b0
@@ -90,7 +109,7 @@ Here are some of the new things available, but check the updated docs.
 - Fix hiding pass from options  3f76b98
 
 
-## [1.0.1] - 3 Jan 2020
+## v1.0.1 - 3 Jan 2020
 
 - Fix #3 url without db and trailing slash  45d4233
 - Fix stream promise - resolve with correct result  730df2c
@@ -99,6 +118,6 @@ Here are some of the new things available, but check the updated docs.
 - Fix params usage for file() call without options  e4f12a4
 - Various Performance improvements
 
-## [1.0.0] - 22 Dec 2019
+## v1.0.0 - 22 Dec 2019
 
 - Initial release
