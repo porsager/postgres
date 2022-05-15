@@ -2103,6 +2103,18 @@ t('Supports nested fragments with parameters', async() => {
   ]
 })
 
+t('Supports multiple nested fragments with parameters', async() => {
+  const [{ b }] = await sql`select * ${
+    sql`from ${
+      sql`(values (2, ${ 1 }::int)) as x(${ sql(['a', 'b']) })`
+    }`
+  }`
+  return [
+    1,
+    b
+  ]
+})
+
 t('Supports arrays of fragments', async() => {
   const [{ x }] = await sql`
     ${ [sql`select`, sql`1`, sql`as`, sql`x`] }
