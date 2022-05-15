@@ -96,19 +96,23 @@ export function handleValue(x, parameters, types, options) {
 
 const defaultHandlers = typeHandlers(types)
 
-export function stringify(q, string, value, parameters, types, o) { // eslint-disable-line
+export function stringify(q, string, value, parameters, types, options) { // eslint-disable-line
   for (let i = 1; i < q.strings.length; i++) {
-    string += (
-      value && value[0] instanceof Query ? value.reduce((acc, x) => acc + ' ' + fragment(x, parameters, types, o), '') :
-      value instanceof Query ? fragment(value, parameters, types, o) :
-      value instanceof Identifier ? value.value :
-      value instanceof Builder ? value.build(string, parameters, types, o) :
-      handleValue(value, parameters, types, o)
-    ) + q.strings[i]
+    string += (stringifyValue(string, value, parameters, types, options)) + q.strings[i]
     value = q.args[i]
   }
 
   return string
+}
+
+function stringifyValue(string, value, parameters, types, o) {
+  return (
+    value instanceof Builder ? value.build(string, parameters, types, o) :
+    value instanceof Query ? fragment(value, parameters, types, o) :
+    value instanceof Identifier ? value.value :
+    value && value[0] instanceof Query ? value.reduce((acc, x) => acc + ' ' + fragment(x, parameters, types, o), '') :
+    handleValue(value, parameters, types, o)
+  )
 }
 
 function fragment(q, parameters, types, options) {
@@ -117,16 +121,10 @@ function fragment(q, parameters, types, options) {
 }
 
 function valuesBuilder(first, parameters, types, columns, options) {
-  let value
   return first.map(row =>
-    '(' + columns.map(column => {
-      value = row[column]
-      return (
-        value instanceof Query ? fragment(value, parameters, types) :
-        value instanceof Identifier ? value.value :
-        handleValue(value, parameters, types, options)
-      )
-    }).join(',') + ')'
+    '(' + columns.map(column =>
+      stringifyValue('values', row[column], parameters, types, options)
+    ).join(',') + ')'
   ).join(',')
 }
 
@@ -146,7 +144,7 @@ function select(first, rest, parameters, types, options) {
   return columns.map(x => {
     value = first[x]
     return (
-      value instanceof Query ? fragment(value, parameters, types) :
+      value instanceof Query ? fragment(value, parameters, types, options) :
       value instanceof Identifier ? value.value :
       handleValue(value, parameters, types, options)
     ) + ' as ' + escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x)
