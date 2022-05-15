@@ -395,7 +395,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     return ending || (
       !connection.reserved && onend(connection),
       !connection.reserved && !initial && !query && sent.length === 0
-        ? Promise.resolve(terminate())
+        ? (terminate(), new Promise(r => socket && socket.readyState !== 'closed' ? socket.once('close', r) : r()))
         : ending = new Promise(r => ended = r)
     )
   }
