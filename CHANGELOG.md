@@ -1,5 +1,8 @@
 # Changelog
 
+## v3.2.2 - 15 May 2022
+- Properly handle errors thrown on commit  99ddae4
+
 ## v3.2.1 - 15 May 2022
 - Exclude target_session_attrs from connection obj  43f1442
 
