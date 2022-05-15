@@ -157,6 +157,7 @@ const builders = Object.entries({
   values,
   in: values,
   select,
+  as: select,
   returning: select,
 
   update(first, rest, parameters, types, options) {
