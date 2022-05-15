@@ -1,5 +1,8 @@
 # Changelog
 
+## v3.2.1 - 15 May 2022
+- Exclude target_session_attrs from connection obj  43f1442
+
 ## v3.2.0 - 15 May 2022
 - Add `sslmode=verify-full` support  e67da29
 - Add support for array of fragments  342bf55

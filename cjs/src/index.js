@@ -397,7 +397,8 @@ function parseOptions(a, b) {
     prepare         : true,
     debug           : false,
     fetch_types     : true,
-    publications    : 'alltables'
+    publications    : 'alltables',
+    target_session_attrs: null
   }
 
   return {
