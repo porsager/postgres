@@ -225,9 +225,6 @@ declare namespace postgres {
     query: string;
     /** Only set when debug is enabled */
     parameters: any[];
-
-    // Disable user-side creation of PostgresError
-    private constructor();
   }
 
   /**
