@@ -2140,3 +2140,16 @@ t('Does not try rollback when commit errors', async() => {
     await sql`drop table test`
   ]
 })
+
+t('Last keyword used even with duplicate keywords', async() => {
+  await sql`create table test (x int);`
+  await sql`insert into test values(1)`
+  const [{ x }] = await sql`
+    select
+      1 in (1) as x
+    from test
+    where x in ${ sql([1, 2]) }
+  `
+
+  return [x, true]
+})
