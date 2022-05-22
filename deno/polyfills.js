@@ -94,7 +94,7 @@ export const net = {
 
       const encrypted = socket.encrypted
       socket.raw = raw
-      keepAlive != null && raw.setKeepAlive(keepAlive)
+      keepAlive != null && raw.setKeepAlive && raw.setKeepAlive(keepAlive)
       socket.readyState = 'open'
       socket.encrypted
         ? call(socket.events.secureConnect)
