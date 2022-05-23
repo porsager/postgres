@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.2.3 - 23 May 2022
+- Fix Only use setKeepAlive in Deno if available  28fbbaf
+- Fix wrong helper match on multiple occurances  02f3854
+
+#### Typescript related
+- Fix Deno assertRejects compatibility (#365)  0f0af92
+- Fix include missing boolean type in JSONValue union (#373)  1817387
+
 ## v3.2.2 - 15 May 2022
 - Properly handle errors thrown on commit  99ddae4
 
