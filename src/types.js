@@ -243,7 +243,7 @@ export const arraySerializer = function arraySerializer(xs, serializer) {
   if (Array.isArray(first) && !first.type)
     return '{' + xs.map(x => arraySerializer(x, serializer)).join(',') + '}'
 
-  return '{' + xs.map(x => x === null ? 'null' :
+  return '{' + xs.map(x => x == null ? 'null' :
     '"' + arrayEscape(serializer ? serializer(x.type ? x.value : x) : '' + x) + '"'
   ).join(',') + '}'
 }
