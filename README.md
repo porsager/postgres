@@ -898,7 +898,7 @@ Prepared statements will automatically be created for any queries where it can b
 
 ## Custom Types
 
-You can add ergonomic support for custom types, or simply use `sql.typed(value, type)` inline, where type is the PostgreSQL `oid` for the type and the correctly serialized string. _(`oid` values for types can be found in the `pg_catalog.pg_types` table.)_
+You can add ergonomic support for custom types, or simply use `sql.typed(value, type)` inline, where type is the PostgreSQL `oid` for the type and the correctly serialized string. _(`oid` values for types can be found in the `pg_catalog.pg_type` table.)_
 
 Adding Query helpers is the cleanest approach which can be done like this:
 
