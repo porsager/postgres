@@ -252,9 +252,7 @@ export const arraySerializer = function arraySerializer(xs, serializer, options)
 
     return x === null
       ? 'null'
-      : x === undefined
-        ? '' + options.transform.undefined
-        : '"' + arrayEscape(serializer ? serializer(x.type ? x.value : x) : '' + x) + '"'
+      : '"' + arrayEscape(serializer ? serializer(x.type ? x.value : x) : '' + x) + '"'
   }).join(',') + '}'
 }
 
