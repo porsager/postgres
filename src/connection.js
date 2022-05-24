@@ -731,7 +731,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     options.shared.typeArrayMap[oid] = typarray
     options.parsers[typarray] = (xs) => arrayParser(xs, parser)
     options.parsers[typarray].array = true
-    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid])
+    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid], options)
   }
 
   function tryNext(x, xs) {
