@@ -894,7 +894,7 @@ const sql = postgres()
 
 ### Prepared statements
 
-Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `no_prepare` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93).
+Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `no_prepare` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93#issuecomment-656290493).
 
 ## Custom Types
 
