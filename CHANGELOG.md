@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.2.4 - 25 May 2022
+- Allow setting keep_alive: false  bee62f3
+- Fix support for null in arrays - fixes #371  b04c853
+
 ## v3.2.3 - 23 May 2022
 - Fix Only use setKeepAlive in Deno if available  28fbbaf
 - Fix wrong helper match on multiple occurances  02f3854
