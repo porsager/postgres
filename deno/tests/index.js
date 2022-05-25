@@ -2144,7 +2144,7 @@ t('Does not try rollback when commit errors', async() => {
 })
 
 t('Last keyword used even with duplicate keywords', async() => {
-  await sql`create table test (x int);`
+  await sql`create table test (x int)`
   await sql`insert into test values(1)`
   const [{ x }] = await sql`
     select
@@ -2153,7 +2153,37 @@ t('Last keyword used even with duplicate keywords', async() => {
     where x in ${ sql([1, 2]) }
   `
 
-  return [x, true]
+  return [x, true, await sql`drop table test`]
+})
+
+t('Insert array with null', async() => {
+  await sql`create table test (x int[])`
+  await sql`insert into test ${ sql({ x: [1, null, 3] }) }`
+  return [
+    1,
+    (await sql`select x from test`)[0].x[0],
+    await sql`drop table test`
+  ]
+})
+
+t('Insert array with undefined throws', async() => {
+  await sql`create table test (x int[])`
+  return [
+    'UNDEFINED_VALUE',
+    await sql`insert into test ${ sql({ x: [1, undefined, 3] }) }`.catch(e => e.code),
+    await sql`drop table test`
+  ]
+})
+
+t('Insert array with undefined transform', async() => {
+  const sql = postgres({ ...options, transform: { undefined: null } })
+  await sql`create table test (x int[])`
+  await sql`insert into test ${ sql({ x: [1, undefined, 3] }) }`
+  return [
+    1,
+    (await sql`select x from test`)[0].x[0],
+    await sql`drop table test`
+  ]
 })
 
 ;window.addEventListener("unload", () => Deno.exit(process.exitCode))

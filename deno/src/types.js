@@ -232,7 +232,7 @@ function arrayEscape(x) {
     .replace(escapeQuote, '\\"')
 }
 
-export const arraySerializer = function arraySerializer(xs, serializer) {
+export const arraySerializer = function arraySerializer(xs, serializer, options) {
   if (Array.isArray(xs) === false)
     return xs
 
@@ -244,9 +244,17 @@ export const arraySerializer = function arraySerializer(xs, serializer) {
   if (Array.isArray(first) && !first.type)
     return '{' + xs.map(x => arraySerializer(x, serializer)).join(',') + '}'
 
-  return '{' + xs.map(x =>
-    '"' + arrayEscape(serializer ? serializer(x.type ? x.value : x) : '' + x) + '"'
-  ).join(',') + '}'
+  return '{' + xs.map(x => {
+    if (x === undefined) {
+      x = options.transform.undefined
+      if (x === undefined)
+        throw Errors.generic('UNDEFINED_VALUE', 'Undefined values are not allowed')
+    }
+
+    return x === null
+      ? 'null'
+      : '"' + arrayEscape(serializer ? serializer(x.type ? x.value : x) : '' + x) + '"'
+  }).join(',') + '}'
 }
 
 const arrayParserState = {

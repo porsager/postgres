@@ -354,7 +354,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       statementCount = 1
       lifeTimer.start()
       socket.on('data', data)
-      keep_alive != null && socket.setKeepAlive(true, 1000 * keep_alive)
+      keep_alive && socket.setKeepAlive(true, 1000 * keep_alive)
       const s = StartupMessage()
       write(s)
     } catch (err) {
@@ -731,7 +731,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     options.shared.typeArrayMap[oid] = typarray
     options.parsers[typarray] = (xs) => arrayParser(xs, parser)
     options.parsers[typarray].array = true
-    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid])
+    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid], options)
   }
 
   function tryNext(x, xs) {
