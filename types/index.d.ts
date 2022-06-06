@@ -530,6 +530,7 @@ declare namespace postgres {
   }
 
   type ExecutionResult<T> = [] & ResultQueryMeta<number, keyof NonNullable<T>>;
+  type ValuesRowList<T extends readonly any[]> = T[number][keyof T[number]][][] & ResultQueryMeta<T['length'], keyof T[number]>;
   type RawRowList<T extends readonly any[]> = Buffer[][] & Iterable<Buffer[][]> & ResultQueryMeta<T['length'], keyof T[number]>;
   type RowList<T extends readonly any[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
 
@@ -555,11 +556,16 @@ declare namespace postgres {
   interface PendingDescribeQuery extends Promise<Statement> {
   }
 
+  interface PendingValuesQuery<TRow extends readonly MaybeRow[]> extends Promise<ValuesRowList<TRow>>, PendingQueryModifiers<TRow[number][keyof TRow[number]][][]> {
+    describe(): PendingDescribeQuery;
+  }
+
   interface PendingRawQuery<TRow extends readonly MaybeRow[]> extends Promise<RawRowList<TRow>>, PendingQueryModifiers<Buffer[][]> {
   }
 
   interface PendingQuery<TRow extends readonly MaybeRow[]> extends Promise<RowList<TRow>>, PendingQueryModifiers<TRow> {
     describe(): PendingDescribeQuery;
+    values(): PendingValuesQuery<TRow>;
     raw(): PendingRawQuery<TRow>;
   }
 
