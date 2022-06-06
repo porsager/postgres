@@ -103,7 +103,7 @@ export default function Subscribe(postgres, options) {
 
     function data(x) {
       if (x[0] === 0x77)
-        parse(x.slice(25), state, sql.options.parsers, handle)
+        parse(x.subarray(25), state, sql.options.parsers, handle)
       else if (x[0] === 0x6b && x[17])
         pong()
     }
@@ -143,8 +143,8 @@ function parse(x, state, parsers, handle) {
     R: x => {  // Relation
       let i = 1
       const r = state[x.readUInt32BE(i)] = {
-        schema: String(x.slice(i += 4, i = x.indexOf(0, i))) || 'pg_catalog',
-        table: String(x.slice(i + 1, i = x.indexOf(0, i + 1))),
+        schema: String(x.subarray(i += 4, i = x.indexOf(0, i))) || 'pg_catalog',
+        table: String(x.subarray(i + 1, i = x.indexOf(0, i + 1))),
         columns: Array(x.readUInt16BE(i += 2)),
         keys: []
       }
@@ -156,7 +156,7 @@ function parse(x, state, parsers, handle) {
       while (i < x.length) {
         column = r.columns[columnIndex++] = {
           key: x[i++],
-          name: String(x.slice(i, i = x.indexOf(0, i))),
+          name: String(x.subarray(i, i = x.indexOf(0, i))),
           type: x.readUInt32BE(i += 1),
           parser: parsers[x.readUInt32BE(i)],
           atttypmod: x.readUInt32BE(i += 4)
@@ -170,7 +170,7 @@ function parse(x, state, parsers, handle) {
     O: () => { /* noop */ }, // Origin
     B: x => { // Begin
       state.date = Time(x.readBigInt64BE(9))
-      state.lsn = x.slice(1, 9)
+      state.lsn = x.subarray(1, 9)
     },
     I: x => { // Insert
       let i = 1

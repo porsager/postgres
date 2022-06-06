@@ -309,12 +309,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       }
 
       try {
-        handle(incoming.slice(0, length + 1))
+        handle(incoming.subarray(0, length + 1))
       } catch (e) {
         query && (query.cursorFn || query.describeFirst) && write(Sync)
         errored(e)
       }
-      incoming = incoming.slice(length + 1)
+      incoming = incoming.subarray(length + 1)
       remaining = 0
       incomings = null
     }
@@ -483,7 +483,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       value = length === -1
         ? null
         : query.isRaw === true
-          ? x.slice(index, index += length)
+          ? x.subarray(index, index += length)
           : column.parser === undefined
             ? x.toString('utf8', index, index += length)
             : column.parser.array === true
@@ -652,7 +652,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   async function AuthenticationMD5Password(x) {
     write(
-      b().p().str('md5' + md5(Buffer.concat([Buffer.from(md5((await Pass()) + user)), x.slice(9)]))).z(1).end()
+      b().p().str('md5' + md5(Buffer.concat([Buffer.from(md5((await Pass()) + user)), x.subarray(9)]))).z(1).end()
     )
   }
 
@@ -851,7 +851,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function CopyData(x) {
-    stream.push(x.slice(5)) || socket.pause()
+    stream.push(x.subarray(5)) || socket.pause()
   }
 
   function CopyDone() {

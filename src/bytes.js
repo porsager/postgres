@@ -47,13 +47,13 @@ const b = Object.assign(reset, messages, {
     return b
   },
   raw(x) {
-    buffer = Buffer.concat([buffer.slice(0, b.i), x])
+    buffer = Buffer.concat([buffer.subarray(0, b.i), x])
     b.i = buffer.length
     return b
   },
   end(at = 1) {
     buffer.writeUInt32BE(b.i - at, at)
-    const out = buffer.slice(0, b.i)
+    const out = buffer.subarray(0, b.i)
     b.i = 0
     buffer = Buffer.allocUnsafe(size)
     return out
