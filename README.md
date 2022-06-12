@@ -845,7 +845,7 @@ Any query which was already sent over the wire will be rejected if the connectio
 
 There are no guarantees about queries executing in order unless using a transaction with `sql.begin()` or setting `max: 1`. Of course doing a series of queries, one awaiting the other will work as expected, but that's just due to the nature of js async/promise handling, so it's not necessary for this library to be concerned with ordering.
 
-Since this library automatically creates prepared statements, it also has a default max lifetime for connections to prevent memory bloat on the database itself. This is a random interval for each connection between 45 and 90 minutes. This allows multiple connections to come up and down seamlessly without user interference.
+Since this library automatically creates prepared statements, it also has a default max lifetime for connections to prevent memory bloat on the database itself. This is a random interval for each connection between 45 and 90 minutes. This allows multiple connections to independently come up and down without affecting the service.
 
 ### Connection timeout
 
