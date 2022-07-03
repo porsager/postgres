@@ -354,7 +354,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       statementCount = 1
       lifeTimer.start()
       socket.on('data', data)
-      keep_alive && socket.setKeepAlive(true, 1000 * keep_alive)
+      keep_alive && socket.setKeepAlive && socket.setKeepAlive(true, 1000 * keep_alive)
       const s = StartupMessage()
       write(s)
     } catch (err) {
