@@ -505,8 +505,8 @@ declare namespace postgres {
   interface Column<T extends string> {
     name: T;
     type: number;
-    tableOid: number;
-    attNum: number;
+    table: number;
+    number: number;
     parser?(raw: string): unknown;
   }
 

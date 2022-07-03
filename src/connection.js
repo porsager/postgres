@@ -615,16 +615,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     for (let i = 0; i < length; ++i) {
       start = index
       while (x[index++] !== 0);
-      const tableOid = x.readUInt32BE(index)
-      const attNum = x.readUInt16BE(index + 4)
+      const table = x.readUInt32BE(index)
+      const number = x.readUInt16BE(index + 4)
       const type = x.readUInt32BE(index + 6)
       query.statement.columns[i] = {
         name: transform.column.from
           ? transform.column.from(x.toString('utf8', start, index - 1))
           : x.toString('utf8', start, index - 1),
         parser: parsers[type],
-        tableOid,
-        attNum,
+        table,
+        number,
         type
       }
       index += 18
