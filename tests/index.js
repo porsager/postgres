@@ -1891,6 +1891,18 @@ t('Describe a statement', async() => {
   ]
 })
 
+t('Include table oid and column number in column details', async() => {
+    await sql`create table tester (name text, age int)`
+    const r = await sql`select name, age from tester where name like $1 and age > $2`.describe();
+    const [{ oid }] = await sql`select oid from pg_class where relname = 'tester'`;
+
+    return [
+        `table:${oid},number:1|table:${oid},number:2`,
+        `${ r.columns.map(c => `table:${c.table},number:${c.number}`).join('|') }`,
+        await sql`drop table tester`
+    ]
+})
+
 t('Describe a statement without parameters', async() => {
   await sql`create table tester (name text, age int)`
   const r = await sql`select name, age from tester`.describe()
