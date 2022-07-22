@@ -65,7 +65,7 @@ async function insertUser({ name, age }) {
 
 * [Connection](#connection)
 * [Queries](#queries)
-* [Building queries](#building-queries)
+* [Building queries with nested Fragments](#building-queries-with-nested-fragments)
 * [Advanced query methods](#advanced-query-methods)
 * [Transactions](#transactions)
 * [Data Transformation](#data-transformation)
@@ -107,7 +107,7 @@ More options can be found in the [Connection details section](#connection-detail
 Postgres.js utilizes [Tagged template functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) to process query parameters **before** interpolation. Using tagged template literals benefits developers by:
 
 1. **Enforcing** safe query generation
-2. Giving the ` sql`` ` function powerful [utility](#dynamic-inserts) and [query building](#building-queries) features.
+2. Giving the ` sql`` ` function powerful [utility](#dynamic-inserts) and [query building](#building-queries-with-nested-fragments) features.
 
 Any generic value will be serialized according to an inferred type, and replaced by a PostgreSQL protocol placeholder `$1, $2, ...`. The parameters are then sent separately to the database which handles escaping & casting.
 
@@ -127,7 +127,24 @@ const xs = await sql`
 // xs = [{ user_id: 1, name: 'Murray', age: 68 }]
 ```
 
-> Please note that queries are first executed when `awaited` – or manually by using `.execute()`.
+### We use Lazy Promises - requires `.then` or `.execute` (or `await`)
+
+In some cases you may intend to run a query in the background without using `await`.
+```sql
+// async (not using await)
+sql`update table ...` // ⚠ wrong
+```
+
+```sql
+// async (not using await)
+sql`update table ...`
+  .execute() // 👌 correct; or you can use `.then()` or `.catch()`
+```
+
+The SQL will not run at all until `.then` or `.execute` (or `.catch`) is called.  
+(The `await` keyord invokes `.then` implicitly so is not an issue)
+
+This non-default Promise implementation allows us to distinguish [Nested Fragments](#building-queries-with-nested-fragments) from the main outer query.
 
 ### Query parameters
 
@@ -252,7 +269,7 @@ const [{ a, b, c }] => await sql`
 `
 ```
 
-## Building queries
+## Building queries with nested Fragments
 
 Postgres.js features a simple dynamic query builder by conditionally appending/omitting query fragments.
 It works by nesting ` sql`` ` fragments within other ` sql`` ` calls or fragments. This allows you to build dynamic queries safely without risking sql injections through usual string concatenation.
