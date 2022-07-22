@@ -879,6 +879,30 @@ t('Connection errors are caught using begin()', {
   ]
 })
 
+t('dynamic table name', async() => {
+  await sql`create table test(a int)`
+  return [
+    0, (await sql`select * from ${ sql('test') }`).count,
+    await sql`drop table test`
+  ]
+})
+
+t('dynamic schema name', async() => {
+  await sql`create table test(a int)`
+  return [
+    0, (await sql`select * from ${ sql('public') }.test`).count,
+    await sql`drop table test`
+  ]
+})
+
+t('dynamic schema and table name', async() => {
+  await sql`create table test(a int)`
+  return [
+    0, (await sql`select * from ${ sql('public.test') }`).count,
+    await sql`drop table test`
+  ]
+})
+
 t('dynamic column name', async() => {
   return ['!not_valid', Object.keys((await sql`select 1 as ${ sql('!not_valid') }`)[0])[0]]
 })
