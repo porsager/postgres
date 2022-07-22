@@ -616,6 +616,18 @@ t('unsafe simple includes columns', async() => {
   return ['x', (await sql.unsafe('select 1 as x').values()).columns[0].name]
 })
 
+t('unsafe describe', async() => {
+  const q = 'insert into test values (1)'
+  await sql`create table test(a int unique)`
+  await sql.unsafe(q).describe()
+  const x = await sql.unsafe(q).describe()
+  return [
+    q,
+    x.string,
+    await sql`drop table test`
+  ]
+})
+
 t('listen and notify', async() => {
   const sql = postgres(options)
   const channel = 'hello'

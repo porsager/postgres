@@ -108,7 +108,8 @@ export class Query extends Promise {
   }
 
   describe() {
-    this.onlyDescribe = true
+    this.options.simple = false
+    this.onlyDescribe = this.options.prepare = true
     return this
   }
 
