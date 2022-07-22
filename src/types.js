@@ -153,7 +153,10 @@ function select(first, rest, parameters, types, options) {
 
 const builders = Object.entries({
   values,
-  in: values,
+  in: (...xs) => {
+    const x = values(...xs)
+    return x === '()' ? '(null)' : x
+  },
   select,
   as: select,
   returning: select,
