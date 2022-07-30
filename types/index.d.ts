@@ -164,7 +164,7 @@ type Keys = string
 
 type SerializableObject<T, K extends readonly any[], TT> =
   number extends K['length'] ? {} :
-  (Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.SerializableParameter<TT> | postgres.JSONValue> & Record<string, any>)
+  Partial<(Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.ParameterOrJSON<TT> | undefined> & Record<string, any>)>
 
 type First<T, K extends readonly any[], TT> =
   // Tagged template string call
@@ -582,6 +582,10 @@ declare namespace postgres {
     first: T;
     rest: U;
   }
+
+  type ParameterOrJSON<T> =
+    | SerializableParameter<T>
+    | JSONValue
 
   interface Sql<TTypes extends JSToPostgresTypeMap> {
     /**
