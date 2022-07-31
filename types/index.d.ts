@@ -130,10 +130,6 @@ interface PostgresTypeList {
   [name: string]: postgres.PostgresType;
 }
 
-interface JSToPostgresTypeMap {
-  [name: string]: unknown;
-}
-
 declare const PRIVATE: unique symbol;
 
 declare class NotAPromise {
@@ -315,7 +311,7 @@ declare namespace postgres {
     timeout?: Options<T>['idle_timeout'];
   }
 
-  interface ParsedOptions<T extends JSToPostgresTypeMap> extends BaseOptions<{ [name in keyof T]: PostgresType<T[name]> }> {
+  interface ParsedOptions<T extends Record<string, unknown> = {}> extends BaseOptions<{ [name in keyof T]: PostgresType<T[name]> }> {
     /** @inheritdoc */
     host: string[];
     /** @inheritdoc */
@@ -480,7 +476,7 @@ declare namespace postgres {
     | boolean
     | Date // serialized as `string`
     | readonly JSONValue[]
-    | { toJSON(): any } // `toJSON` called by `JSON.stringify`; not typing the return type, typings is strict enough anyway
+    | { toJSON(): any } // `toJSON` called by `JSON.stringify`; not typing the return type, types definition is strict enough anyway
     | {
       readonly [prop: string | number]:
       | undefined
@@ -583,7 +579,7 @@ declare namespace postgres {
     rest: U;
   }
 
-  interface Sql<TTypes extends JSToPostgresTypeMap> {
+  interface Sql<TTypes extends Record<string, unknown> = {}> {
     /**
      * Query helper
      * @param first Define how the helper behave
@@ -638,7 +634,7 @@ declare namespace postgres {
     prepare?: boolean;
   }
 
-  interface TransactionSql<TTypes extends JSToPostgresTypeMap> extends Sql<TTypes> {
+  interface TransactionSql<TTypes extends Record<string, unknown> = {}> extends Sql<TTypes> {
     savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
   }
