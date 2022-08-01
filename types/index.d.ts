@@ -5,7 +5,7 @@ import { Readable, Writable } from 'node:stream'
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends PostgresTypeList>(options?: postgres.Options<T>): postgres.Sql<PostgresTypeList extends T ? {} : { [type in keyof T]: T[type] extends {
+declare function postgres<T extends PostgresTypeList = {}>(options?: postgres.Options<T>): postgres.Sql<{ [type in keyof T]: T[type] extends {
   serialize: (value: infer R) => any,
   parse: (raw: any) => infer R
 } ? R : never }>
@@ -15,7 +15,7 @@ declare function postgres<T extends PostgresTypeList>(options?: postgres.Options
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends PostgresTypeList>(url: string, options?: postgres.Options<T>): postgres.Sql<PostgresTypeList extends T ? {} : { [type in keyof T]: T[type] extends {
+declare function postgres<T extends PostgresTypeList = {}>(url: string, options?: postgres.Options<T>): postgres.Sql<{ [type in keyof T]: T[type] extends {
   serialize: (value: infer R) => any,
   parse: (raw: any) => infer R
 } ? R : never }>
@@ -126,9 +126,7 @@ interface BaseOptions<T extends PostgresTypeList> {
   keep_alive: number | null;
 }
 
-interface PostgresTypeList {
-  [name: string]: postgres.PostgresType;
-}
+interface PostgresTypeList extends Record<string, postgres.PostgresType> {}
 
 declare const PRIVATE: unique symbol;
 
