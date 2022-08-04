@@ -5,7 +5,7 @@ import { Readable, Writable } from 'node:stream'
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends PostgresTypeList = {}>(options?: postgres.Options<T>): postgres.Sql<{ [type in keyof T]: T[type] extends {
+declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(options?: postgres.Options<T>): postgres.Sql<Record<string, postgres.PostgresType> extends T ? {} : { [type in keyof T]: T[type] extends {
   serialize: (value: infer R) => any,
   parse: (raw: any) => infer R
 } ? R : never }>
@@ -15,7 +15,7 @@ declare function postgres<T extends PostgresTypeList = {}>(options?: postgres.Op
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends PostgresTypeList = {}>(url: string, options?: postgres.Options<T>): postgres.Sql<{ [type in keyof T]: T[type] extends {
+declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(url: string, options?: postgres.Options<T>): postgres.Sql<Record<string, postgres.PostgresType> extends T ? {} : { [type in keyof T]: T[type] extends {
   serialize: (value: infer R) => any,
   parse: (raw: any) => infer R
 } ? R : never }>
@@ -23,7 +23,7 @@ declare function postgres<T extends PostgresTypeList = {}>(url: string, options?
 /**
  * Connection options of Postgres.
  */
-interface BaseOptions<T extends PostgresTypeList> {
+interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
   /** Postgres ip address[s] or domain name[s] */
   host: string | string[];
   /** Postgres server[s] port[s] */
@@ -126,7 +126,6 @@ interface BaseOptions<T extends PostgresTypeList> {
   keep_alive: number | null;
 }
 
-interface PostgresTypeList extends Record<string, postgres.PostgresType> {}
 
 declare const PRIVATE: unique symbol;
 
@@ -277,7 +276,7 @@ declare namespace postgres {
     [name: string]: string;
   }
 
-  interface Options<T extends PostgresTypeList> extends Partial<BaseOptions<T>> {
+  interface Options<T extends Record<string, postgres.PostgresType>> extends Partial<BaseOptions<T>> {
     /** @inheritdoc */
     host?: string;
     /** @inheritdoc */
