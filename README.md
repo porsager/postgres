@@ -575,32 +575,19 @@ Do note that you can often achieve the same result using [`WITH` queries (Common
 
 ## Data Transformation
 
-Postgres.js comes with a number of built-in data transformation functions that can be used to transform the data returned from a query or when inserting data. They are available under `transform` option in the `postgres()` function connection options.
-
-Like - `postgres('connectionURL', { transform: {...} })`
-
-### Parameters
-* `to`: The function to transform the outgoing query column name to, i.e `SELECT ${ sql('aName') }` to `SELECT a_name` when using `postgres.toCamel`.
-* `from`: The function to transform the incoming query result column name to, see example below.
-
-> Both parameters are optional, if not provided, the default transformation function will be used.
+Postgres.js allows for transformation of the data passed to or returned from a query by using the `transform` option.
 
 Built in transformation functions are:
-* For camelCase - `postgres.toCamel` and `postgres.fromCamel`
-* For PascalCase - `postgres.toPascal` and `postgres.fromPascal`
-* For Kebab-Case - `postgres.toKebab` and `postgres.fromKebab`
 
-These functions can be passed in as options when calling `postgres()`, for example:
+* For camelCase - `postgres.camel`, `postgres.toCamel`, `postgres.fromCamel`
+* For PascalCase - `postgres.pascal`, `postgres.toPascal`, `postgres.fromPascal`
+* For Kebab-Case - `postgres.kebab`, `postgres.toKebab`, `postgres.fromKebab`
+
+By default, using `postgres.camel`, `postgres.pascal` and `postgres.kebab` will perform a two-way transformation - both the data passed to the query and the data returned by the query will be transformed:
+
 ```js
 // Transform the column names to and from camel case
-const sql = postgres('connectionURL', {
-  transform: {
-    column: {
-      to: postgres.fromCamel,
-      from: postgres.toCamel,
-    },
-  },
-})
+const sql = postgres({ transform: postgres.camel })
 
 await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER, b_test TEXT)`
 await sql`INSERT INTO camel_case ${ sql([{ aTest: 1, bTest: 1 }]) }`
@@ -609,7 +596,61 @@ const data = await sql`SELECT ${ sql('aTest', 'bTest') } FROM camel_case`
 console.log(data) // [ { aTest: 1, bTest: '1' } ]
 ```
 
-> Note that if a column name is originally registered as snake_case in the database then to tranform it from camelCase to snake_case when querying or inserting, the column camelCase name must be put in `sql('columnName')` as it's done in the above example, Postgres.js does not rewrite anything inside the static parts of the tagged templates.
+To only perform half of the transformation (eg. only the transformation **to** or **from** camel case), use the other transformation functions:
+
+```js
+// Transform the column names only to camel case
+// (for the results that are returned from the query)
+postgres({ transform: postgres.toCamel })
+
+await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER)`
+await sql`INSERT INTO camel_case ${ sql([{ a_test: 1 }]) }`
+const data = await sql`SELECT a_test FROM camel_case`
+
+console.log(data) // [ { aTest: 1 } ]
+```
+
+```js
+// Transform the column names only from camel case
+// (for interpolated inserts, updates, and selects)
+const sql = postgres({ transform: postgres.fromCamel })
+
+await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER)`
+await sql`INSERT INTO camel_case ${ sql([{ aTest: 1 }]) }`
+const data = await sql`SELECT ${ sql('aTest') } FROM camel_case`
+
+console.log(data) // [ { a_test: 1 } ]
+```
+
+> Note that Postgres.js does not rewrite the static parts of the tagged template strings. So to transform column names in your queries, the `sql()` helper must be used - eg. `${ sql('columnName') }` as in the examples above.
+
+### Custom Transform Functions
+
+To specify your own transformation functions, you can use the `column`, `value` and `row` options inside of `transform`, each an object possibly including `to` and `from` keys:
+
+* `to`: The function to transform the outgoing query column name to, i.e `SELECT ${ sql('aName') }` to `SELECT a_name` when using `postgres.toCamel`.
+* `from`: The function to transform the incoming query result column name to, see example below.
+
+> Both parameters are optional, if not provided, the default transformation function will be used.
+
+```js
+// Implement your own functions, look at postgres.toCamel, etc
+// as a reference:
+// https://github.com/porsager/postgres/blob/4241824ffd7aa94ffb482e54ca9f585d9d0a4eea/src/types.js#L310-L328
+function transformColumnToDatabase() { /* ... */ }
+function transformColumnFromDatabase() { /* ... */ }
+
+const sql = postgres({
+  transform: {
+    column: {
+      to: transformColumnToDatabase,
+      from: transformColumnFromDatabase,
+    },
+    value: { /* ... */ },
+    row: { /* ... */ }
+  }
+})
+```
 
 ## Listen & notify
 
