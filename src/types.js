@@ -322,16 +322,6 @@ function jsonToCamel(x, column) {
     : x
 }
 
-toCamel.column = toCamel
-toCamel.value = jsonToCamel
-
-export const camel = {
-  from: toCamel,
-  to: {
-    column: fromCamel
-  }
-}
-
 export const toPascal = x => {
   let str = x[0].toUpperCase()
   for (let i = 1; i < x.length; i++)
@@ -347,16 +337,6 @@ function jsonToPascal(x, column) {
     : x
 }
 
-toPascal.column = toPascal
-toPascal.value = jsonToPascal
-
-export const pascal = {
-  from: toPascal,
-  to: {
-    column: fromPascal
-  }
-}
-
 export const toKebab = x => x.replace(/_/g, '-')
 
 function jsonToKebab(x, column) {
@@ -365,6 +345,30 @@ function jsonToKebab(x, column) {
       ? x.map(jsonToKebab)
       : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [toKebab(k)]: v }), {})
     : x
+}
+
+export const fromCamel = x => x.replace(/([A-Z])/g, '_$1').toLowerCase()
+export const fromPascal = x => (x.slice(0, 1) + x.slice(1).replace(/([A-Z])/g, '_$1')).toLowerCase()
+export const fromKebab = x => x.replace(/-/g, '_')
+
+toCamel.column = toCamel
+toCamel.value = jsonToCamel
+
+export const camel = {
+  from: toCamel,
+  to: {
+    column: fromCamel
+  }
+}
+
+toPascal.column = toPascal
+toPascal.value = jsonToPascal
+
+export const pascal = {
+  from: toPascal,
+  to: {
+    column: fromPascal
+  }
 }
 
 toKebab.column = toKebab
@@ -376,7 +380,3 @@ export const kebab = {
     column: fromKebab
   }
 }
-
-export const fromCamel = x => x.replace(/([A-Z])/g, '_$1').toLowerCase()
-export const fromPascal = x => (x.slice(0, 1) + x.slice(1).replace(/([A-Z])/g, '_$1')).toLowerCase()
-export const fromKebab = x => x.replace(/-/g, '_')
