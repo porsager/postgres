@@ -314,14 +314,6 @@ export const toCamel = x => {
   return str
 }
 
-function jsonToCamel(x, column) {
-  return column.type === 114 || column.type === 3802
-    ? Array.isArray(x)
-      ? x.map(jsonToCamel)
-      : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [toCamel(k)]: v }), {})
-    : x
-}
-
 export const toPascal = x => {
   let str = x[0].toUpperCase()
   for (let i = 1; i < x.length; i++)
@@ -329,30 +321,24 @@ export const toPascal = x => {
   return str
 }
 
-function jsonToPascal(x, column) {
-  return column.type === 114 || column.type === 3802
-    ? Array.isArray(x)
-      ? x.map(jsonToPascal)
-      : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [toPascal(k)]: v }), {})
-    : x
-}
-
 export const toKebab = x => x.replace(/_/g, '-')
-
-function jsonToKebab(x, column) {
-  return column.type === 114 || column.type === 3802
-    ? Array.isArray(x)
-      ? x.map(jsonToKebab)
-      : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [toKebab(k)]: v }), {})
-    : x
-}
 
 export const fromCamel = x => x.replace(/([A-Z])/g, '_$1').toLowerCase()
 export const fromPascal = x => (x.slice(0, 1) + x.slice(1).replace(/([A-Z])/g, '_$1')).toLowerCase()
 export const fromKebab = x => x.replace(/-/g, '_')
 
+function createJsonTransform(fn) {
+  return function jsonTransform(x, column) {
+    return column.type === 114 || column.type === 3802
+     ? Array.isArray(x)
+       ? x.map(jsonTransform)
+       : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: v }), {})
+     : x
+  }
+}
+
 toCamel.column = toCamel
-toCamel.value = jsonToCamel
+toCamel.value = createJsonTransform(toCamel)
 
 export const camel = {
   from: toCamel,
@@ -362,7 +348,7 @@ export const camel = {
 }
 
 toPascal.column = toPascal
-toPascal.value = jsonToPascal
+toPascal.value = createJsonTransform(toPascal)
 
 export const pascal = {
   from: toPascal,
@@ -372,7 +358,7 @@ export const pascal = {
 }
 
 toKebab.column = toKebab
-toKebab.value = jsonToKebab
+toKebab.value = createJsonTransform(toKebab)
 
 export const kebab = {
   from: toKebab,
