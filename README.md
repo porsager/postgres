@@ -594,13 +594,22 @@ These functions can be passed in as options when calling `postgres()`. For examp
 ```js
 // this will tranform the column names to camel case back and forth
 (async function () {
-  const sql = postgres('connectionURL', { transform: { column: { to: postgres.fromCamel, from: postgres.toCamel } }});
-  await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER, b_test TEXT)`;
+  const sql = postgres('connectionURL', {
+    transform: {
+      column: {
+        to: postgres.fromCamel,
+        from: postgres.toCamel,
+      },
+    },
+  })
+
+  await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER, b_test TEXT)`
   await sql`INSERT INTO camel_case ${ sql([{ aTest: 1, bTest: 1 }]) }`
-  const data = await sql`SELECT ${ sql('aTest', 'bTest') } FROM camel_case`;
+  const data = await sql`SELECT ${ sql('aTest', 'bTest') } FROM camel_case`
+
   console.log(data) // [ { aTest: 1, bTest: '1' } ]
   process.exit(1)
-})();
+})()
 ```
 
 > Note that if a column name is originally registered as snake_case in the database then to tranform it from camelCase to snake_case when querying or inserting, the column camelCase name must be put in `sql('columnName')` as it's done in the above example, Postgres.js does not rewrite anything inside the static parts of the tagged templates.
