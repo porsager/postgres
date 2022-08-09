@@ -341,31 +341,19 @@ toCamel.column = { from: toCamel }
 toCamel.value = { from: createJsonTransform(toCamel) }
 fromCamel.column = { to: fromCamel }
 
-export const camel = {
-  from: toCamel,
-  to: {
-    column: fromCamel
-  }
-}
+export const camel = { ...toCamel }
+camel.column.to = fromCamel;
 
 toPascal.column = { from: toPascal }
 toPascal.value = { from: createJsonTransform(toPascal) }
 fromPascal.column = { to: fromPascal }
 
-export const pascal = {
-  from: toPascal,
-  to: {
-    column: fromPascal
-  }
-}
+export const pascal = { ...toPascal }
+pascal.column.to = fromPascal
 
 toKebab.column = { from: toKebab }
 toKebab.value = { from: createJsonTransform(toKebab) }
 fromKebab.column = { to: fromKebab }
 
-export const kebab = {
-  from: toKebab,
-  to: {
-    column: fromKebab
-  }
-}
+export const kebab = { ...toKebab }
+kebab.column.to = fromKebab
