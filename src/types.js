@@ -337,8 +337,9 @@ function createJsonTransform(fn) {
   }
 }
 
-toCamel.column = toCamel
-toCamel.value = createJsonTransform(toCamel)
+toCamel.column = { from: toCamel }
+toCamel.value = { from: createJsonTransform(toCamel) }
+fromCamel.column = { to: fromCamel }
 
 export const camel = {
   from: toCamel,
@@ -347,8 +348,9 @@ export const camel = {
   }
 }
 
-toPascal.column = toPascal
-toPascal.value = createJsonTransform(toPascal)
+toPascal.column = { from: toPascal }
+toPascal.value = { from: createJsonTransform(toPascal) }
+fromPascal.column = { to: fromPascal }
 
 export const pascal = {
   from: toPascal,
@@ -357,8 +359,9 @@ export const pascal = {
   }
 }
 
-toKebab.column = toKebab
-toKebab.value = createJsonTransform(toKebab)
+toKebab.column = { from: toKebab }
+toKebab.value = { from: createJsonTransform(toKebab) }
+fromKebab.column = { to: fromKebab }
 
 export const kebab = {
   from: toKebab,
