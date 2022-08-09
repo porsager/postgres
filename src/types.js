@@ -314,6 +314,24 @@ export const toCamel = x => {
   return str
 }
 
+function jsonToCamel(x, column) {
+  return column.type === 114 || column.type === 3802
+    ? Array.isArray(x)
+      ? x.map(jsonToCamel)
+      : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [toCamel(k)]: v }), {})
+    : x
+}
+
+toCamel.column = toCamel
+toCamel.value = jsonToCamel
+
+export const camel = {
+  from: toCamel,
+  to: {
+    column: fromCamel
+  }
+}
+
 export const toPascal = x => {
   let str = x[0].toUpperCase()
   for (let i = 1; i < x.length; i++)
@@ -321,7 +339,43 @@ export const toPascal = x => {
   return str
 }
 
+function jsonToPascal(x, column) {
+  return column.type === 114 || column.type === 3802
+    ? Array.isArray(x)
+      ? x.map(jsonToPascal)
+      : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [toPascal(k)]: v }), {})
+    : x
+}
+
+toPascal.column = toPascal
+toPascal.value = jsonToPascal
+
+export const pascal = {
+  from: toPascal,
+  to: {
+    column: fromPascal
+  }
+}
+
 export const toKebab = x => x.replace(/_/g, '-')
+
+function jsonToKebab(x, column) {
+  return column.type === 114 || column.type === 3802
+    ? Array.isArray(x)
+      ? x.map(jsonToKebab)
+      : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [toKebab(k)]: v }), {})
+    : x
+}
+
+toKebab.column = toKebab
+toKebab.value = jsonToKebab
+
+export const kebab = {
+  from: toKebab,
+  to: {
+    column: fromKebab
+  }
+}
 
 export const fromCamel = x => x.replace(/([A-Z])/g, '_$1').toLowerCase()
 export const fromPascal = x => (x.slice(0, 1) + x.slice(1).replace(/([A-Z])/g, '_$1')).toLowerCase()
