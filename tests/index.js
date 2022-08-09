@@ -1321,6 +1321,51 @@ t('Transform value', async() => {
 t('Transform columns from', async() => {
   const sql = postgres({
     ...options,
+    transform: postgres.fromCamel
+  })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
+  await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
+  return [
+    2,
+    (await sql`select ${ sql('aTest', 'bTest') } from test`)[0].a_test,
+    await sql`drop table test`
+  ]
+})
+
+t('Transform columns to', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.toCamel
+  })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ a_test: 1, b_test: 1 }]) }`
+  await sql`update test set ${ sql({ a_test: 2, b_test: 2 }) }`
+  return [
+    2,
+    (await sql`select a_test, b_test from test`)[0].aTest,
+    await sql`drop table test`
+  ]
+})
+
+t('Transform columns from and to', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
+  await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
+  return [
+    2,
+    (await sql`select ${ sql('aTest', 'bTest') } from test`)[0].aTest,
+    await sql`drop table test`
+  ]
+})
+
+t('Transform columns from and to (legacy)', async() => {
+  const sql = postgres({
+    ...options,
     transform: {
       column: {
         to: postgres.fromCamel,
