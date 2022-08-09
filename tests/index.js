@@ -1319,7 +1319,15 @@ t('Transform value', async() => {
 })
 
 t('Transform columns from', async() => {
-  const sql = postgres({ ...options, transform: { column: { to: postgres.fromCamel, from: postgres.toCamel } } })
+  const sql = postgres({
+    ...options,
+    transform: {
+      column: {
+        to: postgres.fromCamel,
+        from: postgres.toCamel
+      }
+    }
+  })
   await sql`create table test (a_test int, b_test text)`
   await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
   await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
