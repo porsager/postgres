@@ -624,6 +624,43 @@ console.log(data) // [ { a_test: 1 } ]
 
 > Note that Postgres.js does not rewrite the static parts of the tagged template strings. So to transform column names in your queries, the `sql()` helper must be used - eg. `${ sql('columnName') }` as in the examples above.
 
+### Transform `undefined` Values
+
+By default, Postgres.js will throw the error `UNDEFINED_VALUE: Undefined values are not allowed` when undefined values are passed 
+
+```js
+// Transform the column names to and from camel case
+const sql = postgres({
+  transform: {
+    undefined: null
+  }
+})
+
+await sql`CREATE TABLE IF NOT EXISTS transform_undefined (a_test INTEGER)`
+await sql`INSERT INTO transform_undefined ${ sql([{ a_test: undefined }]) }`
+const data = await sql`SELECT a_test FROM transform_undefined`
+
+console.log(data) // [ { a_test: null } ]
+```
+
+To combine with the built in transform functions, spread the transform in the `transform` object:
+
+```js
+// Transform the column names to and from camel case
+const sql = postgres({
+  transform: {
+    ...postgres.camel,
+    undefined: null
+  }
+})
+
+await sql`CREATE TABLE IF NOT EXISTS transform_undefined (a_test INTEGER)`
+await sql`INSERT INTO transform_undefined ${ sql([{ aTest: undefined }]) }`
+const data = await sql`SELECT ${ sql('aTest') } FROM transform_undefined`
+
+console.log(data) // [ { aTest: null } ]
+```
+
 ### Custom Transform Functions
 
 To specify your own transformation functions, you can use the `column`, `value` and `row` options inside of `transform`, each an object possibly including `to` and `from` keys:
