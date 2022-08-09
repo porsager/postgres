@@ -83,23 +83,21 @@ interface BaseOptions<T extends PostgresTypeList> {
 
     /** Transforms incoming and outgoing column names */
     column?: ((column: string) => string) | {
-      /** SQL to JS */
+      /** Transform function for column names in result rows */
       from?: ((column: string) => string) | undefined;
-      /** JS to SQL */
+      /** Transform function for column names in interpolated values passed to tagged template literal */
       to?: ((column: string) => string) | undefined;
     } | undefined;
     /** Transforms incoming and outgoing row values */
     value?: ((value: any) => any) | {
-      /** SQL to JS */
-      from?: ((value: unknown) => any) | undefined;
-      // /** JS to SQL */
+      /** Transform function for values in result rows */
+      from?: ((value: unknown, column: postgres.Column<string>) => any) | undefined;
       // to?: ((value: unknown) => any) | undefined; // unused
     } | undefined;
     /** Transforms entire rows */
     row?: ((row: postgres.Row) => any) | {
-      /** SQL to JS */
+      /** Transform function for entire result rows */
       from?: ((row: postgres.Row) => any) | undefined;
-      // /** JS to SQL */
       // to?: ((row: postgres.Row) => any) | undefined; // unused
     } | undefined;
   };
@@ -233,36 +231,87 @@ declare namespace postgres {
    * @returns The new string in PascalCase
    */
   function toPascal(str: string): string;
+  namespace toPascal {
+    namespace column { function from(str: string): string; }
+    namespace value { function from(str: unknown, column: Column<string>): string }
+  }
   /**
    * Convert a PascalCase string to snake_case.
    * @param str The string from snake_case to convert
    * @returns The new string in snake_case
    */
   function fromPascal(str: string): string;
+  namespace fromPascal {
+    namespace column { function to(str: string): string }
+  }
+  /**
+   * Convert snake_case to and from PascalCase.
+   */
+   namespace pascal {
+    namespace column {
+      function from(str: string): string;
+      function to(str: string): string;
+    }
+    namespace value { function from(str: unknown, column: Column<string>): string }
+  }
   /**
    * Convert a snake_case string to camelCase.
    * @param str The string from snake_case to convert
    * @returns The new string in camelCase
    */
   function toCamel(str: string): string;
+  namespace toCamel {
+    namespace column { function from(str: string): string; }
+    namespace value { function from(str: unknown, column: Column<string>): string }
+  }
   /**
    * Convert a camelCase string to snake_case.
    * @param str The string from snake_case to convert
    * @returns The new string in snake_case
    */
   function fromCamel(str: string): string;
+  namespace fromCamel {
+    namespace column { function to(str: string): string }
+  }
+  /**
+   * Convert snake_case to and from camelCase.
+   */
+  namespace camel {
+    namespace column {
+      function from(str: string): string;
+      function to(str: string): string;
+    }
+    namespace value { function from(str: unknown, column: Column<string>): string }
+  }
   /**
    * Convert a snake_case string to kebab-case.
    * @param str The string from snake_case to convert
    * @returns The new string in kebab-case
    */
   function toKebab(str: string): string;
+  namespace toKebab {
+    namespace column { function from(str: string): string; }
+    namespace value { function from(str: unknown, column: Column<string>): string }
+  }
   /**
    * Convert a kebab-case string to snake_case.
    * @param str The string from snake_case to convert
    * @returns The new string in snake_case
    */
   function fromKebab(str: string): string;
+  namespace fromKebab {
+    namespace column { function to(str: string): string }
+  }
+  /**
+   * Convert snake_case to and from kebab-case.
+   */
+  namespace kebab {
+    namespace column {
+      function from(str: string): string;
+      function to(str: string): string;
+    }
+    namespace value { function from(str: unknown, column: Column<string>): string }
+  }
 
   const BigInt: PostgresType<bigint>;
 
@@ -332,18 +381,20 @@ declare namespace postgres {
     /** Transforms outcoming undefined values */
     undefined: any
 
-    /** Transforms incoming column names */
     column: {
+      /** Transform function for column names in result rows */
       from: ((column: string) => string) | undefined;
+      /** Transform function for column names in interpolated values passed to tagged template literal */
       to: ((column: string) => string) | undefined;
     };
-    /** Transforms incoming row values */
     value: {
-      from: ((value: any) => any) | undefined;
+      /** Transform function for values in result rows */
+      from: ((value: any, column?: Column<string>) => any) | undefined;
+      /** Transform function for interpolated values passed to tagged template literal */
       to: undefined; // (value: any) => any
     };
-    /** Transforms entire rows */
     row: {
+      /** Transform function for entire result rows */
       from: ((row: postgres.Row) => any) | undefined;
       to: undefined; // (row: postgres.Row) => any
     };
