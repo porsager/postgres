@@ -252,6 +252,30 @@ const [{ a, b, c }] => await sql`
 `
 ```
 
+### Update jsonb columns
+If you want to update a jsonb column, you have to use "sql.json()"
+```js
+const user = {
+  id: 1,
+  location: {
+    city: "Toronto",
+    street: "1st michel avenue",
+    country: "Canada"
+  }
+  name: 'Murray',
+}
+
+sql`
+  update users set location = ${
+    sql.json(user.location)
+  }
+  where user_id = ${ user.id }
+`
+
+// Which results in:
+update users set "location" = $1 where user_id = $2
+```
+
 ## Building queries
 
 Postgres.js features a simple dynamic query builder by conditionally appending/omitting query fragments.
