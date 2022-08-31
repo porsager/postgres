@@ -628,6 +628,20 @@ t('unsafe describe', async() => {
   ]
 })
 
+t('simple query using unsafe with multiple statements', async() => {
+  return [
+    '1,2',
+    (await sql.unsafe('select 1 as x;select 2 as x')).map(x => x[0].x).join()
+  ]
+})
+
+t('simple query using simple() with multiple statements', async() => {
+  return [
+    '1,2',
+    (await sql`select 1 as x;select 2 as x`.simple()).map(x => x[0].x).join()
+  ]
+})
+
 t('listen and notify', async() => {
   const sql = postgres(options)
   const channel = 'hello'
