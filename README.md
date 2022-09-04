@@ -127,7 +127,7 @@ const xs = await sql`
 // xs = [{ user_id: 1, name: 'Murray', age: 68 }]
 ```
 
-> Please note that queries are first executed when `awaited` – or manually by using `.execute()`.
+> Please note that queries are first executed when `awaited` – or instantly by using [`.execute()`](#execute).
 
 ### Query parameters
 
@@ -482,6 +482,12 @@ const query = sql`select pg_sleep 100`.execute()
 setTimeout(() => query.cancel(), 100)
 const result = await query
 ```
+
+### Execute
+
+#### ```await sql``.execute()```
+
+The lazy Promise implementation in Postgres.js is what allows it to distinguish [Nested Fragments](#building-queries) from the main outer query. This also means that queries are always executed at the earliest in the following tick. If you have a specific need to execute the query in the same tick, you can call `.execute()`
 
 ### Unsafe raw string queries
 
