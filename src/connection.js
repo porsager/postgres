@@ -493,8 +493,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       query.isRaw
         ? (row[i] = query.isRaw === true
           ? value
-          : transform.value.from ? transform.value.from(value) : value)
-        : (row[column.name] = transform.value.from ? transform.value.from(value) : value)
+          : transform.value.from ? transform.value.from(value, column) : value)
+        : (row[column.name] = transform.value.from ? transform.value.from(value, column) : value)
     }
 
     query.forEachFn

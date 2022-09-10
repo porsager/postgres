@@ -11,6 +11,7 @@ export default function Subscribe(postgres, options) {
 
   const sql = subscribe.sql = postgres({
     ...options,
+    transform: { column: {}, value: {}, row: {} },
     max: 1,
     fetch_types: false,
     idle_timeout: null,

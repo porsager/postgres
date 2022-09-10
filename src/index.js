@@ -8,8 +8,11 @@ import {
   Identifier,
   Builder,
   toPascal,
+  pascal,
   toCamel,
+  camel,
   toKebab,
+  kebab,
   fromPascal,
   fromCamel,
   fromKebab
@@ -25,8 +28,11 @@ import largeObject from './large.js'
 Object.assign(Postgres, {
   PostgresError,
   toPascal,
+  pascal,
   toCamel,
+  camel,
   toKebab,
+  kebab,
   fromPascal,
   fromCamel,
   fromKebab,
