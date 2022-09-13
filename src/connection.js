@@ -855,11 +855,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function CopyData(x) {
-    stream.push(x.subarray(5)) || socket.pause()
+    stream && (stream.push(x.subarray(5)) || socket.pause())
   }
 
   function CopyDone() {
-    stream.push(null)
+    stream && stream.push(null)
     stream = null
   }
 
