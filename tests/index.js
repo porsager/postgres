@@ -1859,8 +1859,7 @@ t('multiple queries before connect', async() => {
 t('subscribe', { timeout: 2 }, async() => {
   const sql = postgres({
     database: 'postgres_js_test',
-    publications: 'alltables',
-    fetch_types: false
+    publications: 'alltables'
   })
 
   await sql.unsafe('create publication alltables for all tables')
@@ -1889,6 +1888,53 @@ t('subscribe', { timeout: 2 }, async() => {
   await delay(10)
   await unsubscribe()
   await sql`insert into test (name) values ('Oh noes')`
+  await delay(10)
+  return [
+    'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
+    result.join(','),
+    await sql`drop table test`,
+    await sql`drop publication alltables`,
+    await sql.end()
+  ]
+})
+
+t('subscribe with transform', { timeout: 2 }, async() => {
+  const sql = postgres({
+    transform: {
+      column: {
+        from: postgres.toCamel,
+        to: postgres.fromCamel
+      }
+    },
+    database: 'postgres_js_test',
+    publications: 'alltables'
+  })
+
+  await sql.unsafe('create publication alltables for all tables')
+
+  const result = []
+
+  const { unsubscribe } = await sql.subscribe('*', (row, { command, old }) =>
+    result.push(command, row.nameInCamel || row.id, old && old.nameInCamel)
+  )
+
+  await sql`
+    create table test (
+      id serial primary key,
+      name_in_camel text
+    )
+  `
+
+  await sql`insert into test (name_in_camel) values ('Murray')`
+  await sql`update test set name_in_camel = 'Rothbard'`
+  await sql`delete from test`
+  await sql`alter table test replica identity full`
+  await sql`insert into test (name_in_camel) values ('Murray')`
+  await sql`update test set name_in_camel = 'Rothbard'`
+  await sql`delete from test`
+  await delay(10)
+  await unsubscribe()
+  await sql`insert into test (name_in_camel) values ('Oh noes')`
   await delay(10)
   return [
     'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
