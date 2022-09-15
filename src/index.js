@@ -8,8 +8,11 @@ import {
   Identifier,
   Builder,
   toPascal,
+  pascal,
   toCamel,
+  camel,
   toKebab,
+  kebab,
   fromPascal,
   fromCamel,
   fromKebab
@@ -25,8 +28,11 @@ import largeObject from './large.js'
 Object.assign(Postgres, {
   PostgresError,
   toPascal,
+  pascal,
   toCamel,
+  camel,
   toKebab,
+  kebab,
   fromPascal,
   fromCamel,
   fromKebab,
@@ -162,25 +168,25 @@ function Postgres(a, b) {
 
     const channels = listen.channels || (listen.channels = {})
         , exists = name in channels
-        , channel = exists ? channels[name] : (channels[name] = { listeners: [listener] })
 
     if (exists) {
-      channel.listeners.push(listener)
+      channels[name].listeners.push(listener)
       listener.onlisten && listener.onlisten()
-      return Promise.resolve({ ...channel.result, unlisten })
+      return Promise.resolve({ ...channels[name].result, unlisten })
     }
 
-    channel.result = await sql`listen ${ sql(name) }`
+    const result = await sql`listen ${ sql(name) }`
+    channels[name] = { result, listeners: [listener] }
     listener.onlisten && listener.onlisten()
-    channel.result.unlisten = unlisten
+    result.unlisten = unlisten
 
-    return channel.result
+    return result
 
     async function unlisten() {
       if (name in channels === false)
         return
 
-      channel.listeners = channel.listeners.filter(x => x !== listener)
+      channels[name].listeners = channels[name].listeners.filter(x => x !== listener)
       if (channels[name].listeners.length)
         return
 

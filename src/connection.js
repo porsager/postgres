@@ -309,12 +309,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       }
 
       try {
-        handle(incoming.slice(0, length + 1))
+        handle(incoming.subarray(0, length + 1))
       } catch (e) {
         query && (query.cursorFn || query.describeFirst) && write(Sync)
         errored(e)
       }
-      incoming = incoming.slice(length + 1)
+      incoming = incoming.subarray(length + 1)
       remaining = 0
       incomings = null
     }
@@ -354,7 +354,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       statementCount = 1
       lifeTimer.start()
       socket.on('data', data)
-      keep_alive && socket.setKeepAlive(true, 1000 * keep_alive)
+      keep_alive && socket.setKeepAlive && socket.setKeepAlive(true, 1000 * keep_alive)
       const s = StartupMessage()
       write(s)
     } catch (err) {
@@ -483,7 +483,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       value = length === -1
         ? null
         : query.isRaw === true
-          ? x.slice(index, index += length)
+          ? x.subarray(index, index += length)
           : column.parser === undefined
             ? x.toString('utf8', index, index += length)
             : column.parser.array === true
@@ -493,8 +493,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       query.isRaw
         ? (row[i] = query.isRaw === true
           ? value
-          : transform.value.from ? transform.value.from(value) : value)
-        : (row[column.name] = transform.value.from ? transform.value.from(value) : value)
+          : transform.value.from ? transform.value.from(value, column) : value)
+        : (row[column.name] = transform.value.from ? transform.value.from(value, column) : value)
     }
 
     query.forEachFn
@@ -615,12 +615,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     for (let i = 0; i < length; ++i) {
       start = index
       while (x[index++] !== 0);
+      const table = x.readUInt32BE(index)
+      const number = x.readUInt16BE(index + 4)
       const type = x.readUInt32BE(index + 6)
       query.statement.columns[i] = {
         name: transform.column.from
           ? transform.column.from(x.toString('utf8', start, index - 1))
           : x.toString('utf8', start, index - 1),
         parser: parsers[type],
+        table,
+        number,
         type
       }
       index += 18
@@ -652,7 +656,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   async function AuthenticationMD5Password(x) {
     write(
-      b().p().str('md5' + md5(Buffer.concat([Buffer.from(md5((await Pass()) + user)), x.slice(9)]))).z(1).end()
+      b().p().str('md5' + md5(Buffer.concat([Buffer.from(md5((await Pass()) + user)), x.subarray(9)]))).z(1).end()
     )
   }
 
@@ -851,7 +855,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function CopyData(x) {
-    stream.push(x.slice(5)) || socket.pause()
+    stream.push(x.subarray(5)) || socket.pause()
   }
 
   function CopyDone() {

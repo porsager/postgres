@@ -505,6 +505,8 @@ declare namespace postgres {
   interface Column<T extends string> {
     name: T;
     type: number;
+    table: number;
+    number: number;
     parser?(raw: string): unknown;
   }
 
@@ -598,7 +600,7 @@ declare namespace postgres {
      * @param parameters Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends (object | undefined) = Row>(template: TemplateStringsArray, ...parameters: readonly (SerializableParameter<TTypes[keyof TTypes]> | PendingQuery<any>)[]): PendingQuery<AsRowList<T[]>>;
+    <T extends (object | undefined) = Row>(template: TemplateStringsArray, ...parameters: readonly (SerializableParameter<TTypes[keyof TTypes]> | PendingQuery<any>)[]): PendingQuery<AsRowList<readonly T[]>>;
 
     CLOSE: {};
     END: this['CLOSE'];
@@ -611,7 +613,7 @@ declare namespace postgres {
       [name in keyof TTypes]: (value: TTypes[name]) => postgres.Parameter<TTypes[name]>
     };
 
-    unsafe<T extends any[] = (Row & Iterable<Row>)[]>(query: string, parameters?: SerializableParameter<TTypes[keyof TTypes]>[], queryOptions?: UnsafeQueryOptions): PendingQuery<AsRowList<T>>;
+    unsafe<T extends (object | undefined) = (Row & Iterable<Row>)>(query: string, parameters?: SerializableParameter<TTypes[keyof TTypes]>[], queryOptions?: UnsafeQueryOptions): PendingQuery<AsRowList<readonly T[]>>;
     end(options?: { timeout?: number }): Promise<void>;
 
     listen(channel: string, onnotify: (value: string) => void, onlisten?: () => void): ListenRequest;
