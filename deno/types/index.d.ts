@@ -598,7 +598,7 @@ declare namespace postgres {
      * @param parameters Interpoled values of the template string
      * @returns A promise resolving to the result of your query
      */
-    <T extends readonly (object | undefined)[] = Row[]>(template: TemplateStringsArray, ...parameters: readonly (SerializableParameter<TTypes[keyof TTypes]> | PendingQuery<any>)[]): PendingQuery<AsRowList<T>>;
+    <T extends (object | undefined) = Row>(template: TemplateStringsArray, ...parameters: readonly (SerializableParameter<TTypes[keyof TTypes]> | PendingQuery<any>)[]): PendingQuery<AsRowList<T[]>>;
 
     CLOSE: {};
     END: this['CLOSE'];
