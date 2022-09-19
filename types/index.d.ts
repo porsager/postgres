@@ -5,7 +5,7 @@ import { Readable, Writable } from 'node:stream'
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(options?: postgres.Options<T>): postgres.Sql<Record<string, postgres.PostgresType> extends T ? {} : { [type in keyof T]: T[type] extends {
+declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(options?: postgres.Options<T> | undefined): postgres.Sql<Record<string, postgres.PostgresType> extends T ? {} : { [type in keyof T]: T[type] extends {
   serialize: (value: infer R) => any,
   parse: (raw: any) => infer R
 } ? R : never }>
@@ -15,7 +15,7 @@ declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(
  * @param options Connection options - default to the same as psql
  * @returns An utility function to make queries to the server
  */
-declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(url: string, options?: postgres.Options<T>): postgres.Sql<Record<string, postgres.PostgresType> extends T ? {} : { [type in keyof T]: T[type] extends {
+declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(url: string, options?: postgres.Options<T> | undefined): postgres.Sql<Record<string, postgres.PostgresType> extends T ? {} : { [type in keyof T]: T[type] extends {
   serialize: (value: infer R) => any,
   parse: (raw: any) => infer R
 } ? R : never }>
