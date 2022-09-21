@@ -16,7 +16,7 @@ export const types = {
   json: {
     to: 114,
     from: [114, 3802],
-    serialize: x => JSON.stringify(x),
+    serialize: x => x,
     parse: x => JSON.parse(x)
   },
   boolean: {
