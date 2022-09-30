@@ -36,12 +36,12 @@ export default function Subscribe(postgres, options) {
 
   sql.end = async() => {
     ended = true
-    stream && (await new Promise(r => (stream.once('end', r), stream.end())))
+    stream && (await new Promise(r => (stream.once('close', r), stream.end())))
     return end()
   }
 
   sql.close = async() => {
-    stream && (await new Promise(r => (stream.once('end', r), stream.end())))
+    stream && (await new Promise(r => (stream.once('close', r), stream.end())))
     return close()
   }
 
