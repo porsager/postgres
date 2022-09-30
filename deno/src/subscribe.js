@@ -12,6 +12,7 @@ export default function Subscribe(postgres, options) {
 
   const sql = subscribe.sql = postgres({
     ...options,
+    transform: { column: {}, value: {}, row: {} },
     max: 1,
     fetch_types: false,
     idle_timeout: null,
@@ -104,7 +105,7 @@ export default function Subscribe(postgres, options) {
 
     function data(x) {
       if (x[0] === 0x77)
-        parse(x.slice(25), state, sql.options.parsers, handle)
+        parse(x.subarray(25), state, sql.options.parsers, handle, options.transform)
       else if (x[0] === 0x6b && x[17])
         pong()
     }
@@ -137,15 +138,15 @@ function Time(x) {
   return new Date(Date.UTC(2000, 0, 1) + Number(x / BigInt(1000)))
 }
 
-function parse(x, state, parsers, handle) {
+function parse(x, state, parsers, handle, transform) {
   const char = (acc, [k, v]) => (acc[k.charCodeAt(0)] = v, acc)
 
   Object.entries({
     R: x => {  // Relation
       let i = 1
       const r = state[x.readUInt32BE(i)] = {
-        schema: String(x.slice(i += 4, i = x.indexOf(0, i))) || 'pg_catalog',
-        table: String(x.slice(i + 1, i = x.indexOf(0, i + 1))),
+        schema: x.toString('utf8', i += 4, i = x.indexOf(0, i)) || 'pg_catalog',
+        table: x.toString('utf8', i + 1, i = x.indexOf(0, i + 1)),
         columns: Array(x.readUInt16BE(i += 2)),
         keys: []
       }
@@ -157,7 +158,9 @@ function parse(x, state, parsers, handle) {
       while (i < x.length) {
         column = r.columns[columnIndex++] = {
           key: x[i++],
-          name: String(x.slice(i, i = x.indexOf(0, i))),
+          name: transform.column.from
+            ? transform.column.from(x.toString('utf8', i, i = x.indexOf(0, i)))
+            : x.toString('utf8', i, i = x.indexOf(0, i)),
           type: x.readUInt32BE(i += 1),
           parser: parsers[x.readUInt32BE(i)],
           atttypmod: x.readUInt32BE(i += 4)
@@ -171,13 +174,12 @@ function parse(x, state, parsers, handle) {
     O: () => { /* noop */ }, // Origin
     B: x => { // Begin
       state.date = Time(x.readBigInt64BE(9))
-      state.lsn = x.slice(1, 9)
+      state.lsn = x.subarray(1, 9)
     },
     I: x => { // Insert
       let i = 1
       const relation = state[x.readUInt32BE(i)]
-      const row = {}
-      tuples(x, row, relation.columns, i += 7)
+      const { row } = tuples(x, relation.columns, i += 7, transform)
 
       handle(row, {
         command: 'insert',
@@ -189,13 +191,10 @@ function parse(x, state, parsers, handle) {
       const relation = state[x.readUInt32BE(i)]
       i += 4
       const key = x[i] === 75
-      const row = key || x[i] === 79
-        ? {}
+      handle(key || x[i] === 79
+        ? tuples(x, key ? relation.keys : relation.columns, i += 3, transform).row
         : null
-
-      tuples(x, row, key ? relation.keys : relation.columns, i += 3)
-
-      handle(row, {
+      , {
         command: 'delete',
         relation,
         key
@@ -206,20 +205,19 @@ function parse(x, state, parsers, handle) {
       const relation = state[x.readUInt32BE(i)]
       i += 4
       const key = x[i] === 75
-      const old = key || x[i] === 79
-        ? {}
+      const xs = key || x[i] === 79
+        ? tuples(x, key ? relation.keys : relation.columns, i += 3, transform)
         : null
 
-      old && (i = tuples(x, old, key ? relation.keys : relation.columns, i += 3))
+      xs && (i = xs.i)
 
-      const row = {}
-      tuples(x, row, relation.columns, i + 3)
+      const { row } = tuples(x, relation.columns, i + 3, transform)
 
       handle(row, {
         command: 'update',
         relation,
         key,
-        old
+        old: xs && xs.row
       })
     },
     T: () => { /* noop */ }, // Truncate,
@@ -227,14 +225,16 @@ function parse(x, state, parsers, handle) {
   }).reduce(char, {})[x[0]](x)
 }
 
-function tuples(x, row, columns, xi) {
+function tuples(x, columns, xi, transform) {
   let type
     , column
+    , value
 
+  const row = transform.raw ? new Array(columns.length) : {}
   for (let i = 0; i < columns.length; i++) {
     type = x[xi++]
     column = columns[i]
-    row[column.name] = type === 110 // n
+    value = type === 110 // n
       ? null
       : type === 117 // u
         ? undefined
@@ -243,9 +243,18 @@ function tuples(x, row, columns, xi) {
           : column.parser.array === true
             ? column.parser(x.toString('utf8', xi + 5, xi += 4 + x.readUInt32BE(xi)))
             : column.parser(x.toString('utf8', xi + 4, xi += 4 + x.readUInt32BE(xi)))
+
+    transform.raw
+      ? (row[i] = transform.raw === true
+        ? value
+        : transform.value.from ? transform.value.from(value, column) : value)
+      : (row[column.name] = transform.value.from
+        ? transform.value.from(value, column)
+        : value
+      )
   }
 
-  return xi
+  return { i: xi, row: transform.row.from ? transform.row.from(row) : row }
 }
 
 function parseEvent(x) {

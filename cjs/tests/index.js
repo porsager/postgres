@@ -616,6 +616,32 @@ t('unsafe simple includes columns', async() => {
   return ['x', (await sql.unsafe('select 1 as x').values()).columns[0].name]
 })
 
+t('unsafe describe', async() => {
+  const q = 'insert into test values (1)'
+  await sql`create table test(a int unique)`
+  await sql.unsafe(q).describe()
+  const x = await sql.unsafe(q).describe()
+  return [
+    q,
+    x.string,
+    await sql`drop table test`
+  ]
+})
+
+t('simple query using unsafe with multiple statements', async() => {
+  return [
+    '1,2',
+    (await sql.unsafe('select 1 as x;select 2 as x')).map(x => x[0].x).join()
+  ]
+})
+
+t('simple query using simple() with multiple statements', async() => {
+  return [
+    '1,2',
+    (await sql`select 1 as x;select 2 as x`.simple()).map(x => x[0].x).join()
+  ]
+})
+
 t('listen and notify', async() => {
   const sql = postgres(options)
   const channel = 'hello'
@@ -879,6 +905,30 @@ t('Connection errors are caught using begin()', {
   ]
 })
 
+t('dynamic table name', async() => {
+  await sql`create table test(a int)`
+  return [
+    0, (await sql`select * from ${ sql('test') }`).count,
+    await sql`drop table test`
+  ]
+})
+
+t('dynamic schema name', async() => {
+  await sql`create table test(a int)`
+  return [
+    0, (await sql`select * from ${ sql('public') }.test`).count,
+    await sql`drop table test`
+  ]
+})
+
+t('dynamic schema and table name', async() => {
+  await sql`create table test(a int)`
+  return [
+    0, (await sql`select * from ${ sql('public.test') }`).count,
+    await sql`drop table test`
+  ]
+})
+
 t('dynamic column name', async() => {
   return ['!not_valid', Object.keys((await sql`select 1 as ${ sql('!not_valid') }`)[0])[0]]
 })
@@ -903,6 +953,16 @@ t('dynamic insert pluck', async() => {
   const x = { a: 42, b: 'the answer' }
 
   return [null, (await sql`insert into test ${ sql(x, 'a') } returning *`)[0].b, await sql`drop table test`]
+})
+
+t('dynamic in with empty array', async() => {
+  await sql`create table test (a int)`
+  await sql`insert into test values (1)`
+  return [
+    (await sql`select * from test where null in ${ sql([]) }`).count,
+    0,
+    await sql`drop table test`
+  ]
 })
 
 t('dynamic in after insert', async() => {
@@ -1273,7 +1333,60 @@ t('Transform value', async() => {
 })
 
 t('Transform columns from', async() => {
-  const sql = postgres({ ...options, transform: { column: { to: postgres.fromCamel, from: postgres.toCamel } } })
+  const sql = postgres({
+    ...options,
+    transform: postgres.fromCamel
+  })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
+  await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
+  return [
+    2,
+    (await sql`select ${ sql('aTest', 'bTest') } from test`)[0].a_test,
+    await sql`drop table test`
+  ]
+})
+
+t('Transform columns to', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.toCamel
+  })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ a_test: 1, b_test: 1 }]) }`
+  await sql`update test set ${ sql({ a_test: 2, b_test: 2 }) }`
+  return [
+    2,
+    (await sql`select a_test, b_test from test`)[0].aTest,
+    await sql`drop table test`
+  ]
+})
+
+t('Transform columns from and to', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
+  await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
+  return [
+    2,
+    (await sql`select ${ sql('aTest', 'bTest') } from test`)[0].aTest,
+    await sql`drop table test`
+  ]
+})
+
+t('Transform columns from and to (legacy)', async() => {
+  const sql = postgres({
+    ...options,
+    transform: {
+      column: {
+        to: postgres.fromCamel,
+        from: postgres.toCamel
+      }
+    }
+  })
   await sql`create table test (a_test int, b_test text)`
   await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
   await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
@@ -1746,8 +1859,7 @@ t('multiple queries before connect', async() => {
 t('subscribe', { timeout: 2 }, async() => {
   const sql = postgres({
     database: 'postgres_js_test',
-    publications: 'alltables',
-    fetch_types: false
+    publications: 'alltables'
   })
 
   await sql.unsafe('create publication alltables for all tables')
@@ -1776,6 +1888,53 @@ t('subscribe', { timeout: 2 }, async() => {
   await delay(10)
   await unsubscribe()
   await sql`insert into test (name) values ('Oh noes')`
+  await delay(10)
+  return [
+    'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
+    result.join(','),
+    await sql`drop table test`,
+    await sql`drop publication alltables`,
+    await sql.end()
+  ]
+})
+
+t('subscribe with transform', { timeout: 2 }, async() => {
+  const sql = postgres({
+    transform: {
+      column: {
+        from: postgres.toCamel,
+        to: postgres.fromCamel
+      }
+    },
+    database: 'postgres_js_test',
+    publications: 'alltables'
+  })
+
+  await sql.unsafe('create publication alltables for all tables')
+
+  const result = []
+
+  const { unsubscribe } = await sql.subscribe('*', (row, { command, old }) =>
+    result.push(command, row.nameInCamel || row.id, old && old.nameInCamel)
+  )
+
+  await sql`
+    create table test (
+      id serial primary key,
+      name_in_camel text
+    )
+  `
+
+  await sql`insert into test (name_in_camel) values ('Murray')`
+  await sql`update test set name_in_camel = 'Rothbard'`
+  await sql`delete from test`
+  await sql`alter table test replica identity full`
+  await sql`insert into test (name_in_camel) values ('Murray')`
+  await sql`update test set name_in_camel = 'Rothbard'`
+  await sql`delete from test`
+  await delay(10)
+  await unsubscribe()
+  await sql`insert into test (name_in_camel) values ('Oh noes')`
   await delay(10)
   return [
     'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',

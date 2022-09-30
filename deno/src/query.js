@@ -54,16 +54,20 @@ export class Query extends Promise {
     return this.canceller && (this.canceller(this), this.canceller = null)
   }
 
-  async readable() {
+  simple() {
     this.options.simple = true
     this.options.prepare = false
+    return this
+  }
+
+  async readable() {
+    this.simple()
     this.streaming = true
     return this
   }
 
   async writable() {
-    this.options.simple = true
-    this.options.prepare = false
+    this.simple()
     this.streaming = true
     return this
   }
@@ -108,7 +112,8 @@ export class Query extends Promise {
   }
 
   describe() {
-    this.onlyDescribe = true
+    this.options.simple = false
+    this.onlyDescribe = this.options.prepare = true
     return this
   }
 

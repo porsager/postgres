@@ -153,7 +153,10 @@ function select(first, rest, parameters, types, options) {
 
 const builders = Object.entries({
   values,
-  in: values,
+  in: (...xs) => {
+    const x = values(...xs)
+    return x === '()' ? '(null)' : x
+  },
   select,
   as: select,
   returning: select,
@@ -323,3 +326,34 @@ const toKebab = module.exports.toKebab = x => x.replace(/_/g, '-')
 const fromCamel = module.exports.fromCamel = x => x.replace(/([A-Z])/g, '_$1').toLowerCase()
 const fromPascal = module.exports.fromPascal = x => (x.slice(0, 1) + x.slice(1).replace(/([A-Z])/g, '_$1')).toLowerCase()
 const fromKebab = module.exports.fromKebab = x => x.replace(/-/g, '_')
+
+function createJsonTransform(fn) {
+  return function jsonTransform(x, column) {
+    return column.type === 114 || column.type === 3802
+     ? Array.isArray(x)
+       ? x.map(jsonTransform)
+       : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: v }), {})
+     : x
+  }
+}
+
+toCamel.column = { from: toCamel }
+toCamel.value = { from: createJsonTransform(toCamel) }
+fromCamel.column = { to: fromCamel }
+
+const camel = module.exports.camel = { ...toCamel }
+camel.column.to = fromCamel;
+
+toPascal.column = { from: toPascal }
+toPascal.value = { from: createJsonTransform(toPascal) }
+fromPascal.column = { to: fromPascal }
+
+const pascal = module.exports.pascal = { ...toPascal }
+pascal.column.to = fromPascal
+
+toKebab.column = { from: toKebab }
+toKebab.value = { from: createJsonTransform(toKebab) }
+fromKebab.column = { to: fromKebab }
+
+const kebab = module.exports.kebab = { ...toKebab }
+kebab.column.to = fromKebab
