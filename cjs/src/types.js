@@ -330,10 +330,10 @@ const fromKebab = module.exports.fromKebab = x => x.replace(/-/g, '_')
 function createJsonTransform(fn) {
   return function jsonTransform(x, column) {
     return column.type === 114 || column.type === 3802
-     ? Array.isArray(x)
-       ? x.map(jsonTransform)
-       : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: v }), {})
-     : x
+      ? Array.isArray(x)
+        ? x.map(jsonTransform)
+        : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: v }), {})
+      : x
   }
 }
 
@@ -342,7 +342,7 @@ toCamel.value = { from: createJsonTransform(toCamel) }
 fromCamel.column = { to: fromCamel }
 
 const camel = module.exports.camel = { ...toCamel }
-camel.column.to = fromCamel;
+camel.column.to = fromCamel
 
 toPascal.column = { from: toPascal }
 toPascal.value = { from: createJsonTransform(toPascal) }
