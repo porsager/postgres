@@ -683,6 +683,23 @@ t('double listen', async() => {
   return [2, count]
 })
 
+t('multiple listeners work after a reconnect', async() => {
+  const sql = postgres(options)
+      , xs = []
+
+  const s1 = await sql.listen('test', x => xs.push('1', x))
+  await sql.listen('test', x => xs.push('2', x))
+  await sql.notify('test', 'a')
+  await delay(50)
+  await sql`select pg_terminate_backend(${ s1.state.pid })`
+  await delay(200)
+  await sql.notify('test', 'b')
+  await delay(50)
+  sql.end()
+
+  return ['1a2a1b2b', xs.join('')]
+})
+
 t('listen and notify with weird name', async() => {
   const sql = postgres(options)
   const channel = 'wat-;ø§'

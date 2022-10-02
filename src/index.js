@@ -171,16 +171,15 @@ function Postgres(a, b) {
 
     if (exists) {
       channels[name].listeners.push(listener)
+      const result = await channels[name].result
       listener.onlisten && listener.onlisten()
-      return Promise.resolve({ ...channels[name].result, unlisten })
+      return { state: result.state, unlisten }
     }
 
-    const result = await sql`listen ${ sql(name) }`
-    channels[name] = { result, listeners: [listener] }
+    channels[name] = { result: sql`listen ${ sql(name) }`, listeners: [listener] }
+    const result = await channels[name].result
     listener.onlisten && listener.onlisten()
-    result.unlisten = unlisten
-
-    return result
+    return { state: result.state, unlisten }
 
     async function unlisten() {
       if (name in channels === false)
