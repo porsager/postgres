@@ -232,6 +232,21 @@ sql`
 update users set "name" = $1, "age" = $2 where user_id = $3
 ```
 
+### Multiple updates in one query
+It's possible to create multiple udpates in a single query. It's necessary to use arrays intead of objects to ensure the order of the items so that these correspond with the column names.
+```js
+const users = [
+  [1, 'John', 34],
+  [2, 'Jane', 27],
+]
+
+sql`
+  update users set name = update_data.name, age = update_data.age
+  from (values ${sql(users)}) as update_data (id, name, age)
+  where users.id = update_data.id
+`
+```
+
 ### Dynamic values and `where in`
 Value lists can also be created dynamically, making `where in` queries simple too.
 ```js
