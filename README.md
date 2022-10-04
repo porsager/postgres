@@ -604,6 +604,8 @@ Built in transformation functions are:
 * For PascalCase - `postgres.pascal`, `postgres.toPascal`, `postgres.fromPascal`
 * For Kebab-Case - `postgres.kebab`, `postgres.toKebab`, `postgres.fromKebab`
 
+These built in transformations will only convert to/from snake_case. For example, using `{ transform: postgres.toCamel }` will convert the column names to camelCase only if the column names are in snake_case to begin with. `{ transform: postgres.fromCamel }` will convert camelCase only to snake_case.
+
 By default, using `postgres.camel`, `postgres.pascal` and `postgres.kebab` will perform a two-way transformation - both the data passed to the query and the data returned by the query will be transformed:
 
 ```js
