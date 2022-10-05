@@ -80,6 +80,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     , incoming = Buffer.alloc(0)
     , needsTypes = options.fetch_types
     , backendParameters = {}
+    , portalId = Math.random().toString(36).slice(2)
+    , portalCount = 1
     , statements = {}
     , statementId = Math.random().toString(36).slice(2)
     , statementCount = 1
@@ -168,6 +170,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         && !q.describeFirst
         && sent.length < max_pipeline
         && (!q.options.onexecute || q.options.onexecute(connection))
+        && !q.portal
     } catch (error) {
       sent.length === 0 && write(Sync)
       errored(error)
@@ -199,9 +202,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   function prepared(q) {
     return Buffer.concat([
-      Bind(q.parameters, q.statement.types, q.statement.name, q.cursorName),
-      q.cursorFn
-        ? Execute('', q.cursorRows)
+      Bind(q.parameters, q.statement.types, q.statement.name, q.portal),
+      q.portal
+        ? Execute(q.portal, q.cursorRows)
         : ExecuteUnnamed
     ])
   }
@@ -222,6 +225,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
     !q.tagged && q.args.forEach(x => handleValue(x, parameters, types, options))
 
+    q.cursorRows && (q.portal = 'P' + portalId + portalCount++)
     q.prepare = options.prepare && ('prepare' in q.options ? q.options.prepare : true)
     q.string = string
     q.signature = q.prepare && types + string
@@ -794,7 +798,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       rows = 0
       x === CLOSE
         ? write(Close(query.portal))
-        : (result = new Result(), write(Execute('', query.cursorRows)))
+        : (result = new Result(), write(Execute(query.portal, query.cursorRows)))
     } catch (err) {
       write(Sync)
       query.reject(err)
