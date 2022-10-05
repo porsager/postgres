@@ -700,6 +700,27 @@ t('multiple listeners work after a reconnect', async() => {
   return ['1a2a1b2b', xs.join('')]
 })
 
+t('concurrent cursors', async() => {
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.join('')]
+})
+
+t('concurrent cursors multiple connections', async() => {
+  const sql = postgres({ ...options, max: 2 })
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.sort().join('')]
+})
+
 t('listen and notify with weird name', async() => {
   const sql = postgres(options)
   const channel = 'wat-;ø§'

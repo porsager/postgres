@@ -30,6 +30,7 @@ export class Query extends Promise {
     this.cancelled = null
     this.executed = false
     this.signature = ''
+    this.portal = ''
 
     this[originError] = this.handler.debug
       ? new Error()
