@@ -700,7 +700,7 @@ t('multiple listeners work after a reconnect', async() => {
 
 t('listen and notify with weird name', async() => {
   const sql = postgres(options)
-  const channel = 'wat-;ø§'
+  const channel = 'wat-;.ø.§'
   const result = await new Promise(async r => {
     await sql.listen(channel, r)
     sql.notify(channel, 'works')

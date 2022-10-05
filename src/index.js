@@ -176,7 +176,9 @@ function Postgres(a, b) {
       return { state: result.state, unlisten }
     }
 
-    channels[name] = { result: sql`listen ${ sql(name) }`, listeners: [listener] }
+    channels[name] = { result: sql`listen ${
+      sql.unsafe('"' + name.replace(/"/g, '""') + '"')
+    }`, listeners: [listener] }
     const result = await channels[name].result
     listener.onlisten && listener.onlisten()
     return { state: result.state, unlisten }
