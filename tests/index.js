@@ -351,6 +351,11 @@ t('Connect using uri', async() =>
   })]
 )
 
+t('Options from uri with special characters in user and pass', async() => {
+  const opt = postgres({ user: 'öla', pass: 'pass^word' }).options
+  return [[opt.user, opt.pass].toString(), 'öla,pass^word']
+})
+
 t('Fail with proper error on no host', async() =>
   ['ECONNREFUSED', (await new Promise((resolve, reject) => {
     const sql = postgres('postgres://localhost:33333/' + options.db, {
