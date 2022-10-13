@@ -339,16 +339,16 @@ sql`
 select "id" from "users"
 ```
 
-### Quick Primer
+### Quick primer on interpolation
 
-Here's a quick oversight over all the ways do interpolation in a query template string.
+Here's a quick oversight over all the ways to do interpolation in a query template string:
 
-| Interpolation syntax  | Usage | Example |
-| ------------- | ------------- | ------------- |
-| `${ sql`` }`  | for one or more keywords or sql (fragments)  | const orderClause = `sql`` ` ``order by age desc`` ` ```  |
-| `${ sql(string) }`  | for identifiers  | `sql('table_name')`  |
-| `${ sql([] or {}, ...) }`  |  for helpers  | ``  |
-| `${ 'somevalue' }`  | for values  | `sql```  |
+| Interpolation syntax       | Usage                         | Example                                                   |
+| -------------              | -------------                 | -------------                                             |
+| `${ sql`` }`               | for keywords or sql fragments | ``sql`SELECT * FROM users ${sql`order by age desc` }` ``  |
+| `${ sql(string) }`         | for identifiers               | ``sql`SELECT * FROM ${sql('table_name')` ``               |
+| `${ sql([] or {}, ...) }`  | for helpers                   | ``sql`INSERT INTO users ${sql({ name: 'Peter'})}` ``      |
+| `${ 'somevalue' }`         | for values                    | ``sql`SELECT * FROM users WHERE age = ${42}` ``           |
 
 ## Advanced query methods
 
