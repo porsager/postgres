@@ -423,7 +423,7 @@ await sql`
 ```
 
 ### Query Descriptions
-#### ```await sql``.describe([rows = 1], fn) -> Result[]```
+#### ```await sql``.describe() -> Result[]```
 
 Rather than executing a given query, `.describe` will return information utilized in the query process. This information can include the query identifier, column types, etc.
 
