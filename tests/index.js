@@ -1414,6 +1414,14 @@ t('Transform columns from and to (legacy)', async() => {
   ]
 })
 
+t('Transform columns from and to in nested json_aag', async () => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  });
+  return await sql`select '[{"a_b":1},{"c_d":2}]'::json as nested_field`;
+})
+
 t('Unix socket', async() => {
   const sql = postgres({
     ...options,
