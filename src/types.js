@@ -331,7 +331,7 @@ function createJsonTransform(fn) {
   return function jsonTransform(x, column) {
     return column.type === 114 || column.type === 3802
       ? Array.isArray(x)
-        ? x.map(jsonTransform)
+        ? x.map(x => jsonTransform(x, column))
         : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: v }), {})
       : x
   }

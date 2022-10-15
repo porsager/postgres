@@ -603,6 +603,14 @@ t('column toKebab', async() => {
   return ['hello-world', Object.keys((await sql`select * from test`)[0])[0], await sql`drop table test`]
 })
 
+t('Transform nested json in arrays', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  return ['aBcD', (await sql`select '[{"a_b":1},{"c_d":2}]'::jsonb as x`)[0].x.map(Object.keys).join('')]
+})
+
 t('unsafe', async() => {
   await sql`create table test (x int)`
   return [1, (await sql.unsafe('insert into test values ($1) returning *', [1]))[0].x, await sql`drop table test`]
