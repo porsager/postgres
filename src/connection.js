@@ -103,6 +103,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     , nonce = null
     , query = null
     , final = null
+    , firstFailedHostIndex = null
 
   const connection = {
     queue: queues.closed,
@@ -252,10 +253,17 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function connectTimedOut() {
-    errored(Errors.connection('CONNECT_TIMEOUT', options, socket))
-    socket.destroy()
-  }
+    typeof options.debug === 'function' && options.debug('connect timeout')
 
+    if(firstFailedHostIndex == hostIndex){
+      typeof options.debug === 'function' && options.debug('hosts exhausted')
+      errored(Errors.connection('CONNECT_TIMEOUT', options, socket))
+      socket.destroy()
+      return
+    }
+
+    firstFailedHostIndex??=hostIndex-1
+  }
   async function secure() {
     write(SSLRequest)
     const canSSL = await new Promise(r => socket.once('data', x => r(x[0] === 83))) // S
@@ -323,7 +331,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   async function connect() {
     terminated = false
     backendParameters = {}
-    socket || (socket = await createSocket())
+    // socket || (socket = await createSocket())
+    socket = await createSocket()
 
     if (!socket)
       return
@@ -337,7 +346,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
     if (options.path)
       return socket.connect(options.path)
-
+    typeof options.debug === 'function' && options.debug('trying to connect to '+host[hostIndex]+':'+port[hostIndex]+' @#'+hostIndex)
     socket.connect(port[hostIndex], host[hostIndex])
     hostIndex = (hostIndex + 1) % port.length
   }
@@ -363,6 +372,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function error(err) {
+    typeof options.debug === 'function' && options.debug(err)
     if (connection.queue === queues.connecting && options.host[retries + 1])
       return
 
@@ -516,6 +526,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     query = results = null
     result = new Result()
     connectTimer.cancel()
+    firstFailedHostIndex = null
 
     if (initial) {
       if (target_session_attrs) {
