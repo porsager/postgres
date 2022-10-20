@@ -611,6 +611,14 @@ t('Transform nested json in arrays', async() => {
   return ['aBcD', (await sql`select '[{"a_b":1},{"c_d":2}]'::jsonb as x`)[0].x.map(Object.keys).join('')]
 })
 
+t('Transform null json in arrays', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  return [null, (await sql`select '[{"a_b":null},{"c_d":null}]'::jsonb as x`)[0].x.map(Object.keys).join('')]
+})
+
 t('unsafe', async() => {
   await sql`create table test (x int)`
   return [1, (await sql.unsafe('insert into test values ($1) returning *', [1]))[0].x, await sql`drop table test`]
