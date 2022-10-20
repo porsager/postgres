@@ -39,6 +39,10 @@ export const types = {
   }
 }
 
+const allowList = {
+  object: typeof Object
+}
+
 class NotTagged { then() { notTagged() } catch() { notTagged() } finally() { notTagged() }}
 
 export class Identifier extends NotTagged {
@@ -329,7 +333,7 @@ export const fromKebab = x => x.replace(/-/g, '_')
 
 function createJsonTransform(fn) {
   return function jsonTransform(x, column) {
-    return column.type === 114 || column.type === 3802
+    return (x && typeof x in allowList) && (column.type === 114 || column.type === 3802)
       ? Array.isArray(x)
         ? x.map(x => jsonTransform(x, column))
         : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: v }), {})
