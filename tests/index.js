@@ -622,7 +622,7 @@ t('Bypass transform for json primitive', async () => {
   )[0]
 
   return [
-    JSON.stringify({ a: null, b: false, c: { 0: 'a' }, d: {} }),
+    JSON.stringify({ a: null, b: false, c: 'a', d: 1 }),
     JSON.stringify(x),
   ]
 })
@@ -638,7 +638,7 @@ t('Bypass transform for jsonb primitive', async () => {
   )[0]
 
   return [
-    JSON.stringify({ a: null, b: false, c: { 0: 'a' }, d: {} }),
+    JSON.stringify({ a: null, b: false, c: 'a', d: 1 }),
     JSON.stringify(x),
   ]
 })
