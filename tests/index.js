@@ -615,32 +615,33 @@ t('Bypass transform for json primitive', async () => {
   const sql = postgres({
     ...options,
     transform: postgres.camel,
-  });
+  })
 
   const x = (
     await sql`select 'null'::json as a, 'false'::json as b, '"a"'::json as c, '1'::json as d`
-  )[0];
+  )[0]
 
   return [
     JSON.stringify({ a: null, b: false, c: { 0: 'a' }, d: {} }),
     JSON.stringify(x),
-  ];
-});
+  ]
+})
 
 t('Bypass transform for jsonb primitive', async () => {
   const sql = postgres({
     ...options,
     transform: postgres.camel,
-  });
+  })
+
   const x = (
     await sql`select 'null'::jsonb as a, 'false'::jsonb as b, '"a"'::jsonb as c, '1'::jsonb as d`
-  )[0];
+  )[0]
 
   return [
     JSON.stringify({ a: null, b: false, c: { 0: 'a' }, d: {} }),
     JSON.stringify(x),
-  ];
-});
+  ]
+})
 
 t('unsafe', async() => {
   await sql`create table test (x int)`
