@@ -228,6 +228,21 @@ sql`
 update users set "name" = $1, "age" = $2 where user_id = $3
 ```
 
+### Multiple updates in one query
+It's possible to create multiple udpates in a single query. It's necessary to use arrays intead of objects to ensure the order of the items so that these correspond with the column names.
+```js
+const users = [
+  [1, 'John', 34],
+  [2, 'Jane', 27],
+]
+
+sql`
+  update users set name = update_data.name, age = update_data.age
+  from (values ${sql(users)}) as update_data (id, name, age)
+  where users.id = update_data.id
+`
+```
+
 ### Dynamic values and `where in`
 Value lists can also be created dynamically, making `where in` queries simple too.
 ```js
@@ -320,6 +335,17 @@ sql`
 select "id" from "users"
 ```
 
+### Quick primer on interpolation
+
+Here's a quick oversight over all the ways to do interpolation in a query template string:
+
+| Interpolation syntax       | Usage                         | Example                                                   |
+| -------------              | -------------                 | -------------                                             |
+| `${ sql`` }`               | for keywords or sql fragments | ``sql`SELECT * FROM users ${sql`order by age desc` }` ``  |
+| `${ sql(string) }`         | for identifiers               | ``sql`SELECT * FROM ${sql('table_name')` ``               |
+| `${ sql([] or {}, ...) }`  | for helpers                   | ``sql`INSERT INTO users ${sql({ name: 'Peter'})}` ``      |
+| `${ 'somevalue' }`         | for values                    | ``sql`SELECT * FROM users WHERE age = ${42}` ``           |
+
 ## Advanced query methods
 
 ### Cursors
@@ -393,7 +419,7 @@ await sql`
 ```
 
 ### Query Descriptions
-#### ```await sql``.describe([rows = 1], fn) -> Result[]```
+#### ```await sql``.describe() -> Result[]```
 
 Rather than executing a given query, `.describe` will return information utilized in the query process. This information can include the query identifier, column types, etc.
 
@@ -584,6 +610,8 @@ Built in transformation functions are:
 * For camelCase - `postgres.camel`, `postgres.toCamel`, `postgres.fromCamel`
 * For PascalCase - `postgres.pascal`, `postgres.toPascal`, `postgres.fromPascal`
 * For Kebab-Case - `postgres.kebab`, `postgres.toKebab`, `postgres.fromKebab`
+
+These built in transformations will only convert to/from snake_case. For example, using `{ transform: postgres.toCamel }` will convert the column names to camelCase only if the column names are in snake_case to begin with. `{ transform: postgres.fromCamel }` will convert camelCase only to snake_case.
 
 By default, using `postgres.camel`, `postgres.pascal` and `postgres.kebab` will perform a two-way transformation - both the data passed to the query and the data returned by the query will be transformed:
 
