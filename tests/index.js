@@ -611,10 +611,10 @@ t('Transform nested json in arrays', async() => {
   return ['aBcD', (await sql`select '[{"a_b":1},{"c_d":2}]'::jsonb as x`)[0].x.map(Object.keys).join('')]
 })
 
-t('Bypass transform for json primitive', async () => {
+t('Bypass transform for json primitive', async() => {
   const sql = postgres({
     ...options,
-    transform: postgres.camel,
+    transform: postgres.camel
   })
 
   const x = (
@@ -623,14 +623,14 @@ t('Bypass transform for json primitive', async () => {
 
   return [
     JSON.stringify({ a: null, b: false, c: 'a', d: 1 }),
-    JSON.stringify(x),
+    JSON.stringify(x)
   ]
 })
 
-t('Bypass transform for jsonb primitive', async () => {
+t('Bypass transform for jsonb primitive', async() => {
   const sql = postgres({
     ...options,
-    transform: postgres.camel,
+    transform: postgres.camel
   })
 
   const x = (
@@ -639,7 +639,7 @@ t('Bypass transform for jsonb primitive', async () => {
 
   return [
     JSON.stringify({ a: null, b: false, c: 'a', d: 1 }),
-    JSON.stringify(x),
+    JSON.stringify(x)
   ]
 })
 
