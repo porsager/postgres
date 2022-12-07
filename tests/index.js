@@ -631,6 +631,26 @@ t('Transform deeply nested json object in arrays', async() => {
       .join('_')]
 })
 
+t('Transform deeply nested json array in arrays', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  return ['childArray_deeplyNestedArray_grandchildArray', (await sql`select '[{"nested_array": [{"child_array": 2, "deeply_nested_array": [{"grandchild_array":3}]}]}]'::jsonb AS x`)[0].x
+      .map((x) => {
+        let result;
+        for (const key in x) {
+          const result1 = Object.keys(x[key][0]);
+          const result2 = Object.keys(x[key][0].deeplyNestedArray[0]);
+
+          result = [...result1, ...result2];
+        }
+
+        return result;
+      })[0]
+      .join('_')]
+})
+
 t('Bypass transform for json primitive', async() => {
   const sql = postgres({
     ...options,
