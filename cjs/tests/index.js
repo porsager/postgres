@@ -1577,6 +1577,22 @@ t('connect_timeout throws proper error', async() => [
   })`select 1`.catch(e => e.code)
 ])
 
+t('connect_timeout error message includes host:port', { timeout: 20 }, async() => {
+  const connect_timeout = 0.2
+  const server = net.createServer()
+  server.listen()
+  const sql = postgres({ port: server.address().port, host: '127.0.0.1', connect_timeout })
+  const port = server.address().port
+  let err
+  await sql`select 1`.catch((e) => {
+    if (e.code !== 'CONNECT_TIMEOUT')
+      throw e
+    err = e.message
+  })
+  server.close()
+  return [["write CONNECT_TIMEOUT 127.0.0.1:", port].join(""), err]
+})
+
 t('requests works after single connect_timeout', async() => {
   let first = true
 
