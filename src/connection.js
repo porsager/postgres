@@ -339,6 +339,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return socket.connect(options.path)
 
     socket.connect(port[hostIndex], host[hostIndex])
+    socket.host = host[hostIndex]
+    socket.port = port[hostIndex]
+
     hostIndex = (hostIndex + 1) % port.length
   }
 
