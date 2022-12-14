@@ -92,6 +92,22 @@ t('Boolean false', async() =>
   [false, (await sql`select ${ false } as x`)[0].x]
 )
 
+t('Boolean[] [true, false]', async() =>
+  ["[true,false]", JSON.stringify((await sql`select ${ [true, false] }::bool[] as x`)[0].x)]
+)
+
+t('Number[] [1, 2]', async() =>
+  ["[1,2]", JSON.stringify((await sql`select ${ [1, 2] }::int4[] as x`)[0].x)]
+)
+
+t('String[] ["a", "b"]', async() =>
+  ['["a","b"]', JSON.stringify((await sql`select ${ ["a", "b"] }::text[] as x`)[0].x)]
+)
+
+t('BigInt[] [BigInt(1), BigInt(2)]', async() =>
+  ['[1,2]', JSON.stringify((await sql`select ${ [BigInt(1), BigInt(2)] }::float4[] as x`)[0].x)]
+)
+
 t('Boolean true', async() =>
   [true, (await sql`select ${ true } as x`)[0].x]
 )

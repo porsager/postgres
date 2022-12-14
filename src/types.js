@@ -213,6 +213,17 @@ export const escapeIdentifier = function escape(str) {
   return '"' + str.replace(/"/g, '""').replace(/\./g, '"."') + '"'
 }
 
+const defaultArrayTypes = {
+    "boolean": 1000,
+    "number": 1021,
+    "string": 1009,
+    "bigint": 1016,
+};
+
+export const inferArrayType = function inferArrayType(x) {
+    return defaultArrayTypes[typeof x[0]] || inferType(x[0]);
+}
+
 export const inferType = function inferType(x) {
   return (
     x instanceof Parameter ? x.type :
@@ -220,7 +231,7 @@ export const inferType = function inferType(x) {
     x instanceof Uint8Array ? 17 :
     (x === true || x === false) ? 16 :
     typeof x === 'bigint' ? 20 :
-    Array.isArray(x) ? inferType(x[0]) :
+    Array.isArray(x) ? inferArrayType(x) :
     0
   )
 }
