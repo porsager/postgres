@@ -141,7 +141,7 @@ t('String array', async() =>
 )
 
 t('Array of Integer', async() =>
-  ['3', (await sql`select ${ sql.array([1, 2, 3]) } as x`)[0].x[2]]
+  [3, (await sql`select ${ sql.array([1, 2, 3]) } as x`)[0].x[2]]
 )
 
 t('Array of String', async() =>
