@@ -351,6 +351,11 @@ t('Connect using uri', async() =>
   })]
 )
 
+t('Options from uri with special characters in user and pass', async() => {
+  const opt = postgres({ user: 'öla', pass: 'pass^word' }).options
+  return [[opt.user, opt.pass].toString(), 'öla,pass^word']
+})
+
 t('Fail with proper error on no host', async() =>
   ['ECONNREFUSED', (await new Promise((resolve, reject) => {
     const sql = postgres('postgres://localhost:33333/' + options.db, {
@@ -540,7 +545,7 @@ t('Connection end does not cancel query', async() => {
 
   const promise = sql`select 1 as x`.execute()
 
-  sql.end()
+  await sql.end()
 
   return [1, (await promise)[0].x]
 })
@@ -616,19 +621,18 @@ t('Transform deeply nested json object in arrays', async() => {
     ...options,
     transform: postgres.camel
   })
-  return ['childObj_deeplyNestedObj_grandchildObj', (await sql`select '[{"nested_obj": {"child_obj": 2, "deeply_nested_obj": {"grandchild_obj": 3}}}]'::jsonb as x`)[0].x
-      .map((x) => {
-        let result;
-        for (const key in x) {
-          const result1 = Object.keys(x[key]);
-          const result2 = Object.keys(x[key].deeplyNestedObj);
-
-          result = [...result1, ...result2];
-        }
-
-        return result;
-      })[0]
-      .join('_')]
+  return [
+    'childObj_deeplyNestedObj_grandchildObj',
+    (await sql`
+      select '[{"nested_obj": {"child_obj": 2, "deeply_nested_obj": {"grandchild_obj": 3}}}]'::jsonb as x
+    `)[0].x.map(x => {
+      let result
+      for (const key in x)
+        result = [...Object.keys(x[key]), ...Object.keys(x[key].deeplyNestedObj)]
+      return result
+    })[0]
+    .join('_')
+  ]
 })
 
 t('Transform deeply nested json array in arrays', async() => {
@@ -636,19 +640,18 @@ t('Transform deeply nested json array in arrays', async() => {
     ...options,
     transform: postgres.camel
   })
-  return ['childArray_deeplyNestedArray_grandchildArray', (await sql`select '[{"nested_array": [{"child_array": 2, "deeply_nested_array": [{"grandchild_array":3}]}]}]'::jsonb AS x`)[0].x
-      .map((x) => {
-        let result;
-        for (const key in x) {
-          const result1 = Object.keys(x[key][0]);
-          const result2 = Object.keys(x[key][0].deeplyNestedArray[0]);
-
-          result = [...result1, ...result2];
-        }
-
-        return result;
-      })[0]
-      .join('_')]
+  return [
+    'childArray_deeplyNestedArray_grandchildArray',
+    (await sql`
+      select '[{"nested_array": [{"child_array": 2, "deeply_nested_array": [{"grandchild_array":3}]}]}]'::jsonb AS x
+    `)[0].x.map((x) => {
+      let result
+      for (const key in x)
+        result = [...Object.keys(x[key][0]), ...Object.keys(x[key][0].deeplyNestedArray[0])]
+      return result
+    })[0]
+    .join('_')
+  ]
 })
 
 t('Bypass transform for json primitive', async() => {
@@ -1630,7 +1633,7 @@ t('connect_timeout error message includes host:port', { timeout: 20 }, async() =
     err = e.message
   })
   server.close()
-  return [["write CONNECT_TIMEOUT 127.0.0.1:", port].join(""), err]
+  return [['write CONNECT_TIMEOUT 127.0.0.1:', port].join(''), err]
 })
 
 t('requests works after single connect_timeout', async() => {

@@ -486,8 +486,18 @@ function parseUrl(url) {
   host = host.slice(host.indexOf('://') + 3).split(/[?/]/)[0]
   host = decodeURIComponent(host.slice(host.indexOf('@') + 1))
 
+  const urlObj = new URL(url.replace(host, host.split(',')[0]))
+
   return {
-    url: new URL(url.replace(host, host.split(',')[0])),
+    url: {
+      username: decodeURIComponent(urlObj.username),
+      password: decodeURIComponent(urlObj.password),
+      host: urlObj.host,
+      hostname: urlObj.hostname,
+      port: urlObj.port,
+      pathname: urlObj.pathname,
+      searchParams: urlObj.searchParams
+    },
     multihost: host.indexOf(',') > -1 && host
   }
 }

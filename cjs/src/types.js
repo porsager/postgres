@@ -164,7 +164,7 @@ const builders = Object.entries({
   update(first, rest, parameters, types, options) {
     return (rest.length ? rest.flat() : Object.keys(first)).map(x =>
       escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x) +
-      '=' + handleValue(first[x], parameters, types, options)
+      '=' + stringifyValue('values', first[x], parameters, types, options)
     )
   },
 
