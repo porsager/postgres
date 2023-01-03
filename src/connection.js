@@ -745,8 +745,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     return (
       (x === 'read-write' && xs.default_transaction_read_only === 'on') ||
       (x === 'read-only' && xs.default_transaction_read_only === 'off') ||
-      (x === 'primary' && xs.in_hot_standby === 'off') ||
-      (x === 'standby' && xs.in_hot_standby === 'on') ||
+      (x === 'primary' && xs.in_hot_standby === 'on') ||
+      (x === 'standby' && xs.in_hot_standby === 'off') ||
       (x === 'prefer-standby' && xs.in_hot_standby === 'off' && options.host[retries])
     )
   }
