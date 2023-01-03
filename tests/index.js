@@ -531,7 +531,7 @@ t('Connection ended timeout', async() => {
 
 t('Connection ended error', async() => {
   const sql = postgres(options)
-  sql.end()
+  await sql.end()
   return ['CONNECTION_ENDED', (await sql``.catch(x => x.code))]
 })
 
