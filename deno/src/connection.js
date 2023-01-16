@@ -267,18 +267,24 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (!canSSL && ssl === 'prefer')
       return connected()
 
-    socket.removeAllListeners()
-    socket = tls.connect({
+    const sslOptions = {
       socket,
-      ...(ssl === 'require' || ssl === 'allow' || ssl === 'prefer'
-        ? { rejectUnauthorized: false }
-        : ssl === 'verify-full'
-          ? {}
-          : typeof ssl === 'object'
-            ? ssl
-            : {}
-      )
-    })
+    }
+
+    console.log("chapson!!!")
+
+    if (typeof ssl === 'object') {
+      Object.assign(sslOptions, ssl)
+    } else if (['require', 'allow', 'prefer'].includes(ssl)) {
+      sslOptions.rejectUnauthorized = false
+    }
+
+    if (!options.servername && net.isIP(host) === 0) {
+      options.servername = host
+    }
+
+    socket.removeAllListeners()
+    socket = tls.connect(sslOptions)
     socket.on('secureConnect', connected)
     socket.on('error', error)
     socket.on('close', closed)
