@@ -271,8 +271,6 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       socket,
     }
 
-    console.log("chapson!!!")
-
     if (typeof ssl === 'object') {
       Object.assign(sslOptions, ssl)
     } else if (['require', 'allow', 'prefer'].includes(ssl)) {
