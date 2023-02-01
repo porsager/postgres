@@ -192,7 +192,9 @@ function Postgres(a, b) {
         return
 
       delete channels[name]
-      return sql`unlisten ${ sql(name) }`
+      return sql`unlisten ${
+        sql.unsafe('"' + name.replace(/"/g, '""') + '"')
+      }`
     }
   }
 

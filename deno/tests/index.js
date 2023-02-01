@@ -787,8 +787,10 @@ t('listen and notify with weird name', async() => {
   const sql = postgres(options)
   const channel = 'wat-;.ø.§'
   const result = await new Promise(async r => {
-    await sql.listen(channel, r)
+    const { unlisten } = await sql.listen(channel, r)
     sql.notify(channel, 'works')
+    await delay(50)
+    await unlisten()
   })
 
   return [
