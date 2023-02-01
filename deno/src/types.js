@@ -2,11 +2,19 @@ import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
 import { Query } from './query.js'
 import { Errors } from './errors.js'
 
+export const serialize = function serialize(x) {
+  return typeof x === 'string' ? x :
+    x instanceof Date ? types.date.serialize(x) :
+    x instanceof Uint8Array ? types.bytea.serialize(x) :
+    (x === true || x === false) ? types.boolean.serialize(x) :
+    '' + x
+}
+
 export const types = {
   string: {
     to: 25,
     from: null,             // defaults to string
-    serialize: x => '' + x
+    serialize
   },
   number: {
     to: 0,
@@ -67,10 +75,9 @@ export class Builder extends NotTagged {
 
   build(before, parameters, types, options) {
     const keyword = builders.map(([x, fn]) => ({ fn, i: before.search(x) })).sort((a, b) => a.i - b.i).pop()
-    if (keyword.i === -1)
-      throw new Error('Could not infer helper mode')
-
-    return keyword.fn(this.first, this.rest, parameters, types, options)
+    return keyword.i === -1
+      ? escapeIdentifiers(this.first, options)
+      : keyword.fn(this.first, this.rest, parameters, types, options)
   }
 }
 
@@ -138,7 +145,7 @@ function values(first, rest, parameters, types, options) {
 function select(first, rest, parameters, types, options) {
   typeof first === 'string' && (first = [first].concat(rest))
   if (Array.isArray(first))
-    return first.map(x => escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x)).join(',')
+    return escapeIdentifiers(first, options)
 
   let value
   const columns = rest.length ? rest.flat() : Object.keys(first)
@@ -171,9 +178,7 @@ const builders = Object.entries({
 
   insert(first, rest, parameters, types, options) {
     const columns = rest.length ? rest.flat() : Object.keys(Array.isArray(first) ? first[0] : first)
-    return '(' + columns.map(x =>
-      escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x)
-    ).join(',') + ')values' +
+    return '(' + escapeIdentifiers(columns, options) + ')values' +
     valuesBuilder(Array.isArray(first) ? first : [first], parameters, types, columns, options)
   }
 }).map(([x, fn]) => ([new RegExp('((?:^|[\\s(])' + x + '(?:$|[\\s(]))(?![\\s\\S]*\\1)', 'i'), fn]))
@@ -210,20 +215,18 @@ function typeHandlers(types) {
   }, { parsers: {}, serializers: {} })
 }
 
+function escapeIdentifiers(xs, { transform: { column } }) {
+  return xs.map(x => escapeIdentifier(column.to ? column.to(x) : x)).join(',')
+}
+
 export const escapeIdentifier = function escape(str) {
   return '"' + str.replace(/"/g, '""').replace(/\./g, '"."') + '"'
 }
 
 export const inferType = function inferType(x) {
-  return (
-    x instanceof Parameter ? x.type :
-    x instanceof Date ? 1184 :
-    x instanceof Uint8Array ? 17 :
-    (x === true || x === false) ? 16 :
-    typeof x === 'bigint' ? 20 :
-    Array.isArray(x) ? inferType(x[0]) :
-    0
-  )
+  return x instanceof Parameter
+    ? x.type
+    : 0
 }
 
 const escapeBackslash = /\\/g

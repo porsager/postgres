@@ -3,7 +3,7 @@ import tls from 'tls'
 import crypto from 'crypto'
 import Stream from 'stream'
 
-import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
+import { serialize, stringify, handleValue, arrayParser, arraySerializer } from './types.js'
 import { Errors } from './errors.js'
 import Result from './result.js'
 import Queue from './queue.js'
@@ -912,7 +912,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       type = types[i]
       parameters[i] = x = type in options.serializers
         ? options.serializers[type](x)
-        : '' + x
+        : serialize(x)
 
       prev = b.i
       b.inc(4).str(x).i32(b.i - prev - 4, prev)
