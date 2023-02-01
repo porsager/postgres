@@ -180,7 +180,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       throw Errors.generic('MAX_PARAMETERS_EXCEEDED', 'Max number of parameters (65534) exceeded')
 
     return q.options.simple
-      ? b().Q().str(q.strings[0] + b.N).end()
+      ? b().Q().str(q.statement.string + b.N).end()
       : q.describeFirst
         ? Buffer.concat([describe(q), Flush])
         : q.prepare
