@@ -256,6 +256,18 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.destroy()
   }
 
+  function isIP(input) {
+    if (net.isIP) {
+      return net.isIP(host) !== 0
+    }
+    // fallback to our own implementation.
+    if (input.length === 0) {
+      return false
+    }
+    const firstLetter = input.charAt(0)
+    return firstLetter === ':' || !isNaN(firstLetter)
+  }
+
   async function secure() {
     write(SSLRequest)
     const canSSL = await new Promise(r => socket.once('data', x => r(x[0] === 83))) // S
@@ -273,7 +285,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       sslOptions.rejectUnauthorized = false
     }
 
-    if (!sslOptions.servername && net.isIP(host) === 0) {
+    if (!options.servername && !isIP(host)) {
       sslOptions.servername = host[0]
     }
 
