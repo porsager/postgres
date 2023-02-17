@@ -5,6 +5,7 @@
 - 🏄‍♀️ Simple surface API
 - 🖊️ Dynamic query support
 - 💬 Chat and help on [Gitter](https://gitter.im/porsager/postgres)
+- 🐦 Follow on [Twitter](https://twitter.com/rporsager)
 
 <br>
 
