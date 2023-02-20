@@ -256,18 +256,15 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.destroy()
   }
 
-  function firstAddrIsIP(addressList) {
-    if (!Array.isArray(addressList)) {
-      return false
-    }
-    if (addressList.length === 0) {
-      return false
-    }
+  function firstAddrIsIP(address) {
     if (net.isIP) {
-      return net.isIP(addressList[0]) !== 0
+      return net.isIP(address) !== 0
+    }
+    if (address.length === 0) {
+      return false
     }
     // fallback to our own implementation.
-    const firstLetter = addressList[0].charAt(0)
+    const firstLetter = address.charAt(0)
     return firstLetter === ':' || !isNaN(firstLetter)
   }
 
@@ -288,7 +285,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       sslOptions.rejectUnauthorized = false
     }
 
-    if (!options.servername && !firstAddrIsIP(host)) {
+    if (!options.servername && !firstAddrIsIP(host[0])) {
       sslOptions.servername = host[0]
     }
 
