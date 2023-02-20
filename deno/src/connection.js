@@ -260,15 +260,18 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.destroy()
   }
 
-  function isIP(input) {
-    if (net.isIP) {
-      return net.isIP(host) !== 0
-    }
-    // fallback to our own implementation.
-    if (input.length === 0) {
+  function firstAddrIsIP(addressList) {
+    if (!Array.isArray(addressList)) {
       return false
     }
-    const firstLetter = input.charAt(0)
+    if (addressList.length === 0) {
+      return false
+    }
+    if (net.isIP) {
+      return net.isIP(addressList[0]) !== 0
+    }
+    // fallback to our own implementation.
+    const firstLetter = addressList[0].charAt(0)
     return firstLetter === ':' || !isNaN(firstLetter)
   }
 
@@ -289,8 +292,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       sslOptions.rejectUnauthorized = false
     }
 
-    if (!options.servername && !isIP(host)) {
-      options.servername = host
+    if (!options.servername && !firstAddrIsIP(host)) {
+      sslOptions.servername = host[0]
     }
 
     socket.removeAllListeners()
