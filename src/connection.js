@@ -266,6 +266,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.removeAllListeners()
     socket = tls.connect({
       socket,
+      servername: net.isIP(socket.host) ? undefined : socket.host,
       ...(ssl === 'require' || ssl === 'allow' || ssl === 'prefer'
         ? { rejectUnauthorized: false }
         : ssl === 'verify-full'
