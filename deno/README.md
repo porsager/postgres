@@ -5,13 +5,14 @@
 - 🏄‍♀️ Simple surface API
 - 🖊️ Dynamic query support
 - 💬 Chat and help on [Gitter](https://gitter.im/porsager/postgres)
+- 🐦 Follow on [Twitter](https://twitter.com/rporsager)
 
 <br>
 
 ## Getting started
 
 <br>
-<img height="220" alt="Good UX with Postgres.js" src="https://raw.githubusercontent.com/porsager/postgres/master/demo.gif">
+<img height="220" width="458" alt="Good UX with Postgres.js" src="https://raw.githubusercontent.com/porsager/postgres/master/demo.gif">
 <br>
 
 
