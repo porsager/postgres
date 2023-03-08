@@ -166,6 +166,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       build(q)
       return write(toBuffer(q))
         && !q.describeFirst
+        && !q.cursorFn
         && sent.length < max_pipeline
         && (!q.options.onexecute || q.options.onexecute(connection))
     } catch (error) {
