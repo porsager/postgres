@@ -137,6 +137,11 @@ t('Array of Date', async() => {
   return [now.getTime(), (await sql`select ${ sql.array([now, now, now]) } as x`)[0].x[2].getTime()]
 })
 
+t("Array of Box", async () => [
+  '(3,4),(1,2);(6,7),(4,5)',
+  (await sql`select ${ '{(1,2),(3,4);(4,5),(6,7)}' }::box[] as x`)[0].x.join(";")
+]);
+
 t('Nested array n2', async() =>
   ['4', (await sql`select ${ sql.array([[1, 2], [3, 4]]) } as x`)[0].x[1][1]]
 )
