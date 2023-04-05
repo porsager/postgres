@@ -235,7 +235,7 @@ function arrayEscape(x) {
     .replace(escapeQuote, '\\"')
 }
 
-const arraySerializer = module.exports.arraySerializer = function arraySerializer(xs, serializer, options) {
+const arraySerializer = module.exports.arraySerializer = function arraySerializer(xs, serializer, options, typarray) {
   if (Array.isArray(xs) === false)
     return xs
 
@@ -243,9 +243,11 @@ const arraySerializer = module.exports.arraySerializer = function arraySerialize
     return '{}'
 
   const first = xs[0]
+  // Only _box (1020) has the ';' delimiter for arrays, all other types use the ',' delimiter
+  const delimiter = typarray === 1020 ? ';' : ','
 
   if (Array.isArray(first) && !first.type)
-    return '{' + xs.map(x => arraySerializer(x, serializer)).join(',') + '}'
+    return '{' + xs.map(x => arraySerializer(x, serializer, options, typarray)).join(delimiter) + '}'
 
   return '{' + xs.map(x => {
     if (x === undefined) {
@@ -257,7 +259,7 @@ const arraySerializer = module.exports.arraySerializer = function arraySerialize
     return x === null
       ? 'null'
       : '"' + arrayEscape(serializer ? serializer(x.type ? x.value : x) : '' + x) + '"'
-  }).join(',') + '}'
+  }).join(delimiter) + '}'
 }
 
 const arrayParserState = {
@@ -268,13 +270,15 @@ const arrayParserState = {
   last: 0
 }
 
-const arrayParser = module.exports.arrayParser = function arrayParser(x, parser) {
+const arrayParser = module.exports.arrayParser = function arrayParser(x, parser, typarray) {
   arrayParserState.i = arrayParserState.last = 0
-  return arrayParserLoop(arrayParserState, x, parser)
+  return arrayParserLoop(arrayParserState, x, parser, typarray)
 }
 
-function arrayParserLoop(s, x, parser) {
+function arrayParserLoop(s, x, parser, typarray) {
   const xs = []
+  // Only _box (1020) has the ';' delimiter for arrays, all other types use the ',' delimiter
+  const delimiter = typarray === 1020 ? ';' : ','
   for (; s.i < x.length; s.i++) {
     s.char = x[s.i]
     if (s.quoted) {
@@ -292,13 +296,13 @@ function arrayParserLoop(s, x, parser) {
       s.quoted = true
     } else if (s.char === '{') {
       s.last = ++s.i
-      xs.push(arrayParserLoop(s, x, parser))
+      xs.push(arrayParserLoop(s, x, parser, typarray))
     } else if (s.char === '}') {
       s.quoted = false
       s.last < s.i && xs.push(parser ? parser(x.slice(s.last, s.i)) : x.slice(s.last, s.i))
       s.last = s.i + 1
       break
-    } else if (s.char === ',' && s.p !== '}' && s.p !== '"') {
+    } else if (s.char === delimiter && s.p !== '}' && s.p !== '"') {
       xs.push(parser ? parser(x.slice(s.last, s.i)) : x.slice(s.last, s.i))
       s.last = s.i + 1
     }
