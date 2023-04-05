@@ -735,6 +735,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function addArrayType(oid, typarray) {
+    if (!!options.parsers[typarray] && !!options.serializers[typarray]) return;
     const parser = options.parsers[oid]
     options.shared.typeArrayMap[oid] = typarray
     options.parsers[typarray] = (xs) => arrayParser(xs, parser)
