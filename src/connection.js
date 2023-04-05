@@ -739,9 +739,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (!!options.parsers[typarray] && !!options.serializers[typarray]) return;
     const parser = options.parsers[oid]
     options.shared.typeArrayMap[oid] = typarray
-    options.parsers[typarray] = (xs) => arrayParser(xs, parser)
+    options.parsers[typarray] = (xs) => arrayParser(xs, parser, typarray)
     options.parsers[typarray].array = true
-    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid], options)
+    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid], options, typarray)
   }
 
   function tryNext(x, xs) {
