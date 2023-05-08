@@ -8,7 +8,7 @@ const crypto = require('crypto')
 const postgres = require('../src/index.js')
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
-const rel = x => require('path').join(__dirname, x)
+const rel = x => require("path").join(__dirname, x)
 const idle_timeout = 1
 
 const login = {
@@ -2435,6 +2435,22 @@ t('Does not try rollback when commit errors', async() => {
   ]
 })
 
+
+t('Table created on transaction with role option belongs to role', async() => {
+  await sql.begin({ role: 'postgres_js_test_set_role' }, async sql => {
+    await sql`create table test (x int);`
+  })
+  const [{ tableowner }]  = await sql`select tableowner from pg_tables where tablename = 'test';`
+
+  return [
+    tableowner,
+    'postgres_js_test_set_role',
+    await sql`drop table test`
+  ]
+})
+
+
+
 t('Last keyword used even with duplicate keywords', async() => {
   await sql`create table test (x int)`
   await sql`insert into test values(1)`
@@ -2476,4 +2492,25 @@ t('Insert array with undefined transform', async() => {
     (await sql`select x from test`)[0].x[0],
     await sql`drop table test`
   ]
+})
+
+t('concurrent cursors', async() => {
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.join('')]
+})
+
+t('concurrent cursors multiple connections', async() => {
+  const sql = postgres({ ...options, max: 2 })
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.sort().join('')]
 })
