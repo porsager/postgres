@@ -2435,6 +2435,19 @@ t('Does not try rollback when commit errors', async() => {
   ]
 })
 
+t('Table created on transaction with options should belong to role', async() => {
+  await sql.begin({ role: 'postgres_js_test_set_role' }, async sql => {
+    await sql`create table test (x int);`
+  })
+  const [{ tableowner }]  = await sql`select tableowner from pg_tables where tablename = 'test';`
+
+  return [
+    tableowner,
+    'postgres_js_test_set_role',
+    await sql`drop table test`
+  ]
+})
+
 t('Last keyword used even with duplicate keywords', async() => {
   await sql`create table test (x int)`
   await sql`insert into test values(1)`

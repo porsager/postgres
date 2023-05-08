@@ -204,12 +204,16 @@ function Postgres(a, b) {
 
   async function begin(options, fn) {
     !fn && (fn = options, options = '')
+    if (typeof options === 'string') options = { beginOptions: options }
+    !options.beginOptions && (options.beginOptions = '')
+
     const queries = Queue()
     let savepoints = 0
       , connection
 
     try {
-      await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
+      await sql.unsafe('begin ' + options.beginOptions.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
+      options.role && await sql`SET ROLE ${sql(options.role)};`
       return await scope(connection, fn)
     } catch (error) {
       throw error
