@@ -27,6 +27,8 @@
     "prepublishOnly": "npm run lint"
   },
   "files": [
+    "/cf/src",
+    "/cf/polyfills.js",
     "/cjs/src",
     "/cjs/package.json",
     "/src",
