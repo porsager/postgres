@@ -1,5 +1,6 @@
-import net from 'net'
-import tls from 'tls'
+import { setImmediate, clearImmediate } from '../polyfills.js'
+import { net } from '../polyfills.js'
+import { tls } from '../polyfills.js'
 import crypto from 'crypto'
 import Stream from 'stream'
 
