@@ -524,6 +524,28 @@ If you know what you're doing, you can use `unsafe` to pass any string you'd lik
 ```js
 sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 ```
+  
+You can also nest `sql.unsafe` within a safe `sql` expression.  This is useful if only part of your fraction has unsafe elements.
+
+```js
+const triggerName = 'friend_created'
+const triggerFnName = 'on_friend_created'
+const eventType = 'insert'
+const schema_name = 'app'
+const table_name = 'friends'
+
+await sql`
+  create or replace trigger ${sql(triggerName)}
+  after ${sql.unsafe(eventType)} on ${sql.unsafe(`${schema_name}.${table_name}`)}
+  for each row
+  execute function ${sql(triggerFnName)}()
+`
+
+await sql`
+  create role friend_service with login password ${sql.unsafe(`'${password}'`)}
+`
+```
+
 </details>
 
 ## Transactions

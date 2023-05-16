@@ -2480,4 +2480,25 @@ t('Insert array with undefined transform', async() => {
   ]
 })
 
-;window.addEventListener('unload', () => Deno.exit(process.exitCode))
+t('concurrent cursors', async() => {
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.join('')]
+})
+
+t('concurrent cursors multiple connections', async() => {
+  const sql = postgres({ ...options, max: 2 })
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.sort().join('')]
+})
+
+;window.addEventListener("unload", () => Deno.exit(process.exitCode))

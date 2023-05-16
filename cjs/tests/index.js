@@ -8,7 +8,7 @@ const crypto = require('crypto')
 const postgres = require('../src/index.js')
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
-const rel = x => require('path').join(__dirname, x)
+const rel = x => require("path").join(__dirname, x)
 const idle_timeout = 1
 
 const login = {
@@ -2476,4 +2476,25 @@ t('Insert array with undefined transform', async() => {
     (await sql`select x from test`)[0].x[0],
     await sql`drop table test`
   ]
+})
+
+t('concurrent cursors', async() => {
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.join('')]
+})
+
+t('concurrent cursors multiple connections', async() => {
+  const sql = postgres({ ...options, max: 2 })
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.sort().join('')]
 })
