@@ -1,7 +1,7 @@
 import { setImmediate, clearImmediate } from '../polyfills.js'
 import { net } from '../polyfills.js'
 import { tls } from '../polyfills.js'
-import crypto from 'crypto'
+import { crypto } from '../polyfills.js'
 import Stream from 'stream'
 
 import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
@@ -663,37 +663,47 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   async function AuthenticationMD5Password(x) {
     write(
-      b().p().str('md5' + md5(Buffer.concat([Buffer.from(md5((await Pass()) + user)), x.subarray(9)]))).z(1).end()
+      b().p().str(
+        'md5' +
+        (await md5(Buffer.concat([
+          Buffer.from(await md5((await Pass()) + user)),
+          x.subarray(9)
+        ])))
+      ).z(1).end()
     )
   }
 
-  function SASL() {
+  async function SASL() {
     b().p().str('SCRAM-SHA-256' + b.N)
     const i = b.i
-    nonce = crypto.randomBytes(18).toString('base64')
+    nonce = (await crypto.randomBytes(18)).toString('base64')
     write(b.inc(4).str('n,,n=*,r=' + nonce).i32(b.i - i - 4, i).end())
   }
 
   async function SASLContinue(x) {
     const res = x.toString('utf8', 9).split(',').reduce((acc, x) => (acc[x[0]] = x.slice(2), acc), {})
 
-    const saltedPassword = crypto.pbkdf2Sync(
+    const saltedPassword = await crypto.pbkdf2Sync(
       await Pass(),
       Buffer.from(res.s, 'base64'),
       parseInt(res.i), 32,
       'sha256'
     )
 
-    const clientKey = hmac(saltedPassword, 'Client Key')
+    const clientKey = await hmac(saltedPassword, 'Client Key')
 
     const auth = 'n=*,r=' + nonce + ','
                + 'r=' + res.r + ',s=' + res.s + ',i=' + res.i
                + ',c=biws,r=' + res.r
 
-    serverSignature = hmac(hmac(saltedPassword, 'Server Key'), auth).toString('base64')
+    serverSignature = (await hmac(await hmac(saltedPassword, 'Server Key'), auth)).toString('base64')
 
     write(
-      b().p().str('c=biws,r=' + res.r + ',p=' + xor(clientKey, hmac(sha256(clientKey), auth)).toString('base64')).end()
+      b().p().str(
+        'c=biws,r=' + res.r + ',p=' + xor(
+          clientKey, Buffer.from(await hmac(await sha256(clientKey), auth))
+        ).toString('base64')
+      ).end()
     )
   }
 
