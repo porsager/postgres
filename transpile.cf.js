@@ -34,4 +34,5 @@ function transpile(x) {
   return timers + x
     .replace('import net from \'net\'', 'import { net } from \'../polyfills.js\'')
     .replace('import tls from \'tls\'', 'import { tls } from \'../polyfills.js\'')
+    .replace('import crypto from \'crypto\'', 'import { crypto } from \'../polyfills.js\'')
 }
