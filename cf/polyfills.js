@@ -1,6 +1,8 @@
 import { EventEmitter } from 'events'
 import { connect as Connect } from 'cloudflare:sockets'
 
+const Crypto = globalThis.crypto
+
 let ids = 1
 const tasks = new Set()
 
@@ -19,8 +21,48 @@ const IPv6Reg = new RegExp(
     `(?:${v6Seg}:){2}(?:(:${v6Seg}){0,3}:${v4Str}|(:${v6Seg}){1,5}|:)|` +
     `(?:${v6Seg}:){1}(?:(:${v6Seg}){0,4}:${v4Str}|(:${v6Seg}){1,6}|:)|` +
     `(?::((?::${v6Seg}){0,5}:${v4Str}|(?::${v6Seg}){1,7}|:))` +
-    ')(%[0-9a-zA-Z-.:]{1,})?$',
+    ')(%[0-9a-zA-Z-.:]{1,})?$'
 )
+
+const textEncoder = new TextEncoder()
+export const crypto = {
+  randomBytes: l => Crypto.getRandomValues(Buffer.alloc(l)),
+  pbkdf2Sync: async(password, salt, iterations, keylen) => Crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt,
+      iterations
+    },
+    await Crypto.subtle.importKey(
+      'raw',
+      textEncoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveBits']
+    ),
+    keylen * 8,
+    ['deriveBits']
+  ),
+  createHash: (type) => ({
+    update: (x) => ({
+      digest: () => {
+        return type === 'sha256'
+          ? Crypto.subtle.digest('SHA-256', x)
+          : Crypto.subtle.digest('MD5', x)
+      }
+    })
+  }),
+  createHmac: (type, key) => ({
+    update: x => ({
+      digest: async() => Buffer.from(await Crypto.subtle.sign(
+        'HMAC',
+        await Crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']),
+        textEncoder.encode(x)
+      ))
+    })
+  })
+}
 
 export const net = {
   isIP: x => RegExp.prototype.test.call(IPv4Reg, x) ? 4 : RegExp.prototype.test.call(IPv6Reg, x) ? 6 : 0,
@@ -46,7 +88,6 @@ export const tls = {
     tcp.writer.ready.then(() => {
       tcp.read()
       tcp.readyState = 'upgrade'
-      tcp.emit('secureConnect')
     })
     return tcp
   }
@@ -72,7 +113,11 @@ function Socket() {
       tcp.readyState = 'opening'
       tcp.raw = Connect(host + ':' + port, tcp.ssl ? { secureTransport: 'starttls' } : {})
       tcp.raw.closed.then(
-        () => tcp.readyState !== 'upgrade' ? close() : tcp.readyState = 'open',
+        () => {
+          tcp.readyState !== 'upgrade'
+            ? close()
+            : (tcp.readyState = 'open', tcp.emit('secureConnect'))
+        },
         (e) => tcp.emit('error', e)
       )
       tcp.writer = tcp.raw.writable.getWriter()
