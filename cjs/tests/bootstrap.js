@@ -12,6 +12,8 @@ exec('psql', ['-c', 'create user postgres_js_test_scram with password \'postgres
 exec('dropdb', ['postgres_js_test'])
 exec('createdb', ['postgres_js_test'])
 exec('psql', ['-c', 'grant all on database postgres_js_test to postgres_js_test'])
+exec('psql', ['-c', 'alter database postgres_js_test owner to postgres_js_test'])
+
 
 module.exports.exec = exec;function exec(cmd, args) {
   const { stderr } = spawnSync(cmd, args, { stdio: 'pipe', encoding: 'utf8' })

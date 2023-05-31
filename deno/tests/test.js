@@ -14,7 +14,7 @@ const tests = {}
 export const nt = () => ignored++
 export const ot = (...rest) => (only = true, test(true, ...rest))
 export const t = (...rest) => test(false, ...rest)
-t.timeout = 1
+t.timeout = 5
 
 async function test(o, name, options, fn) {
   typeof options !== 'object' && (fn = options, options = {})

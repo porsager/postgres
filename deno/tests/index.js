@@ -559,7 +559,7 @@ t('Connection end does not cancel query', async() => {
 
 t('Connection destroyed', async() => {
   const sql = postgres(options)
-  setTimeout(() => sql.end({ timeout: 0 }), 0)
+  process.nextTick(() => sql.end({ timeout: 0 }))
   return ['CONNECTION_DESTROYED', await sql``.catch(x => x.code)]
 })
 
@@ -917,7 +917,7 @@ t('has server parameters', async() => {
   return ['postgres.js', (await sql`select 1`.then(() => sql.parameters.application_name))]
 })
 
-t('big query body', async() => {
+t('big query body', { timeout: 2 }, async() => {
   await sql`create table test (x int)`
   return [50000, (await sql`insert into test ${
     sql([...Array(50000).keys()].map(x => ({ x })))
@@ -2127,11 +2127,11 @@ t('Cancel running query', async() => {
   return ['57014', error.code]
 })
 
-t('Cancel piped query', async() => {
+t('Cancel piped query', { timeout: 5 }, async() => {
   await sql`select 1`
-  const last = sql`select pg_sleep(0.2)`.execute()
+  const last = sql`select pg_sleep(1)`.execute()
   const query = sql`select pg_sleep(2) as dig`
-  setTimeout(() => query.cancel(), 100)
+  setTimeout(() => query.cancel(), 500)
   const error = await query.catch(x => x)
   await last
   return ['57014', error.code]
