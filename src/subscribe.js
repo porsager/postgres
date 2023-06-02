@@ -97,10 +97,14 @@ export default function Subscribe(postgres, options) {
     }
 
     stream.on('data', data)
-    stream.on('error', sql.close)
+    stream.on('error', error)
     stream.on('close', sql.close)
 
     return { stream, state: xs.state }
+
+    function error(e) {
+      console.error('Unexpected error during logical streaming - reconnecting', e)
+    }
 
     function data(x) {
       if (x[0] === 0x77)
