@@ -636,6 +636,7 @@ declare namespace postgres {
   type ParameterOrFragment<T> =
   | SerializableParameter<T>
   | Fragment
+  | Fragment[]
 
   interface Sql<TTypes extends Record<string, unknown> = {}> {
     /**
