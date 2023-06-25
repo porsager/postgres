@@ -85,6 +85,8 @@ function Postgres(a, b) {
 
   function Sql(handler) {
     handler.debug = options.debug
+    handler.stats = options.stats
+    handler.onquery = options.onquery
 
     Object.entries(options.types).reduce((acc, [name, type]) => {
       acc[name] = (x) => new Parameter(x, type.to)
@@ -491,6 +493,8 @@ function parseOptions(a, b) {
     onclose         : o.onclose,
     onparameter     : o.onparameter,
     socket          : o.socket,
+    stats           : o.stats,
+    onquery         : o.onquery,
     transform       : parseTransform(o.transform || { undefined: undefined }),
     parameters      : {},
     shared          : { retries: 0, typeArrayMap: {} },

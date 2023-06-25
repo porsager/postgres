@@ -13,6 +13,10 @@ export class Query extends Promise {
       reject = b
     })
 
+    this.resolver = resolve
+    this.rejecter = reject
+
+    this.statistics = handler.stats || handler.debug ? { started: -1, executed: -1 } : undefined
     this.tagged = Array.isArray(strings.raw)
     this.strings = strings
     this.args = args
@@ -23,17 +27,28 @@ export class Query extends Promise {
     this.state = null
     this.statement = null
 
-    this.resolve = x => (this.active = false, resolve(x))
-    this.reject = x => (this.active = false, reject(x))
-
     this.active = false
     this.cancelled = null
     this.executed = false
     this.signature = ''
 
-    this[originError] = this.handler.debug
+    this[originError] = handler.debug
       ? new Error()
       : this.tagged && cachedError(this.strings)
+  }
+
+  resolve(x) {
+    this.active = false
+    this.statistics && addStats(this, x)
+    this.handler.onquery && (this.handler.onquery = this.handler.onquery(x))
+    this.resolver(x)
+  }
+
+  reject(x) {
+    this.active = false
+    this.statistics && addStats(this, x)
+    this.handler.onquery && (this.handler.onquery = this.handler.onquery(x))
+    this.rejecter(x)
   }
 
   get origin() {
@@ -131,13 +146,25 @@ export class Query extends Promise {
     return this
   }
 
+  stats() {
+    this.statistics = { started: -1, executed: -1 }
+    return this
+  }
+
   values() {
     this.isRaw = 'values'
     return this
   }
 
   async handle() {
-    !this.executed && (this.executed = true) && await 1 && this.handler(this)
+    if (this.executed)
+      return
+
+    this.executed = true
+    await 1
+    this.statistics && (this.statistics.started = performance.now())
+    this.handler.onquery && (this.handler.onquery = this.handler.onquery(this))
+    this.handler(this)
   }
 
   execute() {
@@ -170,4 +197,11 @@ function cachedError(xs) {
   originCache.set(xs, new Error())
   Error.stackTraceLimit = x
   return originCache.get(xs)
+}
+
+
+function addStats(query, result) {
+  result.waiting = query.statistics.executed - query.statistics.started
+  result.duration = performance.now() - query.statistics.started
+  result.execution = performance.now() - query.statistics.executed
 }
