@@ -1991,9 +1991,9 @@ t('subscribe', { timeout: 2 }, async() => {
 
   const result = []
 
-  const { unsubscribe } = await sql.subscribe('*', (row, { command, old }) =>
-    result.push(command, row.name || row.id, old && old.name)
-  )
+  const { unsubscribe } = await sql.subscribe('*', (row, { command, old }) => {
+    result.push(command, row.name, row.id, old && old.name, old && old.id)
+  })
 
   await sql`
     create table test (
@@ -2005,6 +2005,7 @@ t('subscribe', { timeout: 2 }, async() => {
   await sql`alter table test replica identity default`
   await sql`insert into test (name) values ('Murray')`
   await sql`update test set name = 'Rothbard'`
+  await sql`update test set id = 2`
   await sql`delete from test`
   await sql`alter table test replica identity full`
   await sql`insert into test (name) values ('Murray')`
@@ -2015,7 +2016,7 @@ t('subscribe', { timeout: 2 }, async() => {
   await sql`insert into test (name) values ('Oh noes')`
   await delay(10)
   return [
-    'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
+    'insert,Murray,1,,,update,Rothbard,1,,,update,Rothbard,2,,1,delete,,2,,,insert,Murray,2,,,update,Rothbard,2,Murray,2,delete,Rothbard,2,,',
     result.join(','),
     await sql`drop table test`,
     await sql`drop publication alltables`,
@@ -2141,7 +2142,7 @@ t('Cancel queued query', async() => {
   const query = sql`select pg_sleep(2) as nej`
   const tx = sql.begin(sql => (
     query.cancel(),
-    sql`select pg_sleep(0.1) as hej, 'hejsa'`
+    sql`select pg_sleep(0.5) as hej, 'hejsa'`
   ))
   const error = await query.catch(x => x)
   await tx

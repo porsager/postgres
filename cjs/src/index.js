@@ -83,7 +83,7 @@ function Postgres(a, b) {
 
   return sql
 
-  function Sql(handler, instant) {
+  function Sql(handler) {
     handler.debug = options.debug
 
     Object.entries(options.types).reduce((acc, [name, type]) => {
@@ -112,7 +112,6 @@ function Postgres(a, b) {
         : typeof strings === 'string' && !args.length
           ? new Identifier(options.transform.column.to ? options.transform.column.to(strings) : strings)
           : new Builder(strings, args)
-      instant && query instanceof Query && query.execute()
       return query
     }
 
@@ -123,7 +122,6 @@ function Postgres(a, b) {
         ...options,
         simple: 'simple' in options ? options.simple : args.length === 0
       })
-      instant && query.execute()
       return query
     }
 
@@ -141,7 +139,6 @@ function Postgres(a, b) {
         ...options,
         simple: 'simple' in options ? options.simple : args.length === 0
       })
-      instant && query.execute()
       return query
     }
   }

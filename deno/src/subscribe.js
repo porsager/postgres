@@ -98,10 +98,14 @@ export default function Subscribe(postgres, options) {
     }
 
     stream.on('data', data)
-    stream.on('error', sql.close)
+    stream.on('error', error)
     stream.on('close', sql.close)
 
     return { stream, state: xs.state }
+
+    function error(e) {
+      console.error('Unexpected error during logical streaming - reconnecting', e)
+    }
 
     function data(x) {
       if (x[0] === 0x77)
@@ -192,7 +196,7 @@ function parse(x, state, parsers, handle, transform) {
       i += 4
       const key = x[i] === 75
       handle(key || x[i] === 79
-        ? tuples(x, key ? relation.keys : relation.columns, i += 3, transform).row
+        ? tuples(x, relation.columns, i += 3, transform).row
         : null
       , {
         command: 'delete',
@@ -206,7 +210,7 @@ function parse(x, state, parsers, handle, transform) {
       i += 4
       const key = x[i] === 75
       const xs = key || x[i] === 79
-        ? tuples(x, key ? relation.keys : relation.columns, i += 3, transform)
+        ? tuples(x, relation.columns, i += 3, transform)
         : null
 
       xs && (i = xs.i)
