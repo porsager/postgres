@@ -52,14 +52,14 @@ function Postgres(a, b) {
 
   let ending = false
 
-  const queries = Queue()
-      , connecting = Queue()
-      , reserved = Queue()
-      , closed = Queue()
-      , ended = Queue()
-      , open = Queue()
-      , busy = Queue()
-      , full = Queue()
+  const queries = Queue('queries')
+      , connecting = Queue('connecting')
+      , reserved = Queue('reserved')
+      , closed = Queue('closed')
+      , ended = Queue('ended')
+      , open = Queue('open')
+      , busy = Queue('busy')
+      , full = Queue('full')
       , queues = { connecting, reserved, closed, ended, open, busy, full }
 
   const connections = [...Array(options.max)].map(() => Connection(options, queues, { onopen, onend, onclose }))
@@ -67,6 +67,19 @@ function Postgres(a, b) {
   const sql = Sql(handler)
 
   Object.assign(sql, {
+    queries,
+    connections: {
+      onchange: null,
+      max: options.max,
+      get open() { return reserved.length + open.length + busy.length + full.length },
+      get connecting() { return connecting.length },
+      get ended() { return ended.length },
+      get closed() { return closed.length },
+      get reserved() { return reserved.length },
+      get idle() { return open.length },
+      get busy() { return busy.length },
+      get full() { return full.length }
+    },
     get parameters() { return options.parameters },
     largeObject: largeObject.bind(null, sql),
     subscribe,
@@ -311,6 +324,8 @@ function Postgres(a, b) {
     queue === open
       ? c.idleTimer.start()
       : c.idleTimer.cancel()
+
+    sql.connections.onchange && sql.connections.onchange(queue.name)
     return c
   }
 

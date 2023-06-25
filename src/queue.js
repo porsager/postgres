@@ -1,10 +1,11 @@
 export default Queue
 
-function Queue(initial = []) {
-  let xs = initial.slice()
+function Queue(name) {
+  let xs = []
   let index = 0
 
   return {
+    name,
     get length() {
       return xs.length - index
     },
