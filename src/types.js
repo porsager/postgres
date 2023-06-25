@@ -159,6 +159,7 @@ const builders = Object.entries({
   select,
   as: select,
   returning: select,
+  '\\(': select,
 
   update(first, rest, parameters, types, options) {
     return (rest.length ? rest.flat() : Object.keys(first)).map(x =>
