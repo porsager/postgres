@@ -75,7 +75,6 @@ function Postgres(a, b) {
     PostgresError,
     options,
     listen,
-    notify,
     begin,
     close,
     end
@@ -95,6 +94,7 @@ function Postgres(a, b) {
       types: typed,
       typed,
       unsafe,
+      notify,
       array,
       json,
       file
