@@ -454,6 +454,11 @@ Using a file for a query is also supported with optional parameters to use if th
 const result = await sql.file('query.sql', ['Murray', 68])
 ```
 
+### Multiple statements in one query
+#### `await sql`select 1;select 2`.simple()
+
+The postgres wire protocol supports "simple" and "extended" queries. "simple" queries supports multiple statements, but does not support any dynamic parameters. "extended" queries support parameters but only one statement. To use "simple" queries you can use sql``.simple(). That will create it as a simple query.
+
 ### Copy to/from as Streams
 
 Postgres.js supports [`COPY ...`](https://www.postgresql.org/docs/14/sql-copy.html) queries, which are exposed as [Node.js streams](https://nodejs.org/api/stream.html).
