@@ -545,7 +545,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return // Consider opening if able and sent.length < 50
 
     connection.reserved
-      ? x[5] === 73 // I
+      ? !connection.reserved.release && x[5] === 73 // I
         ? ending
           ? terminate()
           : (connection.reserved = null, onopen(connection))

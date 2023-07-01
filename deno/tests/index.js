@@ -2502,4 +2502,24 @@ t('concurrent cursors multiple connections', async() => {
   return ['12233445566778', xs.sort().join('')]
 })
 
+t('reserve connection', async() => {
+  const reserved = await sql.reserve()
+
+  setTimeout(() => reserved.release(), 500)
+
+  const xs = await Promise.all([
+    reserved`select 1 as x`.then(([{ x }]) => ({ time: Date.now(), x })),
+    sql`select 2 as x`.then(([{ x }]) => ({ time: Date.now(), x })),
+    reserved`select 3 as x`.then(([{ x }]) => ({ time: Date.now(), x }))
+  ])
+
+  if (xs[1].time - xs[2].time < 500)
+    throw new Error('Wrong time')
+
+  return [
+    '123',
+    xs.map(x => x.x).join('')
+  ]
+})
+
 ;window.addEventListener("unload", () => Deno.exit(process.exitCode))

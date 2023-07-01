@@ -74,6 +74,7 @@ function Postgres(a, b) {
     END: CLOSE,
     PostgresError,
     options,
+    reserve,
     listen,
     begin,
     close,
@@ -199,6 +200,36 @@ function Postgres(a, b) {
     return await sql`select pg_notify(${ channel }, ${ '' + payload })`
   }
 
+  async function reserve() {
+    const q = Queue()
+    const c = open.length
+      ? open.shift()
+      : await new Promise(r => {
+        queries.push({ reserve: r })
+        closed.length && connect(closed.shift())
+      })
+
+    move(c, reserved)
+    c.reserved = () => q.length
+      ? c.execute(q.shift())
+      : move(c, reserved)
+    c.reserved.release = true
+
+    const sql = Sql(handler)
+    sql.release = () => {
+      c.reserved = null
+      onopen(c)
+    }
+
+    return sql
+
+    function handler(q) {
+      c.queue === full
+        ? q.push(q)
+        : c.execute(q) || move(c, full)
+    }
+  }
+
   async function begin(options, fn) {
     !fn && (fn = options, options = '')
     const queries = Queue()
@@ -270,6 +301,7 @@ function Postgres(a, b) {
     queue === open
       ? c.idleTimer.start()
       : c.idleTimer.cancel()
+    return c
   }
 
   function json(x) {
@@ -348,6 +380,7 @@ function Postgres(a, b) {
   function connect(c, query) {
     move(c, connecting)
     c.connect(query)
+    return c
   }
 
   function onend(c) {
@@ -361,8 +394,13 @@ function Postgres(a, b) {
     let max = Math.ceil(queries.length / (connecting.length + 1))
       , ready = true
 
-    while (ready && queries.length && max-- > 0)
-      ready = c.execute(queries.shift())
+    while (ready && queries.length && max-- > 0) {
+      const query = queries.shift()
+      if (query.reserve)
+        return query.reserve(c)
+
+      ready = c.execute(query)
+    }
 
     ready
       ? move(c, busy)
