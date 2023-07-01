@@ -2503,7 +2503,7 @@ t('concurrent cursors multiple connections', async() => {
 t('reserve connection', async() => {
   const reserved = await sql.reserve()
 
-  setTimeout(() => reserved.release(), 500)
+  setTimeout(() => reserved.release(), 510)
 
   const xs = await Promise.all([
     reserved`select 1 as x`.then(([{ x }]) => ({ time: Date.now(), x })),

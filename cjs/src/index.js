@@ -431,6 +431,7 @@ function parseOptions(a, b) {
   query.sslmode && (query.ssl = query.sslmode, delete query.sslmode)
   'timeout' in o && (console.log('The timeout option is deprecated, use idle_timeout instead'), o.idle_timeout = o.timeout) // eslint-disable-line
 
+  const ints = ['idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive']
   const defaults = {
     max             : 10,
     ssl             : false,
@@ -454,12 +455,16 @@ function parseOptions(a, b) {
     database        : o.database || o.db || (url.pathname || '').slice(1) || env.PGDATABASE || user,
     user            : user,
     pass            : o.pass || o.password || url.password || env.PGPASSWORD || '',
-    ...Object.entries(defaults).reduce((acc, [k, d]) =>
-      (acc[k] = k in o ? o[k] : k in query
+    ...Object.entries(defaults).reduce(
+      (acc, [k, d]) => {
+        const value = k in o ? o[k] : k in query
         ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
-        : env['PG' + k.toUpperCase()] || d,
-      acc
-      ),
+          : env['PG' + k.toUpperCase()] || d
+        acc[k] = typeof value === 'string' && ints.includes(k)
+          ? +value
+          : value
+        return acc
+      },
       {}
     ),
     connection      : {

@@ -571,7 +571,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     final && (final(), final = null)
 
     if (result.command === 'BEGIN' && max !== 1 && !connection.reserved)
-      return errored(Errors.generic('UNSAFE_TRANSACTION', 'Only use sql.begin or max: 1'))
+      return errored(Errors.generic('UNSAFE_TRANSACTION', 'Only use sql.begin, sql.reserved or max: 1'))
 
     if (query.options.simple)
       return BindComplete()
