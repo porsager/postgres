@@ -451,9 +451,14 @@ const result = await sql.file('query.sql', ['Murray', 68])
 ```
 
 ### Multiple statements in one query
-#### `await sql`select 1;select 2`.simple()
+#### ```await sql``.simple()```
 
-The postgres wire protocol supports "simple" and "extended" queries. "simple" queries supports multiple statements, but does not support any dynamic parameters. "extended" queries support parameters but only one statement. To use "simple" queries you can use sql``.simple(). That will create it as a simple query.
+The postgres wire protocol supports ["simple"](https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.6.7.4) and ["extended"](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-EXT-QUERY) queries. "simple" queries supports multiple statements, but does not support any dynamic parameters. "extended" queries support parameters but only one statement. To use "simple" queries you can use 
+```sql``.simple()```. That will create it as a simple query.
+
+```js
+await sql`select 1; select 2;`.simple()
+```
 
 ### Copy to/from as Streams
 
