@@ -14,7 +14,6 @@ await exec('createdb', ['postgres_js_test'])
 await exec('psql', ['-c', 'grant all on database postgres_js_test to postgres_js_test'])
 await exec('psql', ['-c', 'alter database postgres_js_test owner to postgres_js_test'])
 
-
 function ignore(cmd, args) {
   const { stderr } = spawnSync(cmd, args, { stdio: 'pipe', encoding: 'utf8' })
   if (stderr && !stderr.includes('already exists') && !stderr.includes('does not exist'))

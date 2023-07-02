@@ -246,7 +246,7 @@ t('Prepared transaction', async() => {
     await sql.prepare('tx1')
   })
 
-  await sql.unsafe("commit prepared 'tx1'")
+  await sql`commit prepared 'tx1'`
 
   return ['1', (await sql`select count(1) from test`)[0].count, await sql`drop table test`]
 })
