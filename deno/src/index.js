@@ -236,6 +236,7 @@ function Postgres(a, b) {
     const queries = Queue()
     let savepoints = 0
       , connection
+    let transactionId = null
 
     try {
       await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
@@ -247,6 +248,7 @@ function Postgres(a, b) {
     async function scope(c, fn, name) {
       const sql = Sql(handler)
       sql.savepoint = savepoint
+      sql.prepare = prepare
       let uncaughtError
         , result
 
@@ -267,7 +269,11 @@ function Postgres(a, b) {
         throw e instanceof PostgresError && e.code === '25P02' && uncaughtError || e
       }
 
-      !name && await sql`commit`
+      if (transactionId) {
+        !name && await sql.unsafe(`prepare transaction '${transactionId}'`)
+      }else{
+        !name && await sql`commit`
+      }
       return result
 
       function savepoint(name, fn) {
@@ -286,6 +292,9 @@ function Postgres(a, b) {
       }
     }
 
+    async function prepare(name) {
+      transactionId = name
+    }
     function onexecute(c) {
       connection = c
       move(c, reserved)
@@ -294,6 +303,7 @@ function Postgres(a, b) {
         : move(c, reserved)
     }
   }
+
 
   function move(c, queue) {
     c.queue.remove(c)
