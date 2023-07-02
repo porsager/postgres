@@ -20,8 +20,19 @@ function transpile(x) {
     ? 'import { setImmediate, clearImmediate } from \'../polyfills.js\'\n'
     : ''
 
-  return timers + x
+  const process = x.includes('process.')
+    ? 'import { process } from \'../polyfills.js\'\n'
+    : ''
+
+  const buffer = x.includes('Buffer')
+    ? 'import { Buffer } from \'node:buffer\'\n'
+    : ''
+
+  return process + buffer + timers + x
     .replace('import net from \'net\'', 'import { net } from \'../polyfills.js\'')
     .replace('import tls from \'tls\'', 'import { tls } from \'../polyfills.js\'')
     .replace('import crypto from \'crypto\'', 'import { crypto } from \'../polyfills.js\'')
+    .replace('import os from \'os\'', 'import { os } from \'../polyfills.js\'')
+    .replace('import fs from \'fs\'', 'import { fs } from \'../polyfills.js\'')
+    .replace(/ from '([a-z_]+)'/g, ' from \'node:$1\'')
 }

@@ -1,5 +1,5 @@
-import { EventEmitter } from 'events'
-import { connect as Connect } from 'cloudflare:sockets'
+import { EventEmitter } from 'node:events'
+import { Buffer } from 'node:buffer'
 
 const Crypto = globalThis.crypto
 
@@ -64,6 +64,22 @@ export const crypto = {
   })
 }
 
+export const process = {
+  env: {}
+}
+
+export const os = {
+  userInfo() {
+    return { username: 'postgres' }
+  }
+}
+
+export const fs = {
+  readFile() {
+    throw new Error('Reading files not supported on CloudFlare')
+  }
+}
+
 export const net = {
   isIP: x => RegExp.prototype.test.call(IPv4Reg, x) ? 4 : RegExp.prototype.test.call(IPv6Reg, x) ? 6 : 0,
   Socket
@@ -108,10 +124,11 @@ function Socket() {
 
   return tcp
 
-  function connect(port, host) {
+  async function connect(port, host) {
     try {
       tcp.readyState = 'opening'
-      tcp.raw = Connect(host + ':' + port, tcp.ssl ? { secureTransport: 'starttls' } : {})
+      const { connect } = await import('cloudflare:sockets')
+      tcp.raw = connect(host + ':' + port, tcp.ssl ? { secureTransport: 'starttls' } : {})
       tcp.raw.closed.then(
         () => {
           tcp.readyState !== 'upgrade'
