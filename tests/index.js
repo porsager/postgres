@@ -238,6 +238,16 @@ t('Savepoint returns Result', async() => {
   return [1, result[0].x]
 })
 
+t('Prepared transaction', async() => {
+  let result
+  await sql.begin(async sql => {
+    result = await sql`select 1 as x`
+    await sql.prepare('tx1')
+  })
+
+  return [1, result[0].x]
+})
+
 t('Transaction requests are executed implicitly', async() => {
   const sql = postgres({ debug: true, idle_timeout: 1, fetch_types: false })
   return [
