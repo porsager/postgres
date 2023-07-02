@@ -77,6 +77,7 @@ function Postgres(a, b) {
     reserve,
     listen,
     begin,
+    beginPrepared,
     close,
     end
   })
@@ -230,7 +231,7 @@ function Postgres(a, b) {
     }
   }
 
-  async function begin(options, fn) {
+  async function begin(options, fn, transactionId) {
     !fn && (fn = options, options = '')
     const queries = Queue()
     let savepoints = 0
@@ -266,7 +267,11 @@ function Postgres(a, b) {
         throw e instanceof PostgresError && e.code === '25P02' && uncaughtError || e
       }
 
-      !name && await sql`commit`
+      if (transactionId) {
+        !name && await sql.unsafe(`prepare transaction '${transactionId}'`)
+      }else{
+        !name && await sql`commit`
+      }
       return result
 
       function savepoint(name, fn) {
@@ -292,6 +297,10 @@ function Postgres(a, b) {
         ? c.execute(queries.shift())
         : move(c, reserved)
     }
+  }
+
+  async function beginPrepared(transactionId, options, fn) {
+    return begin(options, fn, transactionId)
   }
 
   function move(c, queue) {
