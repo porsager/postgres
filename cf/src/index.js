@@ -1,5 +1,6 @@
-import os from 'os'
-import fs from 'fs'
+import { process } from '../polyfills.js'
+import { os } from '../polyfills.js'
+import { fs } from '../polyfills.js'
 
 import {
   mergeUserTypes,
@@ -74,8 +75,8 @@ function Postgres(a, b) {
     END: CLOSE,
     PostgresError,
     options,
+    reserve,
     listen,
-    notify,
     begin,
     close,
     end
@@ -95,6 +96,7 @@ function Postgres(a, b) {
       types: typed,
       typed,
       unsafe,
+      notify,
       array,
       json,
       file
@@ -199,11 +201,42 @@ function Postgres(a, b) {
     return await sql`select pg_notify(${ channel }, ${ '' + payload })`
   }
 
+  async function reserve() {
+    const q = Queue()
+    const c = open.length
+      ? open.shift()
+      : await new Promise(r => {
+        queries.push({ reserve: r })
+        closed.length && connect(closed.shift())
+      })
+
+    move(c, reserved)
+    c.reserved = () => q.length
+      ? c.execute(q.shift())
+      : move(c, reserved)
+    c.reserved.release = true
+
+    const sql = Sql(handler)
+    sql.release = () => {
+      c.reserved = null
+      onopen(c)
+    }
+
+    return sql
+
+    function handler(q) {
+      c.queue === full
+        ? q.push(q)
+        : c.execute(q) || move(c, full)
+    }
+  }
+
   async function begin(options, fn) {
     !fn && (fn = options, options = '')
     const queries = Queue()
     let savepoints = 0
       , connection
+      , prepare = null
 
     try {
       await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
@@ -215,6 +248,7 @@ function Postgres(a, b) {
     async function scope(c, fn, name) {
       const sql = Sql(handler)
       sql.savepoint = savepoint
+      sql.prepare = x => prepare = x.replace(/[^a-z0-9$-_. ]/gi)
       let uncaughtError
         , result
 
@@ -235,7 +269,12 @@ function Postgres(a, b) {
         throw e instanceof PostgresError && e.code === '25P02' && uncaughtError || e
       }
 
-      !name && await sql`commit`
+      if (!name) {
+        prepare
+          ? await sql`prepare transaction '${ sql.unsafe(prepare) }'`
+          : await sql`commit`
+      }
+
       return result
 
       function savepoint(name, fn) {
@@ -270,6 +309,7 @@ function Postgres(a, b) {
     queue === open
       ? c.idleTimer.start()
       : c.idleTimer.cancel()
+    return c
   }
 
   function json(x) {
@@ -348,6 +388,7 @@ function Postgres(a, b) {
   function connect(c, query) {
     move(c, connecting)
     c.connect(query)
+    return c
   }
 
   function onend(c) {
@@ -361,8 +402,13 @@ function Postgres(a, b) {
     let max = Math.ceil(queries.length / (connecting.length + 1))
       , ready = true
 
-    while (ready && queries.length && max-- > 0)
-      ready = c.execute(queries.shift())
+    while (ready && queries.length && max-- > 0) {
+      const query = queries.shift()
+      if (query.reserve)
+        return query.reserve(c)
+
+      ready = c.execute(query)
+    }
 
     ready
       ? move(c, busy)
@@ -393,6 +439,7 @@ function parseOptions(a, b) {
   query.sslmode && (query.ssl = query.sslmode, delete query.sslmode)
   'timeout' in o && (console.log('The timeout option is deprecated, use idle_timeout instead'), o.idle_timeout = o.timeout) // eslint-disable-line
 
+  const ints = ['idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive']
   const defaults = {
     max             : 10,
     ssl             : false,
@@ -416,12 +463,16 @@ function parseOptions(a, b) {
     database        : o.database || o.db || (url.pathname || '').slice(1) || env.PGDATABASE || user,
     user            : user,
     pass            : o.pass || o.password || url.password || env.PGPASSWORD || '',
-    ...Object.entries(defaults).reduce((acc, [k, d]) =>
-      (acc[k] = k in o ? o[k] : k in query
-        ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
-        : env['PG' + k.toUpperCase()] || d,
-      acc
-      ),
+    ...Object.entries(defaults).reduce(
+      (acc, [k, d]) => {
+        const value = k in o ? o[k] : k in query
+          ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
+          : env['PG' + k.toUpperCase()] || d
+        acc[k] = typeof value === 'string' && ints.includes(k)
+          ? +value
+          : value
+        return acc
+      },
       {}
     ),
     connection      : {

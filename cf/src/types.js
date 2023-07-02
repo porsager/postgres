@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { Query } from './query.js'
 import { Errors } from './errors.js'
 
@@ -159,6 +160,7 @@ const builders = Object.entries({
   select,
   as: select,
   returning: select,
+  '\\(': select,
 
   update(first, rest, parameters, types, options) {
     return (rest.length ? rest.flat() : Object.keys(first)).map(x =>
@@ -200,8 +202,10 @@ export const mergeUserTypes = function(types) {
 function typeHandlers(types) {
   return Object.keys(types).reduce((acc, k) => {
     types[k].from && [].concat(types[k].from).forEach(x => acc.parsers[x] = types[k].parse)
-    acc.serializers[types[k].to] = types[k].serialize
-    types[k].from && [].concat(types[k].from).forEach(x => acc.serializers[x] = types[k].serialize)
+    if (types[k].serialize) {
+      acc.serializers[types[k].to] = types[k].serialize
+      types[k].from && [].concat(types[k].from).forEach(x => acc.serializers[x] = types[k].serialize)
+    }
     return acc
   }, { parsers: {}, serializers: {} })
 }
