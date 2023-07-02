@@ -34,8 +34,7 @@ jobs:
           sudo apt-get update
           sudo apt-get -y install "postgresql-${{ matrix.postgres }}"
           sudo cp ./tests/pg_hba.conf /etc/postgresql/${{ matrix.postgres }}/main/pg_hba.conf
-          sudo sed -i 's/.*wal_level.*/wal_level = logical/' /etc/postgresql/${{ matrix.postgres }}/main/postgresql.conf
-          sudo echo 'max_prepared_transactions = 100' >>  /etc/postgresql/${{ matrix.postgres }}/main/postgresql.conf
+          sudo sed -i 's/.*wal_level.*/wal_level = logical/' /etc/postgresql/${{ matrix.postgres }}/main/postgresql.confsudo sed -i 's/.*max_prepared_transactions.*/max_prepared_transactions = 100/' /etc/postgresql/${{ matrix.postgres }}/main/postgresql.conf
           sudo sed -i 's/.*ssl = .*/ssl = on/' /etc/postgresql/${{ matrix.postgres }}/main/postgresql.conf
           openssl req -new -x509 -nodes -days 365 -text -subj "/CN=localhost" -extensions v3_req -config <(cat /etc/ssl/openssl.cnf <(printf "\n[v3_req]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=nonRepudiation,digitalSignature,keyEncipherment\nsubjectAltName=DNS:localhost")) -keyout server.key -out server.crt
           sudo cp server.key /etc/postgresql/${{ matrix.postgres }}/main/server.key
