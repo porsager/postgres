@@ -633,6 +633,26 @@ sql.begin('read write', async sql => {
 })
 ```
 
+
+#### PREPARE `await sql.prepare([name]) -> fn()`
+
+Indicates that the transactions should be prepared using the `PREPARED TRANASCTION [NAME]` statement
+instead of being committed.
+
+```js
+sql.begin('read write', async sql => {
+  const [user] = await sql`
+    insert into users (
+      name
+    ) values (
+      'Murray'
+    )
+  `
+    
+  await sql.prepare('tx1')
+})
+```
+
 Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
 
 ## Data Transformation

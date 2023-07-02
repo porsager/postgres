@@ -698,6 +698,8 @@ declare namespace postgres {
   interface TransactionSql<TTypes extends Record<string, unknown> = {}> extends Sql<TTypes> {
     savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
+
+    prepare<T>(name: string): Promise<UnwrapPromiseArray<T>>;
   }
 }
 
