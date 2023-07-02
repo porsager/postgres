@@ -239,13 +239,16 @@ t('Savepoint returns Result', async() => {
 })
 
 t('Prepared transaction', async() => {
-  let result
+  await sql`create table test (a int)`
+
   await sql.begin(async sql => {
-    result = await sql`select 1 as x`
+    await sql`insert into test values(1)`
     await sql.prepare('tx1')
   })
 
-  return [1, result[0].x]
+  await sql.unsafe("commit prepared 'tx1'")
+
+  return ['1', (await sql`select count(1) from test`)[0].count, await sql`drop table test`]
 })
 
 t('Transaction requests are executed implicitly', async() => {
