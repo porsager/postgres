@@ -78,7 +78,6 @@ function Postgres(a, b) {
     reserve,
     listen,
     begin,
-    beginPrepared,
     close,
     end
   })
@@ -232,11 +231,12 @@ function Postgres(a, b) {
     }
   }
 
-  async function begin(options, fn, transactionId) {
+  async function begin(options, fn) {
     !fn && (fn = options, options = '')
     const queries = Queue()
     let savepoints = 0
       , connection
+    let transactionId = null
 
     try {
       await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
@@ -248,6 +248,7 @@ function Postgres(a, b) {
     async function scope(c, fn, name) {
       const sql = Sql(handler)
       sql.savepoint = savepoint
+      sql.prepare = prepare
       let uncaughtError
         , result
 
@@ -291,6 +292,9 @@ function Postgres(a, b) {
       }
     }
 
+    async function prepare(name) {
+      transactionId = name
+    }
     function onexecute(c) {
       connection = c
       move(c, reserved)
@@ -300,9 +304,6 @@ function Postgres(a, b) {
     }
   }
 
-  async function beginPrepared(transactionId, options, fn) {
-    return begin(options, fn, transactionId)
-  }
 
   function move(c, queue) {
     c.queue.remove(c)
