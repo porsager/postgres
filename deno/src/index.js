@@ -236,7 +236,7 @@ function Postgres(a, b) {
     const queries = Queue()
     let savepoints = 0
       , connection
-    let transactionId = null
+      , prepare = null
 
     try {
       await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
@@ -248,7 +248,7 @@ function Postgres(a, b) {
     async function scope(c, fn, name) {
       const sql = Sql(handler)
       sql.savepoint = savepoint
-      sql.prepare = prepare
+      sql.prepare = x => prepare = x.replace(/[^a-z0-9$-_. ]/gi)
       let uncaughtError
         , result
 
@@ -269,11 +269,12 @@ function Postgres(a, b) {
         throw e instanceof PostgresError && e.code === '25P02' && uncaughtError || e
       }
 
-      if (transactionId) {
-        !name && await sql.unsafe(`prepare transaction '${transactionId}'`)
-      }else{
-        !name && await sql`commit`
+      if (!name) {
+        prepare
+          ? await sql`prepare transaction '${ sql.unsafe(prepare) }'`
+          : await sql`commit`
       }
+
       return result
 
       function savepoint(name, fn) {
@@ -292,9 +293,6 @@ function Postgres(a, b) {
       }
     }
 
-    async function prepare(name) {
-      transactionId = name
-    }
     function onexecute(c) {
       connection = c
       move(c, reserved)
@@ -303,7 +301,6 @@ function Postgres(a, b) {
         : move(c, reserved)
     }
   }
-
 
   function move(c, queue) {
     c.queue.remove(c)
@@ -469,7 +466,7 @@ function parseOptions(a, b) {
     ...Object.entries(defaults).reduce(
       (acc, [k, d]) => {
         const value = k in o ? o[k] : k in query
-        ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
+          ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
           : env['PG' + k.toUpperCase()] || d
         acc[k] = typeof value === 'string' && ints.includes(k)
           ? +value
