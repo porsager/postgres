@@ -1,9 +1,5 @@
-import { process } from '../polyfills.js'
 import { Buffer } from 'node:buffer'
-import { setImmediate, clearImmediate } from '../polyfills.js'
-import { net } from '../polyfills.js'
-import { tls } from '../polyfills.js'
-import { crypto } from '../polyfills.js'
+import { setImmediate, clearImmediate, process, net, tls, crypto } from '../polyfills.js'
 import Stream from 'node:stream'
 
 import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
@@ -131,7 +127,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     try {
       x = options.socket
         ? (await Promise.resolve(options.socket(options)))
-        : net.Socket()
+        : await net.Socket()
     } catch (e) {
       error(e)
       return
