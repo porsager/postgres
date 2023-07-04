@@ -36,8 +36,6 @@ function transpile(x) {
     // bulk add polyfills
     (polyfills.length ? `import { ${polyfills.join(', ')} } from '../polyfills.js'\n` : '') +
     x
-      .replace(': net.Socket()', ': await net.Socket()')
-      .replace('import Stream from \'stream\'', 'import Stream from \'node:stream\'')
       // cleanup polyfills
       .replace('import crypto from \'crypto\'\n', '')
       .replace('import net from \'net\'\n', '')

@@ -127,7 +127,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     try {
       x = options.socket
         ? (await Promise.resolve(options.socket(options)))
-        : await net.Socket()
+        : net.Socket()
     } catch (e) {
       error(e)
       return
