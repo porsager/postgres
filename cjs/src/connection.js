@@ -3,7 +3,7 @@ const tls = require('tls')
 const crypto = require('crypto')
 const Stream = require('stream')
 
-const { stringify, handleValue, arrayParser, arraySerializer } = require('./types.js')
+const { serialize, stringify, handleValue, arrayParser, arraySerializer } = require('./types.js')
 const { Errors } = require('./errors.js')
 const Result = require('./result.js')
 const Queue = require('./queue.js')
@@ -915,7 +915,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       type = types[i]
       parameters[i] = x = type in options.serializers
         ? options.serializers[type](x)
-        : '' + x
+        : serialize(x)
 
       prev = b.i
       b.inc(4).str(x).i32(b.i - prev - 4, prev)

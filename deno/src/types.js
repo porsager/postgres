@@ -2,11 +2,19 @@ import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
 import { Query } from './query.js'
 import { Errors } from './errors.js'
 
+export const serialize = function serialize(x) {
+  return typeof x === 'string' ? x :
+    x instanceof Date ? types.date.serialize(x) :
+    x instanceof Uint8Array ? types.bytea.serialize(x) :
+    (x === true || x === false) ? types.boolean.serialize(x) :
+    '' + x
+}
+
 export const types = {
   string: {
     to: 25,
     from: null,             // defaults to string
-    serialize: x => '' + x
+    serialize
   },
   number: {
     to: 0,
@@ -219,15 +227,9 @@ export const escapeIdentifier = function escape(str) {
 }
 
 export const inferType = function inferType(x) {
-  return (
-    x instanceof Parameter ? x.type :
-    x instanceof Date ? 1184 :
-    x instanceof Uint8Array ? 17 :
-    (x === true || x === false) ? 16 :
-    typeof x === 'bigint' ? 20 :
-    Array.isArray(x) ? inferType(x[0]) :
-    0
-  )
+  return x instanceof Parameter
+    ? x.type
+    : 0
 }
 
 const escapeBackslash = /\\/g

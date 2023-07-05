@@ -89,16 +89,16 @@ t('String', async() =>
 )
 
 t('Boolean false', async() =>
-  [false, (await sql`select ${ false } as x`)[0].x]
+  [false, (await sql`select ${ false }::bool as x`)[0].x]
 )
 
 t('Boolean true', async() =>
-  [true, (await sql`select ${ true } as x`)[0].x]
+  [true, (await sql`select ${ true }::bool as x`)[0].x]
 )
 
 t('Date', async() => {
   const now = new Date()
-  return [0, now - (await sql`select ${ now } as x`)[0].x]
+  return [0, now - (await sql`select ${ now }::timestamptz as x`)[0].x]
 })
 
 t('Json', async() => {
@@ -134,7 +134,8 @@ t('Array of String', async() =>
 
 t('Array of Date', async() => {
   const now = new Date()
-  return [now.getTime(), (await sql`select ${ sql.array([now, now, now]) } as x`)[0].x[2].getTime()]
+      , iso = now.toISOString()
+  return [now.getTime(), (await sql`select ${ sql.array([iso, iso, iso]) }::timestamptz[] as x`)[0].x[2].getTime()]
 })
 
 t('Array of Box', async() => [
@@ -500,7 +501,7 @@ t('Point type array', async() => {
   })
 
   await sql`create table test (x point[])`
-  await sql`insert into test (x) values (${ sql.array([sql.types.point([10, 20]), sql.types.point([20, 30])]) })`
+  await sql`insert into test (x) values (${ [sql.types.point([10, 20]), sql.types.point([20, 30])] })`
   return [30, (await sql`select x from test`)[0].x[1][1], await sql`drop table test`]
 })
 
@@ -1214,10 +1215,7 @@ t('Multiple queries', async() => {
 })
 
 t('Multiple statements', async() =>
-  [2, await sql.unsafe(`
-    select 1 as x;
-    select 2 as a;
-  `).then(([, [x]]) => x.a)]
+  [2, await sql.unsafe(`select 1 as x;select 2 as a`).then(([, [x]]) => x.a)]
 )
 
 t('throws correct error when authentication fails', async() => {
@@ -1368,7 +1366,7 @@ t('Multiple Cursors', { timeout: 2 }, async() => {
 
 t('Cursor as async iterator', async() => {
   const order = []
-  for await (const [x] of sql`select generate_series(1,2) as x;`.cursor()) {
+  for await (const [x] of sql`select generate_series(1,2) as x`.cursor()) {
     order.push(x.x + 'a')
     await delay(10)
     order.push(x.x + 'b')
@@ -1379,7 +1377,7 @@ t('Cursor as async iterator', async() => {
 
 t('Cursor as async iterator with break', async() => {
   const order = []
-  for await (const xs of sql`select generate_series(1,2) as x;`.cursor()) {
+  for await (const xs of sql`select generate_series(1,2) as x`.cursor()) {
     order.push(xs[0].x + 'a')
     await delay(10)
     order.push(xs[0].x + 'b')
@@ -1768,7 +1766,7 @@ t('Recreate prepared statements on transformAssignedExpr error', { timeout: 1 },
 
 t('Throws correct error when retrying in transactions', async() => {
   await sql`create table test(x int)`
-  const error = await sql.begin(sql => sql`insert into test (x) values (${ false })`).catch(e => e)
+  const error = await sql.begin(sql => sql`insert into test (x) values (${ false }::bool)`).catch(e => e)
   return [
     error.code,
     '42804',
