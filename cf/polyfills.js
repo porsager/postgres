@@ -76,6 +76,10 @@ export const crypto = {
   })
 }
 
+export const process = {
+  env: {}
+}
+
 export const os = {
   userInfo() {
     return { username: 'postgres' }
@@ -219,32 +223,4 @@ function setImmediate(fn) {
 
 function clearImmediate(id) {
   tasks.delete(id)
-}
-
-const nowOffset = Date.now()
-const now = () => Date.now() - nowOffset
-const hrtime = (previousTimestamp) => {
-  const baseNow = Math.floor((Date.now() - now()) * 1e-3)
-  const clocktime = now() * 1e-3
-  let seconds = Math.floor(clocktime) + baseNow
-  let nanoseconds = Math.floor((clocktime % 1) * 1e9)
-
-  if (previousTimestamp) {
-    seconds = seconds - previousTimestamp[0]
-    nanoseconds = nanoseconds - previousTimestamp[1]
-    if (nanoseconds < 0) {
-      seconds--
-      nanoseconds += 1e9
-    }
-  }
-  return [seconds, nanoseconds]
-}
-hrtime.bigint = () => {
-  const time = hrtime()
-  return BigInt(`${time[0]}${time[1]}`)
-}
-
-export const process = {
-  env: {},
-  hrtime
 }
