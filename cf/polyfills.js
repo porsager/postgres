@@ -70,6 +70,8 @@ export const crypto = {
   })
 }
 
+export const performance = globalThis.performance
+
 export const process = {
   env: {}
 }

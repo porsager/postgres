@@ -87,5 +87,6 @@ function transpile(x, name, folder) {
     .replace('node:stream', std + 'node/stream.ts')
     .replace('import net from \'net\'', 'import { net } from \'../polyfills.js\'')
     .replace('import tls from \'tls\'', 'import { tls } from \'../polyfills.js\'')
+    .replace('import { performance } from \'perf_hooks\'', '')
     .replace(/ from '([a-z_]+)'/g, ' from \'' + std + 'node/$1.ts\'')
 }

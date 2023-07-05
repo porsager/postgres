@@ -4,6 +4,7 @@ import { net } from '../polyfills.js'
 import { tls } from '../polyfills.js'
 import { crypto } from '../polyfills.js'
 import Stream from 'node:stream'
+import { performance } from '../polyfills.js'
 
 import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
 import { Errors } from './errors.js'

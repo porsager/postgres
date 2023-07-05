@@ -2,6 +2,7 @@ import net from 'net'
 import tls from 'tls'
 import crypto from 'crypto'
 import Stream from 'stream'
+import { performance } from 'perf_hooks'
 
 import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
 import { Errors } from './errors.js'

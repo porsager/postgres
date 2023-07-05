@@ -34,5 +34,6 @@ function transpile(x) {
     .replace('import crypto from \'crypto\'', 'import { crypto } from \'../polyfills.js\'')
     .replace('import os from \'os\'', 'import { os } from \'../polyfills.js\'')
     .replace('import fs from \'fs\'', 'import { fs } from \'../polyfills.js\'')
+    .replace('import { performance } from \'perf_hooks\'', 'import { performance } from \'../polyfills.js\'')
     .replace(/ from '([a-z_]+)'/g, ' from \'node:$1\'')
 }

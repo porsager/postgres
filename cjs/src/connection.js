@@ -2,6 +2,7 @@ const net = require('net')
 const tls = require('tls')
 const crypto = require('crypto')
 const Stream = require('stream')
+const { performance } = require('perf_hooks')
 
 const { stringify, handleValue, arrayParser, arraySerializer } = require('./types.js')
 const { Errors } = require('./errors.js')
