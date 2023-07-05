@@ -1,10 +1,9 @@
-import { HmacSha256 } from 'https://deno.land/std@0.132.0/hash/sha256.ts'
-import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
+import { Buffer } from 'node:buffer'
 import { setImmediate, clearImmediate } from '../polyfills.js'
 import { net } from '../polyfills.js'
 import { tls } from '../polyfills.js'
-import crypto from 'https://deno.land/std@0.132.0/node/crypto.ts'
-import Stream from 'https://deno.land/std@0.132.0/node/stream.ts'
+import { crypto } from '../polyfills.js'
+import Stream from 'node:stream'
 
 import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
 import { Errors } from './errors.js'
@@ -363,7 +362,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       statementCount = 1
       lifeTimer.start()
       socket.on('data', data)
-      keep_alive && socket.setKeepAlive && socket.setKeepAlive(true)
+      keep_alive && socket.setKeepAlive && socket.setKeepAlive(true, 1000 * keep_alive)
       const s = StartupMessage()
       write(s)
     } catch (err) {
@@ -995,7 +994,7 @@ function md5(x) {
 }
 
 function hmac(key, x) {
-  return Buffer.from(new HmacSha256(key).update(x).digest())
+  return crypto.createHmac('sha256', key).update(x).digest()
 }
 
 function sha256(x) {

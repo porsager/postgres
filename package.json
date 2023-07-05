@@ -6,6 +6,7 @@
   "module": "src/index.js",
   "main": "cjs/src/index.js",
   "exports": {
+    "workerd": "./cf/src/index.js",
     "types": "./types/index.d.ts",
     "import": "./src/index.js",
     "default": "./cjs/src/index.js"
@@ -13,9 +14,10 @@
   "types": "types/index.d.ts",
   "typings": "types/index.d.ts",
   "scripts": {
-    "build": "npm run build:cjs && npm run build:deno",
+    "build": "npm run build:cjs && npm run build:deno && npm run build:cf",
     "build:cjs": "node transpile.cjs",
     "build:deno": "node transpile.deno.js",
+    "build:cf": "node transpile.cf.js",
     "test": "npm run test:esm && npm run test:cjs && npm run test:deno",
     "test:esm": "node tests/index.js",
     "test:cjs": "npm run build:cjs && cd cjs/tests && node index.js && cd ../../",
@@ -25,6 +27,8 @@
     "prepublishOnly": "npm run lint"
   },
   "files": [
+    "/cf/src",
+    "/cf/polyfills.js",
     "/cjs/src",
     "/cjs/package.json",
     "/src",
