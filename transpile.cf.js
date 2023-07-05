@@ -16,31 +16,23 @@ fs.readdirSync('src').forEach(name =>
 )
 
 function transpile(x) {
-  const polyfills = [
-    x.includes('setImmediate') ? ['setImmediate', 'clearImmediate'] : undefined,
-    x.includes('process') ? ['process'] : undefined,
-    x.includes('import net from \'net\'') ? ['net'] : undefined,
-    x.includes('import tls from \'tls\'') ? ['tls'] : undefined,
-    x.includes('import crypto from \'crypto\'') ? ['crypto'] : undefined,
-    x.includes('import os from \'os\'') ? ['os'] : undefined,
-    x.includes('import fs from \'fs\'') ? ['fs'] : undefined
-  ].filter(Boolean).flat()
+  const timers = x.includes('setImmediate')
+    ? 'import { setImmediate, clearImmediate } from \'../polyfills.js\'\n'
+    : ''
+
+  const process = x.includes('process.')
+    ? 'import { process } from \'../polyfills.js\'\n'
+    : ''
 
   const buffer = x.includes('Buffer')
     ? 'import { Buffer } from \'node:buffer\'\n'
     : ''
 
-  return (
-    buffer +
-    // bulk add polyfills
-    (polyfills.length ? `import { ${polyfills.join(', ')} } from '../polyfills.js'\n` : '') +
-    x
-      // cleanup polyfills
-      .replace('import crypto from \'crypto\'\n', '')
-      .replace('import net from \'net\'\n', '')
-      .replace('import tls from \'tls\'\n', '')
-      .replace('import os from \'os\'\n', '')
-      .replace('import fs from \'fs\'\n', '')
-      .replace(/ from '([a-z_]+)'/g, ' from \'node:$1\'')
-  )
+  return process + buffer + timers + x
+    .replace('import net from \'net\'', 'import { net } from \'../polyfills.js\'')
+    .replace('import tls from \'tls\'', 'import { tls } from \'../polyfills.js\'')
+    .replace('import crypto from \'crypto\'', 'import { crypto } from \'../polyfills.js\'')
+    .replace('import os from \'os\'', 'import { os } from \'../polyfills.js\'')
+    .replace('import fs from \'fs\'', 'import { fs } from \'../polyfills.js\'')
+    .replace(/ from '([a-z_]+)'/g, ' from \'node:$1\'')
 }
