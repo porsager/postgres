@@ -1,5 +1,8 @@
 import { Buffer } from 'node:buffer'
-import { setImmediate, clearImmediate, process, net, tls, crypto } from '../polyfills.js'
+import { setImmediate, clearImmediate } from '../polyfills.js'
+import { net } from '../polyfills.js'
+import { tls } from '../polyfills.js'
+import { crypto } from '../polyfills.js'
 import Stream from 'node:stream'
 
 import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
@@ -348,7 +351,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function reconnect() {
-    setTimeout(connect, closedDate ? closedDate + delay - Number(process.hrtime.bigint() / 1000000n) : 0)
+    setTimeout(connect, closedDate ? closedDate + delay - performance.now() : 0)
   }
 
   function connected() {
@@ -435,7 +438,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return reconnect()
 
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
-    closedDate = Number(process.hrtime.bigint() / 1000000n)
+    closedDate = performance.now()
     hadError && options.shared.retries++
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
     onclose(connection)
