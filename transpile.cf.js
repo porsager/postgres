@@ -1,15 +1,14 @@
 import fs from 'fs'
 import path from 'path'
 
-const empty = (x) =>
-      fs.readdirSync(x).forEach((f) => fs.unlinkSync(path.join(x, f)))
-    , ensureEmpty = (x) => (!fs.existsSync(x) ? fs.mkdirSync(x) : empty(x))
+const empty = x => fs.readdirSync(x).forEach(f => fs.unlinkSync(path.join(x, f)))
+    , ensureEmpty = x => !fs.existsSync(x) ? fs.mkdirSync(x) : empty(x)
     , root = 'cf'
     , src = path.join(root, 'src')
 
 ensureEmpty(src)
 
-fs.readdirSync('src').forEach((name) =>
+fs.readdirSync('src').forEach(name =>
   fs.writeFileSync(
     path.join(src, name),
     transpile(fs.readFileSync(path.join('src', name), 'utf8'), name, 'src')

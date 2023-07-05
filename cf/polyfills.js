@@ -26,8 +26,8 @@ const IPv6Reg = new RegExp(
 
 const textEncoder = new TextEncoder()
 export const crypto = {
-  randomBytes: (l) => Crypto.getRandomValues(Buffer.alloc(l)),
-  pbkdf2Sync: async (password, salt, iterations, keylen) =>
+  randomBytes: l => Crypto.getRandomValues(Buffer.alloc(l)),
+  pbkdf2Sync: async(password, salt, iterations, keylen) =>
     Crypto.subtle.deriveBits(
       {
         name: 'PBKDF2',
@@ -45,8 +45,8 @@ export const crypto = {
       keylen * 8,
       ['deriveBits']
     ),
-  createHash: (type) => ({
-    update: (x) => ({
+  createHash: type => ({
+    update: x => ({
       digest: () => {
         if (type !== 'sha256')
           throw Error('createHash only supports sha256 on cloudflare.')
@@ -57,18 +57,12 @@ export const crypto = {
     })
   }),
   createHmac: (type, key) => ({
-    update: (x) => ({
-      digest: async () =>
+    update: x => ({
+      digest: async() =>
         Buffer.from(
           await Crypto.subtle.sign(
             'HMAC',
-            await Crypto.subtle.importKey(
-              'raw',
-              key,
-              { name: 'HMAC', hash: 'SHA-256' },
-              false,
-              ['sign']
-            ),
+            await Crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']),
             textEncoder.encode(x)
           )
         )
@@ -93,12 +87,7 @@ export const fs = {
 }
 
 export const net = {
-  isIP: (x) =>
-    RegExp.prototype.test.call(IPv4Reg, x)
-      ? 4
-      : RegExp.prototype.test.call(IPv6Reg, x)
-        ? 6
-        : 0,
+  isIP: (x) => RegExp.prototype.test.call(IPv4Reg, x) ? 4 : RegExp.prototype.test.call(IPv6Reg, x) ? 6 : 0,
   Socket
 }
 
@@ -167,7 +156,8 @@ function Socket() {
   }
 
   function close() {
-    if (tcp.readyState === 'closed') return
+    if (tcp.readyState === 'closed')
+      return
 
     tcp.readyState = 'closed'
     tcp.emit('close')
@@ -179,7 +169,9 @@ function Socket() {
   }
 
   function end(data) {
-    return data ? tcp.write(data, () => tcp.raw.close()) : tcp.raw.close()
+    return data
+      ? tcp.write(data, () => tcp.raw.close())
+      : tcp.raw.close()
   }
 
   function destroy() {
@@ -191,7 +183,7 @@ function Socket() {
     try {
       let done
         , value
-      while ((({ done, value } = await tcp.reader.read()), !done))
+      while (({ done, value } = await tcp.reader.read(), !done))
         tcp.emit('data', Buffer.from(value))
     } catch (err) {
       error(err)

@@ -2027,7 +2027,7 @@ t('subscribe', { timeout: 2 }, async() => {
   await sql`insert into test (name) values ('Oh noes')`
   await delay(10)
   return [
-    'insert,Murray,1,,,update,Rothbard,1,,,update,Rothbard,2,,1,delete,,2,,,insert,Murray,2,,,update,Rothbard,2,Murray,2,delete,Rothbard,2,,', // eslint-disable-line
+    'insert,Murray,1,,,update,Rothbard,1,,,update,Rothbard,2,,1,delete,,2,,,insert,Murray,2,,,update,Rothbard,2,Murray,2,delete,Rothbard,2,,',
     result.join(','),
     await sql`drop table test`,
     await sql`drop publication alltables`,
