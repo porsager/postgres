@@ -49,7 +49,7 @@ export const crypto = {
     update: x => ({
       digest: () => {
         if (type !== 'sha256')
-          throw Error('createHash only supports sha256 on cloudflare.')
+          throw Error('createHash only supports sha256 in this environment.')
         if (!(x instanceof Uint8Array))
           x = textEncoder.encode(x)
         return Crypto.subtle.digest('SHA-256', x)
@@ -87,7 +87,7 @@ export const fs = {
 }
 
 export const net = {
-  isIP: (x) => RegExp.prototype.test.call(IPv4Reg, x) ? 4 : RegExp.prototype.test.call(IPv6Reg, x) ? 6 : 0,
+  isIP: (x) => IPv4Reg.test(x) ? 4 : IPv6Reg.test(x) ? 6 : 0,
   Socket
 }
 
