@@ -638,9 +638,9 @@ sql.begin('read write', async sql => {
 ```
 
 
-#### PREPARE `await sql.prepare([name]) -> fn()`
+#### PREPARE TRANSACTION `await sql.prepare([name]) -> fn()`
 
-Indicates that the transactions should be prepared using the `PREPARED TRANASCTION [NAME]` statement
+Indicates that the transactions should be prepared using the [`PREPARE TRANSACTION [NAME]`](https://www.postgresql.org/docs/current/sql-prepare-transaction.html) statement
 instead of being committed.
 
 ```js
