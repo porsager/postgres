@@ -612,7 +612,7 @@ const [user, account] = await sql.begin(async sql => {
 })
 ```
 
-Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions (see [example](https://dba.stackexchange.com/questions/199916/multiple-insert-queries-after-a-set-of-withs/199917#199917)).
+Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
 
 It's also possible to pipeline the requests in a transaction if needed by returning an array with queries from the callback function like this:
 
