@@ -430,7 +430,7 @@ function parseOptions(a, b) {
       , o = (typeof a === 'string' ? b : a) || {}
       , { url, multihost } = parseUrl(a)
       , query = [...url.searchParams].reduce((a, [b, c]) => (a[b] = c, a), {})
-      , host = o.hostname || o.host || multihost || url.hostname || env.PGHOST || 'localhost'
+      , host = o.hostname || o.host || multihost || url.host || env.PGHOST || 'localhost'
       , port = o.port || url.port || env.PGPORT || 5432
       , user = o.user || o.username || url.username || env.PGUSERNAME || env.PGUSER || osUsername()
 
@@ -456,8 +456,8 @@ function parseOptions(a, b) {
   }
 
   return {
-    host            : Array.isArray(host) ? host : host.split(',').map(x => x.split(':')[0]),
-    port            : Array.isArray(port) ? port : host.split(',').map(x => parseInt(x.split(':')[1] || port)),
+    host            : Array.isArray(host) ? host : host.split(',').map(x => new URL(x).hostname.replace(/[\[\]]/g,'')),
+    port            : Array.isArray(port) ? port : host.split(',').map(x => parseInt(new URL(x).port || port)),
     path            : o.path || host.indexOf('/') > -1 && host + '/.s.PGSQL.' + port,
     database        : o.database || o.db || (url.pathname || '').slice(1) || env.PGDATABASE || user,
     user            : user,
