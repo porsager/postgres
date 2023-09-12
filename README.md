@@ -235,7 +235,7 @@ update users set "name" = $1, "age" = $2 where user_id = $3
 ```
 
 ### Multiple updates in one query
-It's possible to create multiple udpates in a single query. It's necessary to use arrays intead of objects to ensure the order of the items so that these correspond with the column names.
+To create multiple updates in a single query, it is necessary to use arrays instead of objects to ensure that the order of the items correspond with the column names.
 ```js
 const users = [
   [1, 'John', 34],
