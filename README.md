@@ -580,6 +580,7 @@ const [user, account] = await sql.begin(async sql => {
     ) values (
       'Murray'
     )
+  returning *
   `
 
   const [account] = await sql`
@@ -588,6 +589,7 @@ const [user, account] = await sql.begin(async sql => {
     ) values (
       ${ user.user_id }
     )
+  returning *
   `
 
   return [user, account]
