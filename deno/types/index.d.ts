@@ -685,6 +685,8 @@ declare namespace postgres {
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: (ParameterOrJSON<TTypes[keyof TTypes]>)[], options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
     json(value: JSONValue): Parameter;
+
+    reserve(): Promise<ReservedSql<TTypes>>
   }
 
   interface UnsafeQueryOptions {
@@ -700,6 +702,10 @@ declare namespace postgres {
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 
     prepare<T>(name: string): Promise<UnwrapPromiseArray<T>>;
+  }
+
+  interface ReservedSql<TTypes extends Record<string, unknown> = {}> extends Sql<TTypes> {
+    release(): void;
   }
 }
 

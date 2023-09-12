@@ -75,6 +75,7 @@ async function insertUser({ name, age }) {
 * [Teardown / Cleanup](#teardown--cleanup)
 * [Error handling](#error-handling)
 * [TypeScript support](#typescript-support)
+* [Reserving connections](#reserving-connections)
 * [Changelog](./CHANGELOG.md)
 
 
@@ -171,7 +172,7 @@ const user = {
   age: 68
 }
 
-sql`
+await sql`
   insert into users ${
     sql(user, 'name', 'age')
   }
@@ -179,6 +180,15 @@ sql`
 
 // Which results in:
 insert into users ("name", "age") values ($1, $2)
+
+// The columns can also be given with an array
+const columns = ['name', 'age']
+
+await sql`
+  insert into users ${
+    sql(user, columns)
+  }
+`
 ```
 
 **You can omit column names and simply execute `sql(user)` to get all the fields from the object as columns**. Be careful not to allow users to supply columns that you do not want to be inserted.
@@ -218,7 +228,7 @@ const user = {
   age: 68
 }
 
-sql`
+await sql`
   update users set ${
     sql(user, 'name', 'age')
   }
@@ -227,10 +237,20 @@ sql`
 
 // Which results in:
 update users set "name" = $1, "age" = $2 where user_id = $3
+
+// The columns can also be given with an array
+const columns = ['name', 'age']
+
+await sql`
+  update users set ${
+    sql(user, columns)
+  }
+  where user_id = ${ user.id }
+`
 ```
 
 ### Multiple updates in one query
-It's possible to create multiple udpates in a single query. It's necessary to use arrays intead of objects to ensure the order of the items so that these correspond with the column names.
+To create multiple updates in a single query, it is necessary to use arrays instead of objects to ensure that the order of the items correspond with the column names.
 ```js
 const users = [
   [1, 'John', 34],
@@ -575,6 +595,7 @@ const [user, account] = await sql.begin(async sql => {
     ) values (
       'Murray'
     )
+  returning *
   `
 
   const [account] = await sql`
@@ -583,11 +604,14 @@ const [user, account] = await sql.begin(async sql => {
     ) values (
       ${ user.user_id }
     )
+  returning *
   `
 
   return [user, account]
 })
 ```
+
+Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
 
 It's also possible to pipeline the requests in a transaction if needed by returning an array with queries from the callback function like this:
 
@@ -634,9 +658,9 @@ sql.begin('read write', async sql => {
 ```
 
 
-#### PREPARE `await sql.prepare([name]) -> fn()`
+#### PREPARE TRANSACTION `await sql.prepare([name]) -> fn()`
 
-Indicates that the transactions should be prepared using the `PREPARED TRANASCTION [NAME]` statement
+Indicates that the transactions should be prepared using the [`PREPARE TRANSACTION [NAME]`](https://www.postgresql.org/docs/current/sql-prepare-transaction.html) statement
 instead of being committed.
 
 ```js
@@ -652,8 +676,6 @@ sql.begin('read write', async sql => {
   await sql.prepare('tx1')
 })
 ```
-
-Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
 
 ## Data Transformation
 
@@ -937,7 +959,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   connect_timeout      : 30,            // Connect timeout in seconds
   prepare              : true,          // Automatic creation of prepared statements
   types                : [],            // Array of custom types, see more below
-  onnotice             : fn,            // Defaults to console.log
+  onnotice             : fn,            // Default console.log, set false to silence NOTICE
   onparameter          : fn,            // (key, value) when server param change
   debug                : fn,            // Is called with (connection, query, params, types)
   socket               : fn,            // fn returning custom socket to use
@@ -1146,6 +1168,22 @@ prexit(async () => {
   await new Promise(r => server.close(r))
 })
 ```
+
+## Reserving connections
+
+### `await sql.reserve()`
+
+The `reserve` method pulls out a connection from the pool, and returns a client that wraps the single connection. This can be used for running queries on an isolated connection.
+
+```ts
+const reserved = await sql.reserve()
+await reserved`select * from users`
+await reserved.release()
+```
+
+### `reserved.release()`
+
+Once you have finished with the reserved connection, call `release` to add it back to the pool.
 
 ## Error handling
 

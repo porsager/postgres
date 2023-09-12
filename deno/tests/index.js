@@ -2354,7 +2354,7 @@ t('Custom socket', {}, async() => {
   let result
   const sql = postgres({
     socket: () => new Promise((resolve, reject) => {
-      const socket = net.Socket()
+      const socket = new net.Socket()
       socket.connect(5432)
       socket.once('data', x => result = x[0])
       socket.on('error', reject)
