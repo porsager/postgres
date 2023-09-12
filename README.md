@@ -176,7 +176,7 @@ const user = {
   age: 68
 }
 
-sql`
+await sql`
   insert into users ${
     sql(user, 'name', 'age')
   }
@@ -184,6 +184,15 @@ sql`
 
 // Which results in:
 insert into users ("name", "age") values ($1, $2)
+
+// The columns can also be given with an array
+const columns = ['name', 'age']
+
+await sql`
+  insert into users ${
+    sql(user, columns)
+  }
+`
 ```
 
 **You can omit column names and simply execute `sql(user)` to get all the fields from the object as columns**. Be careful not to allow users to supply columns that you do not want to be inserted.
@@ -223,7 +232,7 @@ const user = {
   age: 68
 }
 
-sql`
+await sql`
   update users set ${
     sql(user, 'name', 'age')
   }
@@ -232,6 +241,16 @@ sql`
 
 // Which results in:
 update users set "name" = $1, "age" = $2 where user_id = $3
+
+// The columns can also be given with an array
+const columns = ['name', 'age']
+
+await sql`
+  update users set ${
+    sql(user, columns)
+  }
+  where user_id = ${ user.id }
+`
 ```
 
 ### Multiple updates in one query
@@ -596,6 +615,8 @@ const [user, account] = await sql.begin(async sql => {
 })
 ```
 
+Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
+
 It's also possible to pipeline the requests in a transaction if needed by returning an array with queries from the callback function like this:
 
 ```js
@@ -641,9 +662,9 @@ sql.begin('read write', async sql => {
 ```
 
 
-#### PREPARE `await sql.prepare([name]) -> fn()`
+#### PREPARE TRANSACTION `await sql.prepare([name]) -> fn()`
 
-Indicates that the transactions should be prepared using the `PREPARED TRANASCTION [NAME]` statement
+Indicates that the transactions should be prepared using the [`PREPARE TRANSACTION [NAME]`](https://www.postgresql.org/docs/current/sql-prepare-transaction.html) statement
 instead of being committed.
 
 ```js
@@ -659,8 +680,6 @@ sql.begin('read write', async sql => {
   await sql.prepare('tx1')
 })
 ```
-
-Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
 
 ## Data Transformation
 
