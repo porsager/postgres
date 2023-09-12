@@ -79,6 +79,7 @@ async function insertUser({ name, age }) {
 * [Teardown / Cleanup](#teardown--cleanup)
 * [Error handling](#error-handling)
 * [TypeScript support](#typescript-support)
+* [Reserving connections](#reserving-connections)
 * [Changelog](./CHANGELOG.md)
 
 
@@ -1150,6 +1151,22 @@ prexit(async () => {
   await new Promise(r => server.close(r))
 })
 ```
+
+## Reserving connections
+
+### `await sql.reserve()`
+
+The `reserve` method pulls out a connection from the pool, and returns a client that wraps the single connection. This can be used for running queries on an isolated connection.
+
+```ts
+const reserved = await sql.reserve()
+await reserved`select * from users`
+await reserved.release()
+```
+
+### `reserved.release()`
+
+Once you have finished with the reserved connection, call `release` to add it back to the pool.
 
 ## Error handling
 
