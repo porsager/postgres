@@ -201,7 +201,7 @@ function Postgres(a, b) {
   }
 
   async function reserve() {
-    const q = Queue()
+    const queue = Queue()
     const c = open.length
       ? open.shift()
       : await new Promise(r => {
@@ -210,8 +210,8 @@ function Postgres(a, b) {
       })
 
     move(c, reserved)
-    c.reserved = () => q.length
-      ? c.execute(q.shift())
+    c.reserved = () => queue.length
+      ? c.execute(queue.shift())
       : move(c, reserved)
     c.reserved.release = true
 
@@ -225,7 +225,7 @@ function Postgres(a, b) {
 
     function handler(q) {
       c.queue === full
-        ? q.push(q)
+        ? queue.push(q)
         : c.execute(q) || move(c, full)
     }
   }
