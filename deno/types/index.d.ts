@@ -179,9 +179,17 @@ type Rest<T> =
   T extends TemplateStringsArray ? never : // force fallback to the tagged template function overload
   T extends string ? readonly string[] :
   T extends readonly any[][] ? readonly [] :
-  T extends readonly (object & infer R)[] ? readonly (Keys & keyof R)[] :
+  T extends readonly (object & infer R)[] ? (
+    readonly (Keys & keyof R)[]   // sql(data, "prop", "prop2") syntax
+    |
+    [readonly (Keys & keyof R)[]] // sql(data, ["prop", "prop2"]) syntax
+  ) :
   T extends readonly any[] ? readonly [] :
-  T extends object ? readonly (Keys & keyof T)[] :
+  T extends object ? (
+    readonly (Keys & keyof T)[]   // sql(data, "prop", "prop2") syntax
+    |
+    [readonly (Keys & keyof T)[]] // sql(data, ["prop", "prop2"]) syntax
+  ) :
   any
 
 type Return<T, K extends readonly any[]> =

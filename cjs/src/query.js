@@ -37,13 +37,12 @@ const Query = module.exports.Query = class Query extends Promise {
   }
 
   get origin() {
-    return this.handler.debug
+    return (this.handler.debug
       ? this[originError].stack
-      : this.tagged
-        ? originStackCache.has(this.strings)
-          ? originStackCache.get(this.strings)
-          : originStackCache.set(this.strings, this[originError].stack).get(this.strings)
-        : ''
+      : this.tagged && originStackCache.has(this.strings)
+        ? originStackCache.get(this.strings)
+        : originStackCache.set(this.strings, this[originError].stack).get(this.strings)
+    ) || ''
   }
 
   static get [Symbol.species]() {
