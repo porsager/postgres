@@ -1060,6 +1060,34 @@ const sql = postgres({
 })
 ```
 
+### Cloudflare Workers support
+
+Postgres.js has built-in support for the [TCP socket API](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/) in Cloudflare Workers, which is [on-track](https://github.com/wintercg/proposal-sockets-api) to be standardized and adopted in Node.js and other JavaScript runtimes, such as Deno.
+
+You can use Postgres.js directly in a Worker, or to benefit from connection pooling and query caching, via the [Hyperdrive](https://developers.cloudflare.com/hyperdrive/learning/connect-to-postgres/#driver-examples) service available to Workers by passing the Hyperdrive `connectionString` when creating a new `postgres` client as follows:
+
+```ts
+// Requires Postgres.js 3.4.0 or later
+import postgres from 'postgres'
+
+interface Env {
+    HYPERDRIVE: Hyperdrive;
+}
+
+export default async fetch(req: Request, env: Env, ctx: ExecutionContext) {
+    // The Postgres.js library accepts a connection string directly
+    const sql = postgres(env.HYPERDRIVE.connectionString)
+    const results = await sql`SELECT * FROM users LIMIT 10`
+    return Response.json(results)
+}
+```
+
+In `wrangler.toml` you will need to enable `node_compat` to allow Postgres.js to operate in the Workers environment:
+
+```toml
+node_compat = true # required for database drivers to function
+```
+
 ### Auto fetching of array types
 
 Postgres.js will automatically fetch table/array-type information when it first connects to a database.
