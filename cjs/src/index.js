@@ -427,7 +427,7 @@ function parseOptions(a, b) {
     return a
 
   const env = process.env // eslint-disable-line
-      , o = (typeof a === 'string' ? b : a) || {}
+      , o = (!a || typeof a === 'string' ? b : a) || {}
       , { url, multihost } = parseUrl(a)
       , query = [...url.searchParams].reduce((a, [b, c]) => (a[b] = c, a), {})
       , host = o.hostname || o.host || multihost || url.hostname || env.PGHOST || 'localhost'
@@ -528,7 +528,7 @@ function parseTransform(x) {
 }
 
 function parseUrl(url) {
-  if (typeof url !== 'string')
+  if (!url || typeof url !== 'string')
     return { url: { searchParams: new Map() } }
 
   let host = url
