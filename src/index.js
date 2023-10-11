@@ -437,7 +437,7 @@ function parseOptions(a, b) {
   o.no_prepare && (o.prepare = false)
   query.sslmode && (query.ssl = query.sslmode, delete query.sslmode)
   'timeout' in o && (console.log('The timeout option is deprecated, use idle_timeout instead'), o.idle_timeout = o.timeout) // eslint-disable-line
-  query.sslrootcert && (query.ssl = 'verify-full')
+  query.sslrootcert === 'system' && (query.ssl = 'verify-full')
 
   const ints = ['idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive']
   const defaults = {
