@@ -158,7 +158,7 @@ const users = await sql`
 ```js
 const columns = ['name', 'age']
 
-sql`
+await sql`
   select
     ${ sql(columns) }
   from users
@@ -211,13 +211,13 @@ const users = [{
   age: 80
 }]
 
-sql`insert into users ${ sql(users, 'name', 'age') }`
+await sql`insert into users ${ sql(users, 'name', 'age') }`
 
 // Is translated to:
 insert into users ("name", "age") values ($1, $2), ($3, $4)
 
 // Here you can also omit column names which will use object keys as columns
-sql`insert into users ${ sql(users) }`
+await sql`insert into users ${ sql(users) }`
 
 // Which results in:
 insert into users ("name", "age") values ($1, $2), ($3, $4)
@@ -261,7 +261,7 @@ const users = [
   [2, 'Jane', 27],
 ]
 
-sql`
+await sql`
   update users set name = update_data.name, (age = update_data.age)::int
   from (values ${sql(users)}) as update_data (id, name, age)
   where users.id = (update_data.id)::int
@@ -300,7 +300,7 @@ const olderThan = x => sql`and age > ${ x }`
 
 const filterAge = true
 
-sql`
+await sql`
   select
    *
   from users
@@ -318,7 +318,7 @@ select * from users where name is not null and age > 50
 
 ### Dynamic filters
 ```js
-sql`
+await sql`
   select
     *
   from users ${
@@ -339,7 +339,7 @@ Using keywords or calling functions dynamically is also possible by using ``` sq
 ```js
 const date = null
 
-sql`
+await sql`
   update users set updated_at = ${ date || sql`now()` }
 `
 
@@ -353,7 +353,7 @@ Dynamic identifiers like table names and column names is also supported like so:
 const table = 'users'
     , column = 'id'
 
-sql`
+await sql`
   select ${ sql(column) } from ${ sql(table) }
 `
 
@@ -367,10 +367,10 @@ Here's a quick oversight over all the ways to do interpolation in a query templa
 
 | Interpolation syntax       | Usage                         | Example                                                   |
 | -------------              | -------------                 | -------------                                             |
-| `${ sql`` }`               | for keywords or sql fragments | ``sql`SELECT * FROM users ${sql`order by age desc` }` ``  |
-| `${ sql(string) }`         | for identifiers               | ``sql`SELECT * FROM ${sql('table_name')` ``               |
-| `${ sql([] or {}, ...) }`  | for helpers                   | ``sql`INSERT INTO users ${sql({ name: 'Peter'})}` ``      |
-| `${ 'somevalue' }`         | for values                    | ``sql`SELECT * FROM users WHERE age = ${42}` ``           |
+| `${ sql`` }`               | for keywords or sql fragments | ``await sql`SELECT * FROM users ${sql`order by age desc` }` ``  |
+| `${ sql(string) }`         | for identifiers               | ``await sql`SELECT * FROM ${sql('table_name')` ``               |
+| `${ sql([] or {}, ...) }`  | for helpers                   | ``await sql`INSERT INTO users ${sql({ name: 'Peter'})}` ``      |
+| `${ 'somevalue' }`         | for values                    | ``await sql`SELECT * FROM users WHERE age = ${42}` ``           |
 
 ## Advanced query methods
 
@@ -450,7 +450,7 @@ await sql`
 Rather than executing a given query, `.describe` will return information utilized in the query process. This information can include the query identifier, column types, etc.
 
 This is useful for debugging and analyzing your Postgres queries. Furthermore, **`.describe` will give you access to the final generated query string that would be executed.**
- 
+
 ### Rows as Array of Values
 #### ```sql``.values()```
 
@@ -477,7 +477,7 @@ const result = await sql.file('query.sql', ['Murray', 68])
 ### Multiple statements in one query
 #### ```await sql``.simple()```
 
-The postgres wire protocol supports ["simple"](https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.6.7.4) and ["extended"](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-EXT-QUERY) queries. "simple" queries supports multiple statements, but does not support any dynamic parameters. "extended" queries support parameters but only one statement. To use "simple" queries you can use 
+The postgres wire protocol supports ["simple"](https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.6.7.4) and ["extended"](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-EXT-QUERY) queries. "simple" queries supports multiple statements, but does not support any dynamic parameters. "extended" queries support parameters but only one statement. To use "simple" queries you can use
 ```sql``.simple()```. That will create it as a simple query.
 
 ```js
@@ -519,8 +519,8 @@ await pipeline(readableStream, createWriteStream('output.tsv'))
 ```js
 const readableStream = await sql`
   copy (
-    select name, age 
-    from users 
+    select name, age
+    from users
     where age = 68
   ) to stdout
 `.readable()
@@ -559,7 +559,7 @@ If you know what you're doing, you can use `unsafe` to pass any string you'd lik
 ```js
 sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 ```
-  
+
 You can also nest `sql.unsafe` within a safe `sql` expression.  This is useful if only part of your fraction has unsafe elements.
 
 ```js
@@ -676,7 +676,7 @@ sql.begin('read write', async sql => {
       'Murray'
     )
   `
-    
+
   await sql.prepare('tx1')
 })
 ```
@@ -736,7 +736,7 @@ console.log(data) // [ { a_test: 1 } ]
 
 ### Transform `undefined` Values
 
-By default, Postgres.js will throw the error `UNDEFINED_VALUE: Undefined values are not allowed` when undefined values are passed 
+By default, Postgres.js will throw the error `UNDEFINED_VALUE: Undefined values are not allowed` when undefined values are passed
 
 ```js
 // Transform the column names to and from camel case
@@ -817,7 +817,7 @@ The optional `onlisten` method is great to use for a very simply queue mechanism
 
 ```js
 await sql.listen(
-  'jobs', 
+  'jobs',
   (x) => run(JSON.parse(x)),
   ( ) => sql`select unfinished_jobs()`.forEach(run)
 )
@@ -850,7 +850,7 @@ CREATE PUBLICATION alltables FOR ALL TABLES
 const sql = postgres({ publications: 'alltables' })
 
 const { unsubscribe } = await sql.subscribe(
-  'insert:events', 
+  'insert:events',
   (row, { command, relation, key, old }) => {
     // Callback function for each row change
     // tell about new event row over eg. websockets or do something else
@@ -985,6 +985,19 @@ const sql = postgres('postgres://username:password@host:port/database', {
 ```
 
 Note that `max_lifetime = 60 * (30 + Math.random() * 30)` by default. This resolves to an interval between 45 and 90 minutes to optimize for the benefits of prepared statements **and** working nicely with Linux's OOM killer.
+
+#### Dynamic passwords
+
+When clients need to use alternative authentication schemes such as access tokens or connections to databases with rotating passwords, provide either a synchronous or asynchronous function that will resolve the dynamic password value at connection time.
+
+```js
+const sql = postgres({
+  // Other connection config
+  ...
+  // Password function for the database user
+  password : async () => await signer.getAuthToken(),
+})
+```
 
 ### SSL
 
@@ -1144,7 +1157,7 @@ const sql = postgres({
 })
 
 // Now you can use sql.typed.rect() as specified above
-const [custom] = sql`
+const [custom] = await sql`
   insert into rectangles (
     name,
     rect
@@ -1174,8 +1187,8 @@ const sql = postgres({
     const ssh = new ssh2.Client()
     ssh
     .on('error', reject)
-    .on('ready', () => 
-      ssh.forwardOut('127.0.0.1', 12345, host, port, 
+    .on('ready', () =>
+      ssh.forwardOut('127.0.0.1', 12345, host, port,
         (err, socket) => err ? reject(err) : resolve(socket)
       )
     )
