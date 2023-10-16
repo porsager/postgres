@@ -62,6 +62,14 @@ async function insertUser({ name, age }) {
 }
 ```
 
+#### ESM dynamic imports
+
+The library can be used with ESM dynamic imports as well as shown here.
+
+```js
+const { default: postgres } = await import('postgres')
+```
+
 ## Table of Contents
 
 * [Connection](#connection)
