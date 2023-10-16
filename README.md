@@ -994,12 +994,12 @@ const sql = postgres('postgres://username:password@host:port/database', {
 
 Note that `max_lifetime = 60 * (30 + Math.random() * 30)` by default. This resolves to an interval between 45 and 90 minutes to optimize for the benefits of prepared statements **and** working nicely with Linux's OOM killer.
 
-#### Dynamic passwords
+### Dynamic passwords
 
 When clients need to use alternative authentication schemes such as access tokens or connections to databases with rotating passwords, provide either a synchronous or asynchronous function that will resolve the dynamic password value at connection time.
 
 ```js
-const sql = postgres({
+const sql = postgres(url, {
   // Other connection config
   ...
   // Password function for the database user
