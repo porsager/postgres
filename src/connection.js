@@ -386,11 +386,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   function queryError(query, err) {
     Object.defineProperties(err, {
-      stack: {value: err.stack + query.origin.replace(/.*\n/, '\n'), enumerate: options.debug},
-      query: {value:  query.string, enumerate: options.debug},
-      parameters: {value:  query.parameters, enumerate: options.debug},
-      args: {value:  query.args, enumerate: options.debug},
-      types: {value:  query.statement && query.statement.types, enumerate: options.debug}
+      stack: {value: err.stack + query.origin.replace(/.*\n/, '\n'), enumerable: options.debug},
+      query: {value: query.string, enumerable: options.debug},
+      parameters: {value: query.parameters, enumerable: options.debug},
+      args: {value: query.args, enumerable: options.debug},
+      types: {value: query.statement && query.statement.types, enumerable: options.debug}
     })
     query.reject(err)
   }
