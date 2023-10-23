@@ -6,6 +6,7 @@
   "module": "src/index.js",
   "main": "cjs/src/index.js",
   "exports": {
+    "bun": "./src/index.js",
     "worker": "./cf/src/index.js",
     "types": "./types/index.d.ts",
     "import": "./src/index.js",
