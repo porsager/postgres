@@ -14,6 +14,9 @@
   },
   "types": "types/index.d.ts",
   "typings": "types/index.d.ts",
+  "engines": {
+    "node": ">=12"
+  },
   "scripts": {
     "build": "npm run build:cjs && npm run build:deno && npm run build:cf",
     "build:cjs": "node transpile.cjs",
