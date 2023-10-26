@@ -2134,7 +2134,7 @@ t('Execute', async() => {
 
 t('Cancel running query', async() => {
   const query = sql`select pg_sleep(2)`
-  setTimeout(() => query.cancel(), 200)
+  setTimeout(() => query.cancel(), 500)
   const error = await query.catch(x => x)
   return ['57014', error.code]
 })
