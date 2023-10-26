@@ -983,7 +983,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   },
   connection           : {
     application_name   : 'postgres.js', // Default application_name
-    ...                                 // Other connection parameters
+    ...                                 // Other connection parameters, see https://www.postgresql.org/docs/current/runtime-config-client.html
   },
   target_session_attrs : null,          // Use 'read-write' with multiple hosts to
                                         // ensure only connecting to primary

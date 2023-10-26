@@ -329,8 +329,18 @@ declare namespace postgres {
      * @default 'postgres.js'
      */
     application_name: string;
+    default_transaction_isolation: 'read uncommitted' | 'read committed' | 'repeatable read' | 'serializable',
+    default_transaction_read_only: boolean,
+    default_transaction_deferrable: boolean,
+    statement_timeout: number,
+    lock_timeout: number,
+    idle_in_transaction_session_timeout: number,
+    idle_session_timeout: number,
+    DateStyle: string,
+    IntervalStyle: string,
+    TimeZone: string,
     /** Other connection parameters */
-    [name: string]: string;
+    [name: string]: string | number | boolean;
   }
 
   interface Options<T extends Record<string, postgres.PostgresType>> extends Partial<BaseOptions<T>> {
