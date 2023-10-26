@@ -656,27 +656,30 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   /* c8 ignore next 5 */
   async function AuthenticationCleartextPassword() {
+    const payload = await Pass()
     write(
-      b().p().str(await Pass()).z(1).end()
+      b().p().str(payload).z(1).end()
     )
   }
 
   async function AuthenticationMD5Password(x) {
-    write(
-      b().p().str(
-        'md5' +
-        (await md5(Buffer.concat([
+    const payload = 'md5' + (
+      await md5(
+        Buffer.concat([
           Buffer.from(await md5((await Pass()) + user)),
           x.subarray(9)
-        ])))
-      ).z(1).end()
+        ])
+      )
+    )
+    write(
+      b().p().str(payload).z(1).end()
     )
   }
 
   async function SASL() {
+    nonce = (await crypto.randomBytes(18)).toString('base64')
     b().p().str('SCRAM-SHA-256' + b.N)
     const i = b.i
-    nonce = (await crypto.randomBytes(18)).toString('base64')
     write(b.inc(4).str('n,,n=*,r=' + nonce).i32(b.i - i - 4, i).end())
   }
 
@@ -698,12 +701,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
     serverSignature = (await hmac(await hmac(saltedPassword, 'Server Key'), auth)).toString('base64')
 
+    const payload = 'c=biws,r=' + res.r + ',p=' + xor(
+      clientKey, Buffer.from(await hmac(await sha256(clientKey), auth))
+    ).toString('base64')
+
     write(
-      b().p().str(
-        'c=biws,r=' + res.r + ',p=' + xor(
-          clientKey, Buffer.from(await hmac(await sha256(clientKey), auth))
-        ).toString('base64')
-      ).end()
+      b().p().str(payload).end()
     )
   }
 
