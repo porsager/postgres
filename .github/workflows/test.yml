@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['12', '14', '16', '18', '20']
+        node: ['12', '14', '16', '18', '20', '21']
         postgres: ['12', '13', '14', '15', '16']
     runs-on: ubuntu-latest
     services:
