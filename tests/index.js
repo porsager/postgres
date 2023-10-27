@@ -2350,6 +2350,7 @@ t('Ensure reconnect after max_lifetime with transactions', { timeout: 5 }, async
 
 
 t('Ensure transactions throw if connection is closed dwhile there is no query', async() => {
+  const sql = postgres(options)
   const x = await sql.begin(async() => {
     setTimeout(() => sql.end({ timeout: 0 }), 10)
     await new Promise(r => setTimeout(r, 200))
