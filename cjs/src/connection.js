@@ -385,13 +385,14 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function queryError(query, err) {
-    query.reject(Object.create(err, {
+    Object.defineProperties(err, {
       stack: { value: err.stack + query.origin.replace(/.*\n/, '\n'), enumerable: options.debug },
       query: { value: query.string, enumerable: options.debug },
       parameters: { value: query.parameters, enumerable: options.debug },
       args: { value: query.args, enumerable: options.debug },
       types: { value: query.statement && query.statement.types, enumerable: options.debug }
-    }))
+    })
+    query.reject(err)
   }
 
   function end() {
@@ -440,7 +441,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     closedDate = performance.now()
     hadError && options.shared.retries++
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
-    onclose(connection)
+    onclose(connection, Errors.connection('CONNECTION_CLOSED', options, socket))
   }
 
   /* Handlers */

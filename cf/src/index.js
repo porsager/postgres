@@ -240,7 +240,10 @@ function Postgres(a, b) {
 
     try {
       await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
-      return await scope(connection, fn)
+      return await Promise.race([
+        scope(connection, fn),
+        new Promise((_, reject) => connection.onclose = reject)
+      ])
     } catch (error) {
       throw error
     }
@@ -415,9 +418,10 @@ function Postgres(a, b) {
       : move(c, full)
   }
 
-  function onclose(c) {
+  function onclose(c, e) {
     move(c, closed)
     c.reserved = null
+    c.onclose && (c.onclose(e), c.onclose = null)
     options.onclose && options.onclose(c.id)
     queries.length && connect(c, queries.shift())
   }
@@ -438,6 +442,7 @@ function parseOptions(a, b) {
   o.no_prepare && (o.prepare = false)
   query.sslmode && (query.ssl = query.sslmode, delete query.sslmode)
   'timeout' in o && (console.log('The timeout option is deprecated, use idle_timeout instead'), o.idle_timeout = o.timeout) // eslint-disable-line
+  query.sslrootcert === 'system' && (query.ssl = 'verify-full')
 
   const ints = ['idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive']
   const defaults = {
