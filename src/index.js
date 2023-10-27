@@ -239,7 +239,10 @@ function Postgres(a, b) {
 
     try {
       await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
-      return await scope(connection, fn)
+      return await Promise.race([
+        scope(connection, fn),
+        new Promise((_, reject) => connection.onclose = reject)
+      ])
     } catch (error) {
       throw error
     }
@@ -414,9 +417,10 @@ function Postgres(a, b) {
       : move(c, full)
   }
 
-  function onclose(c) {
+  function onclose(c, e) {
     move(c, closed)
     c.reserved = null
+    c.onclose && (c.onclose(e), c.onclose = null)
     options.onclose && options.onclose(c.id)
     queries.length && connect(c, queries.shift())
   }

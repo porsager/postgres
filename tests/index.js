@@ -2348,6 +2348,16 @@ t('Ensure reconnect after max_lifetime with transactions', { timeout: 5 }, async
   return [true, true]
 })
 
+
+t('Ensure transactions throw if connection is closed dwhile there is no query', async() => {
+  const x = await sql.begin(async() => {
+    setTimeout(() => sql.end({ timeout: 0 }), 10)
+    await new Promise(r => setTimeout(r, 200))
+    return sql`select 1`
+  }).catch(x => x)
+  return ['CONNECTION_CLOSED', x.code]
+})
+
 t('Custom socket', {}, async() => {
   let result
   const sql = postgres({
