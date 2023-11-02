@@ -2546,4 +2546,15 @@ t('reserve connection', async() => {
   ]
 })
 
+t('arrays in reserved connection', async() => {
+  const reserved = await sql.reserve()
+  const [{ x }] = await reserved`select array[1, 2, 3] as x`
+  reserved.release()
+
+  return [
+    '123',
+    x.join('')
+  ]
+})
+
 ;window.addEventListener("unload", () => Deno.exit(process.exitCode))

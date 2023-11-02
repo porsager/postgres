@@ -111,7 +111,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     queue: queues.closed,
     idleTimer,
     connect(query) {
-      initial = query
+      initial = query || true
       reconnect()
     },
     terminate,
@@ -535,11 +535,14 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
           return terminate()
       }
 
-      if (needsTypes)
+      if (needsTypes) {
+        initial === true && (initial = null)
         return fetchArrayTypes()
+      }
 
-      execute(initial)
-      options.shared.retries = retries = initial = 0
+      initial !== true && execute(initial)
+      options.shared.retries = retries = 0
+      initial = null
       return
     }
 

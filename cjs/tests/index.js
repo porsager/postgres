@@ -2543,3 +2543,14 @@ t('reserve connection', async() => {
     xs.map(x => x.x).join('')
   ]
 })
+
+t('arrays in reserved connection', async() => {
+  const reserved = await sql.reserve()
+  const [{ x }] = await reserved`select array[1, 2, 3] as x`
+  reserved.release()
+
+  return [
+    '123',
+    x.join('')
+  ]
+})
