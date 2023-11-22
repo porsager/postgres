@@ -4,7 +4,7 @@ import crypto from 'crypto'
 import Stream from 'stream'
 import { performance } from 'perf_hooks'
 
-import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
+import { stringify, handleValue, arrayParser, arraySerializer, typesMapped } from './types.js'
 import { Errors } from './errors.js'
 import Result from './result.js'
 import Queue from './queue.js'
@@ -183,13 +183,13 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
     return q.options.simple
       ? b().Q().str(q.statement.string + b.N).end()
-      : q.describeFirst
+      : q.describeFirst 
         ? Buffer.concat([describe(q), Flush])
-        : q.prepare
-          ? q.prepared
-            ? prepared(q)
-            : Buffer.concat([describe(q), prepared(q)])
-          : unnamed(q)
+        : q.prepare 
+          ? q.prepared 
+            ? prepared(q) 
+            : Buffer.concat([describe(q), prepared(q)]) 
+          : unnamed(q);
   }
 
   function describe(q) {
@@ -230,7 +230,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     q.onlyDescribe && (delete statements[q.signature])
     q.parameters = q.parameters || parameters
     q.prepared = q.prepare && q.signature in statements
-    q.describeFirst = q.onlyDescribe || (parameters.length && !q.prepared)
+    q.describeFirst = q.onlyDescribe || (!typesMapped(q.args, types) && !q.prepared);
     q.statement = q.prepared
       ? statements[q.signature]
       : { string, types, name: q.prepare ? statementId + statementCount++ : '' }
@@ -602,8 +602,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       !query.statement.types[i] && (query.statement.types[i] = x.readUInt32BE(7 + i * 4))
 
     query.prepare && (statements[query.signature] = query.statement)
-    query.describeFirst && !query.onlyDescribe && (write(prepared(query)), query.describeFirst = false)
-  }
+    query.describeFirst && !query.onlyDescribe && write(prepared(query)), (query.describeFirst = false)  }
 
   function RowDescription(x) {
     if (result.command) {
@@ -951,7 +950,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function Execute(portal = '', rows = 0) {
     return Buffer.concat([
       b().E().str(portal + b.N).i32(rows).end(),
-      Flush
+      rows != 0 ? Flush : Sync 
     ])
   }
 
