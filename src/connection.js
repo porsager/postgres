@@ -429,10 +429,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     lifeTimer.cancel()
     connectTimer.cancel()
 
-    if (socket.encrypted) {
+    if (socket.encrypted)
       socket.removeAllListeners()
-      socket = null
-    }
+    socket = null
 
     if (initial)
       return reconnect()
