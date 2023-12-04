@@ -917,7 +917,7 @@ The `Result` Array returned from queries is a custom array allowing for easy des
 
 ### .count
 
-The `count` property is the number of affected rows returned by the database. This is usefull for insert, update and delete operations to know the number of rows since .length will be 0 in these cases if not using `RETURNING ...`.
+The `count` property is the number of affected rows returned by the database. This is useful for insert, update and delete operations to know the number of rows since .length will be 0 in these cases if not using `RETURNING ...`.
 
 ### .command
 
