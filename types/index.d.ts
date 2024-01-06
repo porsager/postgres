@@ -599,6 +599,7 @@ declare namespace postgres {
   type RowList<T extends readonly any[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
 
   interface PendingQueryModifiers<TRow extends readonly any[]> {
+    simple(): this;
     readable(): Promise<Readable>;
     writable(): Promise<Writable>;
 
