@@ -1,6 +1,6 @@
-import process from 'https://deno.land/std@0.132.0/node/process.ts'
-import os from 'https://deno.land/std@0.132.0/node/os.ts'
-import fs from 'https://deno.land/std@0.132.0/node/fs.ts'
+import process from 'node:process'
+import os from 'node:os'
+import fs from 'node:fs'
 
 import {
   mergeUserTypes,
