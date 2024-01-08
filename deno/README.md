@@ -15,10 +15,6 @@
 <img height="220" width="458" alt="Good UX with Postgres.js" src="https://raw.githubusercontent.com/porsager/postgres/master/demo.gif">
 <br>
 
-### Installation
-```bash
-$ npm install postgres
-```
 
 ### Usage
 Create your `sql` database instance
