@@ -8,6 +8,7 @@
     ],
     "esModuleInterop": true,
     "strict": true,
-    "noImplicitAny": true
+    "noImplicitAny": true,
+    "exactOptionalPropertyTypes": true
   }
 }

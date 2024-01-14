@@ -67,10 +67,9 @@ export class Builder extends NotTagged {
 
   build(before, parameters, types, options) {
     const keyword = builders.map(([x, fn]) => ({ fn, i: before.search(x) })).sort((a, b) => a.i - b.i).pop()
-    if (keyword.i === -1)
-      throw new Error('Could not infer helper mode')
-
-    return keyword.fn(this.first, this.rest, parameters, types, options)
+    return keyword.i === -1
+      ? escapeIdentifiers(this.first, options)
+      : keyword.fn(this.first, this.rest, parameters, types, options)
   }
 }
 
@@ -138,7 +137,7 @@ function values(first, rest, parameters, types, options) {
 function select(first, rest, parameters, types, options) {
   typeof first === 'string' && (first = [first].concat(rest))
   if (Array.isArray(first))
-    return first.map(x => escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x)).join(',')
+    return escapeIdentifiers(first, options)
 
   let value
   const columns = rest.length ? rest.flat() : Object.keys(first)
@@ -154,23 +153,25 @@ function select(first, rest, parameters, types, options) {
 
 const builders = Object.entries({
   values,
-  in: values,
+  in: (...xs) => {
+    const x = values(...xs)
+    return x === '()' ? '(null)' : x
+  },
   select,
   as: select,
   returning: select,
+  '\\(': select,
 
   update(first, rest, parameters, types, options) {
     return (rest.length ? rest.flat() : Object.keys(first)).map(x =>
       escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x) +
-      '=' + handleValue(first[x], parameters, types, options)
+      '=' + stringifyValue('values', first[x], parameters, types, options)
     )
   },
 
   insert(first, rest, parameters, types, options) {
     const columns = rest.length ? rest.flat() : Object.keys(Array.isArray(first) ? first[0] : first)
-    return '(' + columns.map(x =>
-      escapeIdentifier(options.transform.column.to ? options.transform.column.to(x) : x)
-    ).join(',') + ')values' +
+    return '(' + escapeIdentifiers(columns, options) + ')values' +
     valuesBuilder(Array.isArray(first) ? first : [first], parameters, types, columns, options)
   }
 }).map(([x, fn]) => ([new RegExp('((?:^|[\\s(])' + x + '(?:$|[\\s(]))(?![\\s\\S]*\\1)', 'i'), fn]))
@@ -201,10 +202,16 @@ export const mergeUserTypes = function(types) {
 function typeHandlers(types) {
   return Object.keys(types).reduce((acc, k) => {
     types[k].from && [].concat(types[k].from).forEach(x => acc.parsers[x] = types[k].parse)
-    acc.serializers[types[k].to] = types[k].serialize
-    types[k].from && [].concat(types[k].from).forEach(x => acc.serializers[x] = types[k].serialize)
+    if (types[k].serialize) {
+      acc.serializers[types[k].to] = types[k].serialize
+      types[k].from && [].concat(types[k].from).forEach(x => acc.serializers[x] = types[k].serialize)
+    }
     return acc
   }, { parsers: {}, serializers: {} })
+}
+
+function escapeIdentifiers(xs, { transform: { column } }) {
+  return xs.map(x => escapeIdentifier(column.to ? column.to(x) : x)).join(',')
 }
 
 export const escapeIdentifier = function escape(str) {
@@ -232,7 +239,7 @@ function arrayEscape(x) {
     .replace(escapeQuote, '\\"')
 }
 
-export const arraySerializer = function arraySerializer(xs, serializer, options) {
+export const arraySerializer = function arraySerializer(xs, serializer, options, typarray) {
   if (Array.isArray(xs) === false)
     return xs
 
@@ -240,9 +247,11 @@ export const arraySerializer = function arraySerializer(xs, serializer, options)
     return '{}'
 
   const first = xs[0]
+  // Only _box (1020) has the ';' delimiter for arrays, all other types use the ',' delimiter
+  const delimiter = typarray === 1020 ? ';' : ','
 
   if (Array.isArray(first) && !first.type)
-    return '{' + xs.map(x => arraySerializer(x, serializer)).join(',') + '}'
+    return '{' + xs.map(x => arraySerializer(x, serializer, options, typarray)).join(delimiter) + '}'
 
   return '{' + xs.map(x => {
     if (x === undefined) {
@@ -254,7 +263,7 @@ export const arraySerializer = function arraySerializer(xs, serializer, options)
     return x === null
       ? 'null'
       : '"' + arrayEscape(serializer ? serializer(x.type ? x.value : x) : '' + x) + '"'
-  }).join(',') + '}'
+  }).join(delimiter) + '}'
 }
 
 const arrayParserState = {
@@ -265,13 +274,15 @@ const arrayParserState = {
   last: 0
 }
 
-export const arrayParser = function arrayParser(x, parser) {
+export const arrayParser = function arrayParser(x, parser, typarray) {
   arrayParserState.i = arrayParserState.last = 0
-  return arrayParserLoop(arrayParserState, x, parser)
+  return arrayParserLoop(arrayParserState, x, parser, typarray)
 }
 
-function arrayParserLoop(s, x, parser) {
+function arrayParserLoop(s, x, parser, typarray) {
   const xs = []
+  // Only _box (1020) has the ';' delimiter for arrays, all other types use the ',' delimiter
+  const delimiter = typarray === 1020 ? ';' : ','
   for (; s.i < x.length; s.i++) {
     s.char = x[s.i]
     if (s.quoted) {
@@ -289,13 +300,13 @@ function arrayParserLoop(s, x, parser) {
       s.quoted = true
     } else if (s.char === '{') {
       s.last = ++s.i
-      xs.push(arrayParserLoop(s, x, parser))
+      xs.push(arrayParserLoop(s, x, parser, typarray))
     } else if (s.char === '}') {
       s.quoted = false
       s.last < s.i && xs.push(parser ? parser(x.slice(s.last, s.i)) : x.slice(s.last, s.i))
       s.last = s.i + 1
       break
-    } else if (s.char === ',' && s.p !== '}' && s.p !== '"') {
+    } else if (s.char === delimiter && s.p !== '}' && s.p !== '"') {
       xs.push(parser ? parser(x.slice(s.last, s.i)) : x.slice(s.last, s.i))
       s.last = s.i + 1
     }
@@ -324,3 +335,34 @@ export const toKebab = x => x.replace(/_/g, '-')
 export const fromCamel = x => x.replace(/([A-Z])/g, '_$1').toLowerCase()
 export const fromPascal = x => (x.slice(0, 1) + x.slice(1).replace(/([A-Z])/g, '_$1')).toLowerCase()
 export const fromKebab = x => x.replace(/-/g, '_')
+
+function createJsonTransform(fn) {
+  return function jsonTransform(x, column) {
+    return typeof x === 'object' && x !== null && (column.type === 114 || column.type === 3802)
+      ? Array.isArray(x)
+        ? x.map(x => jsonTransform(x, column))
+        : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: jsonTransform(v, column) }), {})
+      : x
+  }
+}
+
+toCamel.column = { from: toCamel }
+toCamel.value = { from: createJsonTransform(toCamel) }
+fromCamel.column = { to: fromCamel }
+
+export const camel = { ...toCamel }
+camel.column.to = fromCamel
+
+toPascal.column = { from: toPascal }
+toPascal.value = { from: createJsonTransform(toPascal) }
+fromPascal.column = { to: fromPascal }
+
+export const pascal = { ...toPascal }
+pascal.column.to = fromPascal
+
+toKebab.column = { from: toKebab }
+toKebab.value = { from: createJsonTransform(toKebab) }
+fromKebab.column = { to: fromKebab }
+
+export const kebab = { ...toKebab }
+kebab.column.to = fromKebab

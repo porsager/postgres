@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 const size = 256
 let buffer = Buffer.allocUnsafe(size)
 
@@ -60,7 +61,7 @@ const b = Object.assign(reset, messages, {
   }
 })
 
-module.exports = b
+export default b
 
 function fit(x) {
   if (buffer.length - b.i < x) {

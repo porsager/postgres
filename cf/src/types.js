@@ -1,7 +1,8 @@
-const { Query } = require('./query.js')
-const { Errors } = require('./errors.js')
+import { Buffer } from 'node:buffer'
+import { Query } from './query.js'
+import { Errors } from './errors.js'
 
-const types = module.exports.types = {
+export const types = {
   string: {
     to: 25,
     from: null,             // defaults to string
@@ -41,14 +42,14 @@ const types = module.exports.types = {
 
 class NotTagged { then() { notTagged() } catch() { notTagged() } finally() { notTagged() }}
 
-const Identifier = module.exports.Identifier = class Identifier extends NotTagged {
+export class Identifier extends NotTagged {
   constructor(value) {
     super()
     this.value = escapeIdentifier(value)
   }
 }
 
-const Parameter = module.exports.Parameter = class Parameter extends NotTagged {
+export class Parameter extends NotTagged {
   constructor(value, type, array) {
     super()
     this.value = value
@@ -57,7 +58,7 @@ const Parameter = module.exports.Parameter = class Parameter extends NotTagged {
   }
 }
 
-const Builder = module.exports.Builder = class Builder extends NotTagged {
+export class Builder extends NotTagged {
   constructor(first, rest) {
     super()
     this.first = first
@@ -72,7 +73,7 @@ const Builder = module.exports.Builder = class Builder extends NotTagged {
   }
 }
 
-module.exports.handleValue = handleValue;function handleValue(x, parameters, types, options) {
+export function handleValue(x, parameters, types, options) {
   let value = x instanceof Parameter ? x.value : x
   if (value === undefined) {
     x instanceof Parameter
@@ -95,7 +96,7 @@ module.exports.handleValue = handleValue;function handleValue(x, parameters, typ
 
 const defaultHandlers = typeHandlers(types)
 
-module.exports.stringify = stringify;function stringify(q, string, value, parameters, types, options) { // eslint-disable-line
+export function stringify(q, string, value, parameters, types, options) { // eslint-disable-line
   for (let i = 1; i < q.strings.length; i++) {
     string += (stringifyValue(string, value, parameters, types, options)) + q.strings[i]
     value = q.args[i]
@@ -179,10 +180,10 @@ function notTagged() {
   throw Errors.generic('NOT_TAGGED_CALL', 'Query not called as a tagged template literal')
 }
 
-const serializers = module.exports.serializers = defaultHandlers.serializers
-const parsers = module.exports.parsers = defaultHandlers.parsers
+export const serializers = defaultHandlers.serializers
+export const parsers = defaultHandlers.parsers
 
-const END = module.exports.END = {}
+export const END = {}
 
 function firstIsString(x) {
   if (Array.isArray(x))
@@ -190,7 +191,7 @@ function firstIsString(x) {
   return typeof x === 'string' ? 1009 : 0
 }
 
-const mergeUserTypes = module.exports.mergeUserTypes = function(types) {
+export const mergeUserTypes = function(types) {
   const user = typeHandlers(types || {})
   return {
     serializers: Object.assign({}, serializers, user.serializers),
@@ -213,11 +214,11 @@ function escapeIdentifiers(xs, { transform: { column } }) {
   return xs.map(x => escapeIdentifier(column.to ? column.to(x) : x)).join(',')
 }
 
-const escapeIdentifier = module.exports.escapeIdentifier = function escape(str) {
+export const escapeIdentifier = function escape(str) {
   return '"' + str.replace(/"/g, '""').replace(/\./g, '"."') + '"'
 }
 
-const inferType = module.exports.inferType = function inferType(x) {
+export const inferType = function inferType(x) {
   return (
     x instanceof Parameter ? x.type :
     x instanceof Date ? 1184 :
@@ -238,7 +239,7 @@ function arrayEscape(x) {
     .replace(escapeQuote, '\\"')
 }
 
-const arraySerializer = module.exports.arraySerializer = function arraySerializer(xs, serializer, options, typarray) {
+export const arraySerializer = function arraySerializer(xs, serializer, options, typarray) {
   if (Array.isArray(xs) === false)
     return xs
 
@@ -273,7 +274,7 @@ const arrayParserState = {
   last: 0
 }
 
-const arrayParser = module.exports.arrayParser = function arrayParser(x, parser, typarray) {
+export const arrayParser = function arrayParser(x, parser, typarray) {
   arrayParserState.i = arrayParserState.last = 0
   return arrayParserLoop(arrayParserState, x, parser, typarray)
 }
@@ -315,25 +316,25 @@ function arrayParserLoop(s, x, parser, typarray) {
   return xs
 }
 
-const toCamel = module.exports.toCamel = x => {
+export const toCamel = x => {
   let str = x[0]
   for (let i = 1; i < x.length; i++)
     str += x[i] === '_' ? x[++i].toUpperCase() : x[i]
   return str
 }
 
-const toPascal = module.exports.toPascal = x => {
+export const toPascal = x => {
   let str = x[0].toUpperCase()
   for (let i = 1; i < x.length; i++)
     str += x[i] === '_' ? x[++i].toUpperCase() : x[i]
   return str
 }
 
-const toKebab = module.exports.toKebab = x => x.replace(/_/g, '-')
+export const toKebab = x => x.replace(/_/g, '-')
 
-const fromCamel = module.exports.fromCamel = x => x.replace(/([A-Z])/g, '_$1').toLowerCase()
-const fromPascal = module.exports.fromPascal = x => (x.slice(0, 1) + x.slice(1).replace(/([A-Z])/g, '_$1')).toLowerCase()
-const fromKebab = module.exports.fromKebab = x => x.replace(/-/g, '_')
+export const fromCamel = x => x.replace(/([A-Z])/g, '_$1').toLowerCase()
+export const fromPascal = x => (x.slice(0, 1) + x.slice(1).replace(/([A-Z])/g, '_$1')).toLowerCase()
+export const fromKebab = x => x.replace(/-/g, '_')
 
 function createJsonTransform(fn) {
   return function jsonTransform(x, column) {
@@ -349,19 +350,19 @@ toCamel.column = { from: toCamel }
 toCamel.value = { from: createJsonTransform(toCamel) }
 fromCamel.column = { to: fromCamel }
 
-const camel = module.exports.camel = { ...toCamel }
+export const camel = { ...toCamel }
 camel.column.to = fromCamel
 
 toPascal.column = { from: toPascal }
 toPascal.value = { from: createJsonTransform(toPascal) }
 fromPascal.column = { to: fromPascal }
 
-const pascal = module.exports.pascal = { ...toPascal }
+export const pascal = { ...toPascal }
 pascal.column.to = fromPascal
 
 toKebab.column = { from: toKebab }
 toKebab.value = { from: createJsonTransform(toKebab) }
 fromKebab.column = { to: fromKebab }
 
-const kebab = module.exports.kebab = { ...toKebab }
+export const kebab = { ...toKebab }
 kebab.column.to = fromKebab

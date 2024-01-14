@@ -5,13 +5,14 @@
 - 🏄‍♀️ Simple surface API
 - 🖊️ Dynamic query support
 - 💬 Chat and help on [Gitter](https://gitter.im/porsager/postgres)
+- 🐦 Follow on [Twitter](https://twitter.com/rporsager)
 
 <br>
 
 ## Getting started
 
 <br>
-<img height="220" alt="Good UX with Postgres.js" src="https://raw.githubusercontent.com/porsager/postgres/master/demo.gif">
+<img height="220" width="458" alt="Good UX with Postgres.js" src="https://raw.githubusercontent.com/porsager/postgres/master/demo.gif">
 <br>
 
 
@@ -57,6 +58,14 @@ async function insertUser({ name, age }) {
 }
 ```
 
+#### ESM dynamic imports
+
+The library can be used with ESM dynamic imports as well as shown here.
+
+```js
+const { default: postgres } = await import('postgres')
+```
+
 ## Table of Contents
 
 * [Connection](#connection)
@@ -74,6 +83,7 @@ async function insertUser({ name, age }) {
 * [Teardown / Cleanup](#teardown--cleanup)
 * [Error handling](#error-handling)
 * [TypeScript support](#typescript-support)
+* [Reserving connections](#reserving-connections)
 * [Changelog](./CHANGELOG.md)
 
 
@@ -123,7 +133,7 @@ const xs = await sql`
 // xs = [{ user_id: 1, name: 'Murray', age: 68 }]
 ```
 
-> Please note that queries are first executed when `awaited` – or manually by using `.execute()`.
+> Please note that queries are first executed when `awaited` – or instantly by using [`.execute()`](#execute).
 
 ### Query parameters
 
@@ -152,7 +162,7 @@ const users = await sql`
 ```js
 const columns = ['name', 'age']
 
-sql`
+await sql`
   select
     ${ sql(columns) }
   from users
@@ -170,7 +180,7 @@ const user = {
   age: 68
 }
 
-sql`
+await sql`
   insert into users ${
     sql(user, 'name', 'age')
   }
@@ -178,6 +188,15 @@ sql`
 
 // Which results in:
 insert into users ("name", "age") values ($1, $2)
+
+// The columns can also be given with an array
+const columns = ['name', 'age']
+
+await sql`
+  insert into users ${
+    sql(user, columns)
+  }
+`
 ```
 
 **You can omit column names and simply execute `sql(user)` to get all the fields from the object as columns**. Be careful not to allow users to supply columns that you do not want to be inserted.
@@ -196,13 +215,13 @@ const users = [{
   age: 80
 }]
 
-sql`insert into users ${ sql(users, 'name', 'age') }`
+await sql`insert into users ${ sql(users, 'name', 'age') }`
 
 // Is translated to:
 insert into users ("name", "age") values ($1, $2), ($3, $4)
 
 // Here you can also omit column names which will use object keys as columns
-sql`insert into users ${ sql(users) }`
+await sql`insert into users ${ sql(users) }`
 
 // Which results in:
 insert into users ("name", "age") values ($1, $2), ($3, $4)
@@ -217,7 +236,7 @@ const user = {
   age: 68
 }
 
-sql`
+await sql`
   update users set ${
     sql(user, 'name', 'age')
   }
@@ -226,6 +245,32 @@ sql`
 
 // Which results in:
 update users set "name" = $1, "age" = $2 where user_id = $3
+
+// The columns can also be given with an array
+const columns = ['name', 'age']
+
+await sql`
+  update users set ${
+    sql(user, columns)
+  }
+  where user_id = ${ user.id }
+`
+```
+
+### Multiple updates in one query
+To create multiple updates in a single query, it is necessary to use arrays instead of objects to ensure that the order of the items correspond with the column names.
+```js
+const users = [
+  [1, 'John', 34],
+  [2, 'Jane', 27],
+]
+
+await sql`
+  update users set name = update_data.name, (age = update_data.age)::int
+  from (values ${sql(users)}) as update_data (id, name, age)
+  where users.id = (update_data.id)::int
+  returning users.id, users.name, users.age
+`
 ```
 
 ### Dynamic values and `where in`
@@ -259,7 +304,7 @@ const olderThan = x => sql`and age > ${ x }`
 
 const filterAge = true
 
-sql`
+await sql`
   select
    *
   from users
@@ -277,7 +322,7 @@ select * from users where name is not null and age > 50
 
 ### Dynamic filters
 ```js
-sql`
+await sql`
   select
     *
   from users ${
@@ -298,7 +343,7 @@ Using keywords or calling functions dynamically is also possible by using ``` sq
 ```js
 const date = null
 
-sql`
+await sql`
   update users set updated_at = ${ date || sql`now()` }
 `
 
@@ -312,13 +357,24 @@ Dynamic identifiers like table names and column names is also supported like so:
 const table = 'users'
     , column = 'id'
 
-sql`
+await sql`
   select ${ sql(column) } from ${ sql(table) }
 `
 
 // Which results in:
 select "id" from "users"
 ```
+
+### Quick primer on interpolation
+
+Here's a quick oversight over all the ways to do interpolation in a query template string:
+
+| Interpolation syntax       | Usage                         | Example                                                   |
+| -------------              | -------------                 | -------------                                             |
+| `${ sql`` }`               | for keywords or sql fragments | ``await sql`SELECT * FROM users ${sql`order by age desc` }` ``  |
+| `${ sql(string) }`         | for identifiers               | ``await sql`SELECT * FROM ${sql('table_name')` ``               |
+| `${ sql([] or {}, ...) }`  | for helpers                   | ``await sql`INSERT INTO users ${sql({ name: 'Peter'})}` ``      |
+| `${ 'somevalue' }`         | for values                    | ``await sql`SELECT * FROM users WHERE age = ${42}` ``           |
 
 ## Advanced query methods
 
@@ -393,12 +449,12 @@ await sql`
 ```
 
 ### Query Descriptions
-#### ```await sql``.describe([rows = 1], fn) -> Result[]```
+#### ```await sql``.describe() -> Result[]```
 
 Rather than executing a given query, `.describe` will return information utilized in the query process. This information can include the query identifier, column types, etc.
 
 This is useful for debugging and analyzing your Postgres queries. Furthermore, **`.describe` will give you access to the final generated query string that would be executed.**
- 
+
 ### Rows as Array of Values
 #### ```sql``.values()```
 
@@ -420,6 +476,16 @@ Using a file for a query is also supported with optional parameters to use if th
 
 ```js
 const result = await sql.file('query.sql', ['Murray', 68])
+```
+
+### Multiple statements in one query
+#### ```await sql``.simple()```
+
+The postgres wire protocol supports ["simple"](https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.6.7.4) and ["extended"](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-EXT-QUERY) queries. "simple" queries supports multiple statements, but does not support any dynamic parameters. "extended" queries support parameters but only one statement. To use "simple" queries you can use
+```sql``.simple()```. That will create it as a simple query.
+
+```js
+await sql`select 1; select 2;`.simple()
 ```
 
 ### Copy to/from as Streams
@@ -457,8 +523,8 @@ await pipeline(readableStream, createWriteStream('output.tsv'))
 ```js
 const readableStream = await sql`
   copy (
-    select name, age 
-    from users 
+    select name, age
+    from users
     where age = 68
   ) to stdout
 `.readable()
@@ -479,6 +545,12 @@ setTimeout(() => query.cancel(), 100)
 const result = await query
 ```
 
+### Execute
+
+#### ```await sql``.execute()```
+
+The lazy Promise implementation in Postgres.js is what allows it to distinguish [Nested Fragments](#building-queries) from the main outer query. This also means that queries are always executed at the earliest in the following tick. If you have a specific need to execute the query in the same tick, you can call `.execute()`
+
 ### Unsafe raw string queries
 
 <details>
@@ -491,6 +563,28 @@ If you know what you're doing, you can use `unsafe` to pass any string you'd lik
 ```js
 sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 ```
+
+You can also nest `sql.unsafe` within a safe `sql` expression.  This is useful if only part of your fraction has unsafe elements.
+
+```js
+const triggerName = 'friend_created'
+const triggerFnName = 'on_friend_created'
+const eventType = 'insert'
+const schema_name = 'app'
+const table_name = 'friends'
+
+await sql`
+  create or replace trigger ${sql(triggerName)}
+  after ${sql.unsafe(eventType)} on ${sql.unsafe(`${schema_name}.${table_name}`)}
+  for each row
+  execute function ${sql(triggerFnName)}()
+`
+
+await sql`
+  create role friend_service with login password ${sql.unsafe(`'${password}'`)}
+`
+```
+
 </details>
 
 ## Transactions
@@ -509,6 +603,7 @@ const [user, account] = await sql.begin(async sql => {
     ) values (
       'Murray'
     )
+    returning *
   `
 
   const [account] = await sql`
@@ -517,11 +612,14 @@ const [user, account] = await sql.begin(async sql => {
     ) values (
       ${ user.user_id }
     )
+    returning *
   `
 
   return [user, account]
 })
 ```
+
+Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
 
 It's also possible to pipeline the requests in a transaction if needed by returning an array with queries from the callback function like this:
 
@@ -567,39 +665,143 @@ sql.begin('read write', async sql => {
 })
 ```
 
-Do note that you can often achieve the same result using [`WITH` queries (Common Table Expressions)](https://www.postgresql.org/docs/current/queries-with.html) instead of using transactions.
+
+#### PREPARE TRANSACTION `await sql.prepare([name]) -> fn()`
+
+Indicates that the transactions should be prepared using the [`PREPARE TRANSACTION [NAME]`](https://www.postgresql.org/docs/current/sql-prepare-transaction.html) statement
+instead of being committed.
+
+```js
+sql.begin('read write', async sql => {
+  const [user] = await sql`
+    insert into users (
+      name
+    ) values (
+      'Murray'
+    )
+  `
+
+  await sql.prepare('tx1')
+})
+```
 
 ## Data Transformation
 
-Postgres.js comes with a number of built-in data transformation functions that can be used to transform the data returned from a query or when inserting data. They are available under `transform` option in the `postgres()` function connection options.
+Postgres.js allows for transformation of the data passed to or returned from a query by using the `transform` option.
 
-Like - `postgres('connectionURL', { transform: {...} })`
+Built in transformation functions are:
 
-### Parameters
+* For camelCase - `postgres.camel`, `postgres.toCamel`, `postgres.fromCamel`
+* For PascalCase - `postgres.pascal`, `postgres.toPascal`, `postgres.fromPascal`
+* For Kebab-Case - `postgres.kebab`, `postgres.toKebab`, `postgres.fromKebab`
+
+These built in transformations will only convert to/from snake_case. For example, using `{ transform: postgres.toCamel }` will convert the column names to camelCase only if the column names are in snake_case to begin with. `{ transform: postgres.fromCamel }` will convert camelCase only to snake_case.
+
+By default, using `postgres.camel`, `postgres.pascal` and `postgres.kebab` will perform a two-way transformation - both the data passed to the query and the data returned by the query will be transformed:
+
+```js
+// Transform the column names to and from camel case
+const sql = postgres({ transform: postgres.camel })
+
+await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER, b_test TEXT)`
+await sql`INSERT INTO camel_case ${ sql([{ aTest: 1, bTest: 1 }]) }`
+const data = await sql`SELECT ${ sql('aTest', 'bTest') } FROM camel_case`
+
+console.log(data) // [ { aTest: 1, bTest: '1' } ]
+```
+
+To only perform half of the transformation (eg. only the transformation **to** or **from** camel case), use the other transformation functions:
+
+```js
+// Transform the column names only to camel case
+// (for the results that are returned from the query)
+postgres({ transform: postgres.toCamel })
+
+await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER)`
+await sql`INSERT INTO camel_case ${ sql([{ a_test: 1 }]) }`
+const data = await sql`SELECT a_test FROM camel_case`
+
+console.log(data) // [ { aTest: 1 } ]
+```
+
+```js
+// Transform the column names only from camel case
+// (for interpolated inserts, updates, and selects)
+const sql = postgres({ transform: postgres.fromCamel })
+
+await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER)`
+await sql`INSERT INTO camel_case ${ sql([{ aTest: 1 }]) }`
+const data = await sql`SELECT ${ sql('aTest') } FROM camel_case`
+
+console.log(data) // [ { a_test: 1 } ]
+```
+
+> Note that Postgres.js does not rewrite the static parts of the tagged template strings. So to transform column names in your queries, the `sql()` helper must be used - eg. `${ sql('columnName') }` as in the examples above.
+
+### Transform `undefined` Values
+
+By default, Postgres.js will throw the error `UNDEFINED_VALUE: Undefined values are not allowed` when undefined values are passed
+
+```js
+// Transform the column names to and from camel case
+const sql = postgres({
+  transform: {
+    undefined: null
+  }
+})
+
+await sql`CREATE TABLE IF NOT EXISTS transform_undefined (a_test INTEGER)`
+await sql`INSERT INTO transform_undefined ${ sql([{ a_test: undefined }]) }`
+const data = await sql`SELECT a_test FROM transform_undefined`
+
+console.log(data) // [ { a_test: null } ]
+```
+
+To combine with the built in transform functions, spread the transform in the `transform` object:
+
+```js
+// Transform the column names to and from camel case
+const sql = postgres({
+  transform: {
+    ...postgres.camel,
+    undefined: null
+  }
+})
+
+await sql`CREATE TABLE IF NOT EXISTS transform_undefined (a_test INTEGER)`
+await sql`INSERT INTO transform_undefined ${ sql([{ aTest: undefined }]) }`
+const data = await sql`SELECT ${ sql('aTest') } FROM transform_undefined`
+
+console.log(data) // [ { aTest: null } ]
+```
+
+### Custom Transform Functions
+
+To specify your own transformation functions, you can use the `column`, `value` and `row` options inside of `transform`, each an object possibly including `to` and `from` keys:
+
 * `to`: The function to transform the outgoing query column name to, i.e `SELECT ${ sql('aName') }` to `SELECT a_name` when using `postgres.toCamel`.
 * `from`: The function to transform the incoming query result column name to, see example below.
 
 > Both parameters are optional, if not provided, the default transformation function will be used.
 
-Built in transformation functions are:
-* For camelCase - `postgres.toCamel` and `postgres.fromCamel`
-* For PascalCase - `postgres.toPascal` and `postgres.fromPascal`
-* For Kebab-Case - `postgres.toKebab` and `postgres.fromKebab`
-
-These functions can be passed in as options when calling `postgres()`. For example -
 ```js
-// this will tranform the column names to camel case back and forth
-(async function () {
-  const sql = postgres('connectionURL', { transform: { column: { to: postgres.fromCamel, from: postgres.toCamel } }});
-  await sql`CREATE TABLE IF NOT EXISTS camel_case (a_test INTEGER, b_test TEXT)`;
-  await sql`INSERT INTO camel_case ${ sql([{ aTest: 1, bTest: 1 }]) }`
-  const data = await sql`SELECT ${ sql('aTest', 'bTest') } FROM camel_case`;
-  console.log(data) // [ { aTest: 1, bTest: '1' } ]
-  process.exit(1)
-})();
-```
+// Implement your own functions, look at postgres.toCamel, etc
+// as a reference:
+// https://github.com/porsager/postgres/blob/4241824ffd7aa94ffb482e54ca9f585d9d0a4eea/src/types.js#L310-L328
+function transformColumnToDatabase() { /* ... */ }
+function transformColumnFromDatabase() { /* ... */ }
 
-> Note that if a column name is originally registered as snake_case in the database then to tranform it from camelCase to snake_case when querying or inserting, the column camelCase name must be put in `sql('columnName')` as it's done in the above example, Postgres.js does not rewrite anything inside the static parts of the tagged templates.
+const sql = postgres({
+  transform: {
+    column: {
+      to: transformColumnToDatabase,
+      from: transformColumnFromDatabase,
+    },
+    value: { /* ... */ },
+    row: { /* ... */ }
+  }
+})
+```
 
 ## Listen & notify
 
@@ -619,7 +821,7 @@ The optional `onlisten` method is great to use for a very simply queue mechanism
 
 ```js
 await sql.listen(
-  'jobs', 
+  'jobs',
   (x) => run(JSON.parse(x)),
   ( ) => sql`select unfinished_jobs()`.forEach(run)
 )
@@ -652,7 +854,7 @@ CREATE PUBLICATION alltables FOR ALL TABLES
 const sql = postgres({ publications: 'alltables' })
 
 const { unsubscribe } = await sql.subscribe(
-  'insert:events', 
+  'insert:events',
   (row, { command, relation, key, old }) => {
     // Callback function for each row change
     // tell about new event row over eg. websockets or do something else
@@ -765,7 +967,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   connect_timeout      : 30,            // Connect timeout in seconds
   prepare              : true,          // Automatic creation of prepared statements
   types                : [],            // Array of custom types, see more below
-  onnotice             : fn,            // Defaults to console.log
+  onnotice             : fn,            // Default console.log, set false to silence NOTICE
   onparameter          : fn,            // (key, value) when server param change
   debug                : fn,            // Is called with (connection, query, params, types)
   socket               : fn,            // fn returning custom socket to use
@@ -777,7 +979,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   },
   connection           : {
     application_name   : 'postgres.js', // Default application_name
-    ...                                 // Other connection parameters
+    ...                                 // Other connection parameters, see https://www.postgresql.org/docs/current/runtime-config-client.html
   },
   target_session_attrs : null,          // Use 'read-write' with multiple hosts to
                                         // ensure only connecting to primary
@@ -787,6 +989,19 @@ const sql = postgres('postgres://username:password@host:port/database', {
 ```
 
 Note that `max_lifetime = 60 * (30 + Math.random() * 30)` by default. This resolves to an interval between 45 and 90 minutes to optimize for the benefits of prepared statements **and** working nicely with Linux's OOM killer.
+
+### Dynamic passwords
+
+When clients need to use alternative authentication schemes such as access tokens or connections to databases with rotating passwords, provide either a synchronous or asynchronous function that will resolve the dynamic password value at connection time.
+
+```js
+const sql = postgres(url, {
+  // Other connection config
+  ...
+  // Password function for the database user
+  password : async () => await signer.getAuthToken(),
+})
+```
 
 ### SSL
 
@@ -841,7 +1056,7 @@ Any query which was already sent over the wire will be rejected if the connectio
 
 There are no guarantees about queries executing in order unless using a transaction with `sql.begin()` or setting `max: 1`. Of course doing a series of queries, one awaiting the other will work as expected, but that's just due to the nature of js async/promise handling, so it's not necessary for this library to be concerned with ordering.
 
-Since this library automatically creates prepared statements, it also has a default max lifetime for connections to prevent memory bloat on the database itself. This is a random interval for each connection between 45 and 90 minutes. This allows multiple connections to come up and down seamlessly without user interference.
+Since this library automatically creates prepared statements, it also has a default max lifetime for connections to prevent memory bloat on the database itself. This is a random interval for each connection between 45 and 90 minutes. This allows multiple connections to independently come up and down without affecting the service.
 
 ### Connection timeout
 
@@ -860,6 +1075,34 @@ const sql = postgres({
   idle_timeout: 20,
   max_lifetime: 60 * 30
 })
+```
+
+### Cloudflare Workers support
+
+Postgres.js has built-in support for the [TCP socket API](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/) in Cloudflare Workers, which is [on-track](https://github.com/wintercg/proposal-sockets-api) to be standardized and adopted in Node.js and other JavaScript runtimes, such as Deno.
+
+You can use Postgres.js directly in a Worker, or to benefit from connection pooling and query caching, via the [Hyperdrive](https://developers.cloudflare.com/hyperdrive/learning/connect-to-postgres/#driver-examples) service available to Workers by passing the Hyperdrive `connectionString` when creating a new `postgres` client as follows:
+
+```ts
+// Requires Postgres.js 3.4.0 or later
+import postgres from 'postgres'
+
+interface Env {
+    HYPERDRIVE: Hyperdrive;
+}
+
+export default async fetch(req: Request, env: Env, ctx: ExecutionContext) {
+    // The Postgres.js library accepts a connection string directly
+    const sql = postgres(env.HYPERDRIVE.connectionString)
+    const results = await sql`SELECT * FROM users LIMIT 10`
+    return Response.json(results)
+}
+```
+
+In `wrangler.toml` you will need to enable `node_compat` to allow Postgres.js to operate in the Workers environment:
+
+```toml
+node_compat = true # required for database drivers to function
 ```
 
 ### Auto fetching of array types
@@ -890,7 +1133,7 @@ const sql = postgres()
 
 ### Prepared statements
 
-Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `no_prepare` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93).
+Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `prepare: false` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93#issuecomment-656290493).
 
 ## Custom Types
 
@@ -918,7 +1161,7 @@ const sql = postgres({
 })
 
 // Now you can use sql.typed.rect() as specified above
-const [custom] = sql`
+const [custom] = await sql`
   insert into rectangles (
     name,
     rect
@@ -948,8 +1191,8 @@ const sql = postgres({
     const ssh = new ssh2.Client()
     ssh
     .on('error', reject)
-    .on('ready', () => 
-      ssh.forwardOut('127.0.0.1', 12345, host, port, 
+    .on('ready', () =>
+      ssh.forwardOut('127.0.0.1', 12345, host, port,
         (err, socket) => err ? reject(err) : resolve(socket)
       )
     )
@@ -974,6 +1217,22 @@ prexit(async () => {
   await new Promise(r => server.close(r))
 })
 ```
+
+## Reserving connections
+
+### `await sql.reserve()`
+
+The `reserve` method pulls out a connection from the pool, and returns a client that wraps the single connection. This can be used for running queries on an isolated connection.
+
+```ts
+const reserved = await sql.reserve()
+await reserved`select * from users`
+await reserved.release()
+```
+
+### `reserved.release()`
+
+Once you have finished with the reserved connection, call `release` to add it back to the pool.
 
 ## Error handling
 

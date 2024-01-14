@@ -1,6 +1,7 @@
+import { Buffer } from 'node:buffer'
 const noop = () => { /* noop */ }
 
-module.exports = Subscribe;function Subscribe(postgres, options) {
+export default function Subscribe(postgres, options) {
   const subscribers = new Map()
       , slot = 'postgresjs_' + Math.random().toString(36).slice(2)
       , state = {}

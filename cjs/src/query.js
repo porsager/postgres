@@ -37,13 +37,12 @@ const Query = module.exports.Query = class Query extends Promise {
   }
 
   get origin() {
-    return this.handler.debug
+    return (this.handler.debug
       ? this[originError].stack
-      : this.tagged
-        ? originStackCache.has(this.strings)
-          ? originStackCache.get(this.strings)
-          : originStackCache.set(this.strings, this[originError].stack).get(this.strings)
-        : ''
+      : this.tagged && originStackCache.has(this.strings)
+        ? originStackCache.get(this.strings)
+        : originStackCache.set(this.strings, this[originError].stack).get(this.strings)
+    ) || ''
   }
 
   static get [Symbol.species]() {
@@ -54,16 +53,20 @@ const Query = module.exports.Query = class Query extends Promise {
     return this.canceller && (this.canceller(this), this.canceller = null)
   }
 
-  async readable() {
+  simple() {
     this.options.simple = true
     this.options.prepare = false
+    return this
+  }
+
+  async readable() {
+    this.simple()
     this.streaming = true
     return this
   }
 
   async writable() {
-    this.options.simple = true
-    this.options.prepare = false
+    this.simple()
     this.streaming = true
     return this
   }
@@ -108,7 +111,8 @@ const Query = module.exports.Query = class Query extends Promise {
   }
 
   describe() {
-    this.onlyDescribe = true
+    this.options.simple = false
+    this.onlyDescribe = this.options.prepare = true
     return this
   }
 

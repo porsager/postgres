@@ -8,8 +8,11 @@ const {
   Identifier,
   Builder,
   toPascal,
+  pascal,
   toCamel,
+  camel,
   toKebab,
+  kebab,
   fromPascal,
   fromCamel,
   fromKebab
@@ -25,8 +28,11 @@ const largeObject = require('./large.js')
 Object.assign(Postgres, {
   PostgresError,
   toPascal,
+  pascal,
   toCamel,
+  camel,
   toKebab,
+  kebab,
   fromPascal,
   fromCamel,
   fromKebab,
@@ -68,8 +74,8 @@ function Postgres(a, b) {
     END: CLOSE,
     PostgresError,
     options,
+    reserve,
     listen,
-    notify,
     begin,
     close,
     end
@@ -77,7 +83,7 @@ function Postgres(a, b) {
 
   return sql
 
-  function Sql(handler, instant) {
+  function Sql(handler) {
     handler.debug = options.debug
 
     Object.entries(options.types).reduce((acc, [name, type]) => {
@@ -89,6 +95,7 @@ function Postgres(a, b) {
       types: typed,
       typed,
       unsafe,
+      notify,
       array,
       json,
       file
@@ -106,7 +113,6 @@ function Postgres(a, b) {
         : typeof strings === 'string' && !args.length
           ? new Identifier(options.transform.column.to ? options.transform.column.to(strings) : strings)
           : new Builder(strings, args)
-      instant && query instanceof Query && query.execute()
       return query
     }
 
@@ -117,7 +123,6 @@ function Postgres(a, b) {
         ...options,
         simple: 'simple' in options ? options.simple : args.length === 0
       })
-      instant && query.execute()
       return query
     }
 
@@ -135,7 +140,6 @@ function Postgres(a, b) {
         ...options,
         simple: 'simple' in options ? options.simple : args.length === 0
       })
-      instant && query.execute()
       return query
     }
   }
@@ -162,30 +166,33 @@ function Postgres(a, b) {
 
     const channels = listen.channels || (listen.channels = {})
         , exists = name in channels
-        , channel = exists ? channels[name] : (channels[name] = { listeners: [listener] })
 
     if (exists) {
-      channel.listeners.push(listener)
+      channels[name].listeners.push(listener)
+      const result = await channels[name].result
       listener.onlisten && listener.onlisten()
-      return Promise.resolve({ ...channel.result, unlisten })
+      return { state: result.state, unlisten }
     }
 
-    channel.result = await sql`listen ${ sql(name) }`
+    channels[name] = { result: sql`listen ${
+      sql.unsafe('"' + name.replace(/"/g, '""') + '"')
+    }`, listeners: [listener] }
+    const result = await channels[name].result
     listener.onlisten && listener.onlisten()
-    channel.result.unlisten = unlisten
-
-    return channel.result
+    return { state: result.state, unlisten }
 
     async function unlisten() {
       if (name in channels === false)
         return
 
-      channel.listeners = channel.listeners.filter(x => x !== listener)
+      channels[name].listeners = channels[name].listeners.filter(x => x !== listener)
       if (channels[name].listeners.length)
         return
 
       delete channels[name]
-      return sql`unlisten ${ sql(name) }`
+      return sql`unlisten ${
+        sql.unsafe('"' + name.replace(/"/g, '""') + '"')
+      }`
     }
   }
 
@@ -193,15 +200,49 @@ function Postgres(a, b) {
     return await sql`select pg_notify(${ channel }, ${ '' + payload })`
   }
 
+  async function reserve() {
+    const queue = Queue()
+    const c = open.length
+      ? open.shift()
+      : await new Promise(r => {
+        queries.push({ reserve: r })
+        closed.length && connect(closed.shift())
+      })
+
+    move(c, reserved)
+    c.reserved = () => queue.length
+      ? c.execute(queue.shift())
+      : move(c, reserved)
+    c.reserved.release = true
+
+    const sql = Sql(handler)
+    sql.release = () => {
+      c.reserved = null
+      onopen(c)
+    }
+
+    return sql
+
+    function handler(q) {
+      c.queue === full
+        ? queue.push(q)
+        : c.execute(q) || move(c, full)
+    }
+  }
+
   async function begin(options, fn) {
     !fn && (fn = options, options = '')
     const queries = Queue()
     let savepoints = 0
       , connection
+      , prepare = null
 
     try {
       await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
-      return await scope(connection, fn)
+      return await Promise.race([
+        scope(connection, fn),
+        new Promise((_, reject) => connection.onclose = reject)
+      ])
     } catch (error) {
       throw error
     }
@@ -209,6 +250,7 @@ function Postgres(a, b) {
     async function scope(c, fn, name) {
       const sql = Sql(handler)
       sql.savepoint = savepoint
+      sql.prepare = x => prepare = x.replace(/[^a-z0-9$-_. ]/gi)
       let uncaughtError
         , result
 
@@ -229,7 +271,12 @@ function Postgres(a, b) {
         throw e instanceof PostgresError && e.code === '25P02' && uncaughtError || e
       }
 
-      !name && await sql`commit`
+      if (!name) {
+        prepare
+          ? await sql`prepare transaction '${ sql.unsafe(prepare) }'`
+          : await sql`commit`
+      }
+
       return result
 
       function savepoint(name, fn) {
@@ -264,6 +311,7 @@ function Postgres(a, b) {
     queue === open
       ? c.idleTimer.start()
       : c.idleTimer.cancel()
+    return c
   }
 
   function json(x) {
@@ -342,6 +390,7 @@ function Postgres(a, b) {
   function connect(c, query) {
     move(c, connecting)
     c.connect(query)
+    return c
   }
 
   function onend(c) {
@@ -355,17 +404,23 @@ function Postgres(a, b) {
     let max = Math.ceil(queries.length / (connecting.length + 1))
       , ready = true
 
-    while (ready && queries.length && max-- > 0)
-      ready = c.execute(queries.shift())
+    while (ready && queries.length && max-- > 0) {
+      const query = queries.shift()
+      if (query.reserve)
+        return query.reserve(c)
+
+      ready = c.execute(query)
+    }
 
     ready
       ? move(c, busy)
       : move(c, full)
   }
 
-  function onclose(c) {
+  function onclose(c, e) {
     move(c, closed)
     c.reserved = null
+    c.onclose && (c.onclose(e), c.onclose = null)
     options.onclose && options.onclose(c.id)
     queries.length && connect(c, queries.shift())
   }
@@ -376,7 +431,7 @@ function parseOptions(a, b) {
     return a
 
   const env = process.env // eslint-disable-line
-      , o = (typeof a === 'string' ? b : a) || {}
+      , o = (!a || typeof a === 'string' ? b : a) || {}
       , { url, multihost } = parseUrl(a)
       , query = [...url.searchParams].reduce((a, [b, c]) => (a[b] = c, a), {})
       , host = o.hostname || o.host || multihost || url.hostname || env.PGHOST || 'localhost'
@@ -386,7 +441,9 @@ function parseOptions(a, b) {
   o.no_prepare && (o.prepare = false)
   query.sslmode && (query.ssl = query.sslmode, delete query.sslmode)
   'timeout' in o && (console.log('The timeout option is deprecated, use idle_timeout instead'), o.idle_timeout = o.timeout) // eslint-disable-line
+  query.sslrootcert === 'system' && (query.ssl = 'verify-full')
 
+  const ints = ['idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive']
   const defaults = {
     max             : 10,
     ssl             : false,
@@ -410,12 +467,16 @@ function parseOptions(a, b) {
     database        : o.database || o.db || (url.pathname || '').slice(1) || env.PGDATABASE || user,
     user            : user,
     pass            : o.pass || o.password || url.password || env.PGPASSWORD || '',
-    ...Object.entries(defaults).reduce((acc, [k, d]) =>
-      (acc[k] = k in o ? o[k] : k in query
-        ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
-        : env['PG' + k.toUpperCase()] || d,
-      acc
-      ),
+    ...Object.entries(defaults).reduce(
+      (acc, [k, d]) => {
+        const value = k in o ? o[k] : k in query
+          ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
+          : env['PG' + k.toUpperCase()] || d
+        acc[k] = typeof value === 'string' && ints.includes(k)
+          ? +value
+          : value
+        return acc
+      },
       {}
     ),
     connection      : {
@@ -472,15 +533,25 @@ function parseTransform(x) {
 }
 
 function parseUrl(url) {
-  if (typeof url !== 'string')
+  if (!url || typeof url !== 'string')
     return { url: { searchParams: new Map() } }
 
   let host = url
   host = host.slice(host.indexOf('://') + 3).split(/[?/]/)[0]
   host = decodeURIComponent(host.slice(host.indexOf('@') + 1))
 
+  const urlObj = new URL(url.replace(host, host.split(',')[0]))
+
   return {
-    url: new URL(url.replace(host, host.split(',')[0])),
+    url: {
+      username: decodeURIComponent(urlObj.username),
+      password: decodeURIComponent(urlObj.password),
+      host: urlObj.host,
+      hostname: urlObj.hostname,
+      port: urlObj.port,
+      pathname: urlObj.pathname,
+      searchParams: urlObj.searchParams
+    },
     multihost: host.indexOf(',') > -1 && host
   }
 }

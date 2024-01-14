@@ -1,6 +1,6 @@
-import process from 'https://deno.land/std@0.132.0/node/process.ts'
-import os from 'https://deno.land/std@0.132.0/node/os.ts'
-import fs from 'https://deno.land/std@0.132.0/node/fs.ts'
+import { process } from '../polyfills.js'
+import { os } from '../polyfills.js'
+import { fs } from '../polyfills.js'
 
 import {
   mergeUserTypes,

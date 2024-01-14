@@ -2,6 +2,7 @@ const net = require('net')
 const tls = require('tls')
 const crypto = require('crypto')
 const Stream = require('stream')
+const { performance } = require('perf_hooks')
 
 const { stringify, handleValue, arrayParser, arraySerializer } = require('./types.js')
 const { Errors } = require('./errors.js')
@@ -108,7 +109,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     queue: queues.closed,
     idleTimer,
     connect(query) {
-      initial = query
+      initial = query || true
       reconnect()
     },
     terminate,
@@ -128,7 +129,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     try {
       x = options.socket
         ? (await Promise.resolve(options.socket(options)))
-        : net.Socket()
+        : new net.Socket()
     } catch (e) {
       error(e)
       return
@@ -166,6 +167,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       build(q)
       return write(toBuffer(q))
         && !q.describeFirst
+        && !q.cursorFn
         && sent.length < max_pipeline
         && (!q.options.onexecute || q.options.onexecute(connection))
     } catch (error) {
@@ -180,7 +182,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       throw Errors.generic('MAX_PARAMETERS_EXCEEDED', 'Max number of parameters (65534) exceeded')
 
     return q.options.simple
-      ? b().Q().str(q.strings[0] + b.N).end()
+      ? b().Q().str(q.statement.string + b.N).end()
       : q.describeFirst
         ? Buffer.concat([describe(q), Flush])
         : q.prepare
@@ -266,6 +268,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.removeAllListeners()
     socket = tls.connect({
       socket,
+      servername: net.isIP(socket.host) ? undefined : socket.host,
       ...(ssl === 'require' || ssl === 'allow' || ssl === 'prefer'
         ? { rejectUnauthorized: false }
         : ssl === 'verify-full'
@@ -309,12 +312,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       }
 
       try {
-        handle(incoming.slice(0, length + 1))
+        handle(incoming.subarray(0, length + 1))
       } catch (e) {
         query && (query.cursorFn || query.describeFirst) && write(Sync)
         errored(e)
       }
-      incoming = incoming.slice(length + 1)
+      incoming = incoming.subarray(length + 1)
       remaining = 0
       incomings = null
     }
@@ -338,12 +341,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (options.path)
       return socket.connect(options.path)
 
+    socket.ssl = ssl
     socket.connect(port[hostIndex], host[hostIndex])
+    socket.host = host[hostIndex]
+    socket.port = port[hostIndex]
+
     hostIndex = (hostIndex + 1) % port.length
   }
 
   function reconnect() {
-    setTimeout(connect, closedDate ? closedDate + delay - Number(process.hrtime.bigint() / 1000000n) : 0)
+    setTimeout(connect, closedDate ? closedDate + delay - performance.now() : 0)
   }
 
   function connected() {
@@ -354,7 +361,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       statementCount = 1
       lifeTimer.start()
       socket.on('data', data)
-      keep_alive && socket.setKeepAlive(true, 1000 * keep_alive)
+      keep_alive && socket.setKeepAlive && socket.setKeepAlive(true, 1000 * keep_alive)
       const s = StartupMessage()
       write(s)
     } catch (err) {
@@ -378,13 +385,14 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function queryError(query, err) {
-    query.reject(Object.create(err, {
+    Object.defineProperties(err, {
       stack: { value: err.stack + query.origin.replace(/.*\n/, '\n'), enumerable: options.debug },
       query: { value: query.string, enumerable: options.debug },
       parameters: { value: query.parameters, enumerable: options.debug },
       args: { value: query.args, enumerable: options.debug },
       types: { value: query.statement && query.statement.types, enumerable: options.debug }
-    }))
+    })
+    query.reject(err)
   }
 
   function end() {
@@ -430,10 +438,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return reconnect()
 
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
-    closedDate = Number(process.hrtime.bigint() / 1000000n)
+    closedDate = performance.now()
     hadError && options.shared.retries++
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
-    onclose(connection)
+    onclose(connection, Errors.connection('CONNECTION_CLOSED', options, socket))
   }
 
   /* Handlers */
@@ -483,7 +491,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       value = length === -1
         ? null
         : query.isRaw === true
-          ? x.slice(index, index += length)
+          ? x.subarray(index, index += length)
           : column.parser === undefined
             ? x.toString('utf8', index, index += length)
             : column.parser.array === true
@@ -493,8 +501,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       query.isRaw
         ? (row[i] = query.isRaw === true
           ? value
-          : transform.value.from ? transform.value.from(value) : value)
-        : (row[column.name] = transform.value.from ? transform.value.from(value) : value)
+          : transform.value.from ? transform.value.from(value, column) : value)
+        : (row[column.name] = transform.value.from ? transform.value.from(value, column) : value)
     }
 
     query.forEachFn
@@ -525,11 +533,14 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
           return terminate()
       }
 
-      if (needsTypes)
+      if (needsTypes) {
+        initial === true && (initial = null)
         return fetchArrayTypes()
+      }
 
-      execute(initial)
-      options.shared.retries = retries = initial = 0
+      initial !== true && execute(initial)
+      options.shared.retries = retries = 0
+      initial = null
       return
     }
 
@@ -540,7 +551,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return // Consider opening if able and sent.length < 50
 
     connection.reserved
-      ? x[5] === 73 // I
+      ? !connection.reserved.release && x[5] === 73 // I
         ? ending
           ? terminate()
           : (connection.reserved = null, onopen(connection))
@@ -566,7 +577,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     final && (final(), final = null)
 
     if (result.command === 'BEGIN' && max !== 1 && !connection.reserved)
-      return errored(Errors.generic('UNSAFE_TRANSACTION', 'Only use sql.begin or max: 1'))
+      return errored(Errors.generic('UNSAFE_TRANSACTION', 'Only use sql.begin, sql.reserved or max: 1'))
 
     if (query.options.simple)
       return BindComplete()
@@ -649,44 +660,57 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   /* c8 ignore next 5 */
   async function AuthenticationCleartextPassword() {
+    const payload = await Pass()
     write(
-      b().p().str(await Pass()).z(1).end()
+      b().p().str(payload).z(1).end()
     )
   }
 
   async function AuthenticationMD5Password(x) {
+    const payload = 'md5' + (
+      await md5(
+        Buffer.concat([
+          Buffer.from(await md5((await Pass()) + user)),
+          x.subarray(9)
+        ])
+      )
+    )
     write(
-      b().p().str('md5' + md5(Buffer.concat([Buffer.from(md5((await Pass()) + user)), x.slice(9)]))).z(1).end()
+      b().p().str(payload).z(1).end()
     )
   }
 
-  function SASL() {
+  async function SASL() {
+    nonce = (await crypto.randomBytes(18)).toString('base64')
     b().p().str('SCRAM-SHA-256' + b.N)
     const i = b.i
-    nonce = crypto.randomBytes(18).toString('base64')
     write(b.inc(4).str('n,,n=*,r=' + nonce).i32(b.i - i - 4, i).end())
   }
 
   async function SASLContinue(x) {
     const res = x.toString('utf8', 9).split(',').reduce((acc, x) => (acc[x[0]] = x.slice(2), acc), {})
 
-    const saltedPassword = crypto.pbkdf2Sync(
+    const saltedPassword = await crypto.pbkdf2Sync(
       await Pass(),
       Buffer.from(res.s, 'base64'),
       parseInt(res.i), 32,
       'sha256'
     )
 
-    const clientKey = hmac(saltedPassword, 'Client Key')
+    const clientKey = await hmac(saltedPassword, 'Client Key')
 
     const auth = 'n=*,r=' + nonce + ','
                + 'r=' + res.r + ',s=' + res.s + ',i=' + res.i
                + ',c=biws,r=' + res.r
 
-    serverSignature = hmac(hmac(saltedPassword, 'Server Key'), auth).toString('base64')
+    serverSignature = (await hmac(await hmac(saltedPassword, 'Server Key'), auth)).toString('base64')
+
+    const payload = 'c=biws,r=' + res.r + ',p=' + xor(
+      clientKey, Buffer.from(await hmac(await sha256(clientKey), auth))
+    ).toString('base64')
 
     write(
-      b().p().str('c=biws,r=' + res.r + ',p=' + xor(clientKey, hmac(sha256(clientKey), auth)).toString('base64')).end()
+      b().p().str(payload).end()
     )
   }
 
@@ -731,19 +755,20 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function addArrayType(oid, typarray) {
+    if (!!options.parsers[typarray] && !!options.serializers[typarray]) return
     const parser = options.parsers[oid]
     options.shared.typeArrayMap[oid] = typarray
-    options.parsers[typarray] = (xs) => arrayParser(xs, parser)
+    options.parsers[typarray] = (xs) => arrayParser(xs, parser, typarray)
     options.parsers[typarray].array = true
-    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid], options)
+    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid], options, typarray)
   }
 
   function tryNext(x, xs) {
     return (
       (x === 'read-write' && xs.default_transaction_read_only === 'on') ||
       (x === 'read-only' && xs.default_transaction_read_only === 'off') ||
-      (x === 'primary' && xs.in_hot_standby === 'off') ||
-      (x === 'standby' && xs.in_hot_standby === 'on') ||
+      (x === 'primary' && xs.in_hot_standby === 'on') ||
+      (x === 'standby' && xs.in_hot_standby === 'off') ||
       (x === 'prefer-standby' && xs.in_hot_standby === 'off' && options.host[retries])
     )
   }
@@ -855,11 +880,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function CopyData(x) {
-    stream.push(x.slice(5)) || socket.pause()
+    stream && (stream.push(x.subarray(5)) || socket.pause())
   }
 
   function CopyDone() {
-    stream.push(null)
+    stream && stream.push(null)
     stream = null
   }
 

@@ -139,6 +139,11 @@ t('Array of Date', async() => {
   return [now.getTime(), (await sql`select ${ sql.array([now, now, now]) } as x`)[0].x[2].getTime()]
 })
 
+t('Array of Box', async() => [
+  '(3,4),(1,2);(6,7),(4,5)',
+  (await sql`select ${ '{(1,2),(3,4);(4,5),(6,7)}' }::box[] as x`)[0].x.join(';')
+])
+
 t('Nested array n2', async() =>
   ['4', (await sql`select ${ sql.array([[1, 2], [3, 4]]) } as x`)[0].x[1][1]]
 )
@@ -233,6 +238,19 @@ t('Savepoint returns Result', async() => {
   })
 
   return [1, result[0].x]
+})
+
+t('Prepared transaction', async() => {
+  await sql`create table test (a int)`
+
+  await sql.begin(async sql => {
+    await sql`insert into test values(1)`
+    await sql.prepare('tx1')
+  })
+
+  await sql`commit prepared 'tx1'`
+
+  return ['1', (await sql`select count(1) from test`)[0].count, await sql`drop table test`]
 })
 
 t('Transaction requests are executed implicitly', async() => {
@@ -352,6 +370,11 @@ t('Connect using uri', async() =>
     sql`select 1`.then(() => resolve(true), reject)
   })]
 )
+
+t('Options from uri with special characters in user and pass', async() => {
+  const opt = postgres({ user: 'öla', pass: 'pass^word' }).options
+  return [[opt.user, opt.pass].toString(), 'öla,pass^word']
+})
 
 t('Fail with proper error on no host', async() =>
   ['ECONNREFUSED', (await new Promise((resolve, reject) => {
@@ -533,7 +556,7 @@ t('Connection ended timeout', async() => {
 
 t('Connection ended error', async() => {
   const sql = postgres(options)
-  sql.end()
+  await sql.end()
   return ['CONNECTION_ENDED', (await sql``.catch(x => x.code))]
 })
 
@@ -542,14 +565,14 @@ t('Connection end does not cancel query', async() => {
 
   const promise = sql`select 1 as x`.execute()
 
-  sql.end()
+  await sql.end()
 
   return [1, (await promise)[0].x]
 })
 
 t('Connection destroyed', async() => {
   const sql = postgres(options)
-  setTimeout(() => sql.end({ timeout: 0 }), 0)
+  process.nextTick(() => sql.end({ timeout: 0 }))
   return ['CONNECTION_DESTROYED', await sql``.catch(x => x.code)]
 })
 
@@ -605,6 +628,84 @@ t('column toKebab', async() => {
   return ['hello-world', Object.keys((await sql`select * from test`)[0])[0], await sql`drop table test`]
 })
 
+t('Transform nested json in arrays', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  return ['aBcD', (await sql`select '[{"a_b":1},{"c_d":2}]'::jsonb as x`)[0].x.map(Object.keys).join('')]
+})
+
+t('Transform deeply nested json object in arrays', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  return [
+    'childObj_deeplyNestedObj_grandchildObj',
+    (await sql`
+      select '[{"nested_obj": {"child_obj": 2, "deeply_nested_obj": {"grandchild_obj": 3}}}]'::jsonb as x
+    `)[0].x.map(x => {
+      let result
+      for (const key in x)
+        result = [...Object.keys(x[key]), ...Object.keys(x[key].deeplyNestedObj)]
+      return result
+    })[0]
+    .join('_')
+  ]
+})
+
+t('Transform deeply nested json array in arrays', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  return [
+    'childArray_deeplyNestedArray_grandchildArray',
+    (await sql`
+      select '[{"nested_array": [{"child_array": 2, "deeply_nested_array": [{"grandchild_array":3}]}]}]'::jsonb AS x
+    `)[0].x.map((x) => {
+      let result
+      for (const key in x)
+        result = [...Object.keys(x[key][0]), ...Object.keys(x[key][0].deeplyNestedArray[0])]
+      return result
+    })[0]
+    .join('_')
+  ]
+})
+
+t('Bypass transform for json primitive', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+
+  const x = (
+    await sql`select 'null'::json as a, 'false'::json as b, '"a"'::json as c, '1'::json as d`
+  )[0]
+
+  return [
+    JSON.stringify({ a: null, b: false, c: 'a', d: 1 }),
+    JSON.stringify(x)
+  ]
+})
+
+t('Bypass transform for jsonb primitive', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+
+  const x = (
+    await sql`select 'null'::jsonb as a, 'false'::jsonb as b, '"a"'::jsonb as c, '1'::jsonb as d`
+  )[0]
+
+  return [
+    JSON.stringify({ a: null, b: false, c: 'a', d: 1 }),
+    JSON.stringify(x)
+  ]
+})
+
 t('unsafe', async() => {
   await sql`create table test (x int)`
   return [1, (await sql.unsafe('insert into test values ($1) returning *', [1]))[0].x, await sql`drop table test`]
@@ -616,6 +717,32 @@ t('unsafe simple', async() => {
 
 t('unsafe simple includes columns', async() => {
   return ['x', (await sql.unsafe('select 1 as x').values()).columns[0].name]
+})
+
+t('unsafe describe', async() => {
+  const q = 'insert into test values (1)'
+  await sql`create table test(a int unique)`
+  await sql.unsafe(q).describe()
+  const x = await sql.unsafe(q).describe()
+  return [
+    q,
+    x.string,
+    await sql`drop table test`
+  ]
+})
+
+t('simple query using unsafe with multiple statements', async() => {
+  return [
+    '1,2',
+    (await sql.unsafe('select 1 as x;select 2 as x')).map(x => x[0].x).join()
+  ]
+})
+
+t('simple query using simple() with multiple statements', async() => {
+  return [
+    '1,2',
+    (await sql`select 1 as x;select 2 as x`.simple()).map(x => x[0].x).join()
+  ]
 })
 
 t('listen and notify', async() => {
@@ -657,12 +784,31 @@ t('double listen', async() => {
   return [2, count]
 })
 
+t('multiple listeners work after a reconnect', async() => {
+  const sql = postgres(options)
+      , xs = []
+
+  const s1 = await sql.listen('test', x => xs.push('1', x))
+  await sql.listen('test', x => xs.push('2', x))
+  await sql.notify('test', 'a')
+  await delay(50)
+  await sql`select pg_terminate_backend(${ s1.state.pid })`
+  await delay(200)
+  await sql.notify('test', 'b')
+  await delay(50)
+  sql.end()
+
+  return ['1a2a1b2b', xs.join('')]
+})
+
 t('listen and notify with weird name', async() => {
   const sql = postgres(options)
-  const channel = 'wat-;ø§'
+  const channel = 'wat-;.ø.§'
   const result = await new Promise(async r => {
-    await sql.listen(channel, r)
+    const { unlisten } = await sql.listen(channel, r)
     sql.notify(channel, 'works')
+    await delay(50)
+    await unlisten()
   })
 
   return [
@@ -784,7 +930,7 @@ t('has server parameters', async() => {
   return ['postgres.js', (await sql`select 1`.then(() => sql.parameters.application_name))]
 })
 
-t('big query body', async() => {
+t('big query body', { timeout: 2 }, async() => {
   await sql`create table test (x int)`
   return [50000, (await sql`insert into test ${
     sql([...Array(50000).keys()].map(x => ({ x })))
@@ -881,6 +1027,30 @@ t('Connection errors are caught using begin()', {
   ]
 })
 
+t('dynamic table name', async() => {
+  await sql`create table test(a int)`
+  return [
+    0, (await sql`select * from ${ sql('test') }`).count,
+    await sql`drop table test`
+  ]
+})
+
+t('dynamic schema name', async() => {
+  await sql`create table test(a int)`
+  return [
+    0, (await sql`select * from ${ sql('public') }.test`).count,
+    await sql`drop table test`
+  ]
+})
+
+t('dynamic schema and table name', async() => {
+  await sql`create table test(a int)`
+  return [
+    0, (await sql`select * from ${ sql('public.test') }`).count,
+    await sql`drop table test`
+  ]
+})
+
 t('dynamic column name', async() => {
   return ['!not_valid', Object.keys((await sql`select 1 as ${ sql('!not_valid') }`)[0])[0]]
 })
@@ -905,6 +1075,16 @@ t('dynamic insert pluck', async() => {
   const x = { a: 42, b: 'the answer' }
 
   return [null, (await sql`insert into test ${ sql(x, 'a') } returning *`)[0].b, await sql`drop table test`]
+})
+
+t('dynamic in with empty array', async() => {
+  await sql`create table test (a int)`
+  await sql`insert into test values (1)`
+  return [
+    (await sql`select * from test where null in ${ sql([]) }`).count,
+    0,
+    await sql`drop table test`
+  ]
 })
 
 t('dynamic in after insert', async() => {
@@ -1275,7 +1455,60 @@ t('Transform value', async() => {
 })
 
 t('Transform columns from', async() => {
-  const sql = postgres({ ...options, transform: { column: { to: postgres.fromCamel, from: postgres.toCamel } } })
+  const sql = postgres({
+    ...options,
+    transform: postgres.fromCamel
+  })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
+  await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
+  return [
+    2,
+    (await sql`select ${ sql('aTest', 'bTest') } from test`)[0].a_test,
+    await sql`drop table test`
+  ]
+})
+
+t('Transform columns to', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.toCamel
+  })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ a_test: 1, b_test: 1 }]) }`
+  await sql`update test set ${ sql({ a_test: 2, b_test: 2 }) }`
+  return [
+    2,
+    (await sql`select a_test, b_test from test`)[0].aTest,
+    await sql`drop table test`
+  ]
+})
+
+t('Transform columns from and to', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  await sql`create table test (a_test int, b_test text)`
+  await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
+  await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
+  return [
+    2,
+    (await sql`select ${ sql('aTest', 'bTest') } from test`)[0].aTest,
+    await sql`drop table test`
+  ]
+})
+
+t('Transform columns from and to (legacy)', async() => {
+  const sql = postgres({
+    ...options,
+    transform: {
+      column: {
+        to: postgres.fromCamel,
+        from: postgres.toCamel
+      }
+    }
+  })
   await sql`create table test (a_test int, b_test text)`
   await sql`insert into test ${ sql([{ aTest: 1, bTest: 1 }]) }`
   await sql`update test set ${ sql({ aTest: 2, bTest: 2 }) }`
@@ -1408,6 +1641,22 @@ t('connect_timeout throws proper error', async() => [
     connect_timeout: 0.001
   })`select 1`.catch(e => e.code)
 ])
+
+t('connect_timeout error message includes host:port', { timeout: 20 }, async() => {
+  const connect_timeout = 0.2
+  const server = net.createServer()
+  server.listen()
+  const sql = postgres({ port: server.address().port, host: '127.0.0.1', connect_timeout })
+  const port = server.address().port
+  let err
+  await sql`select 1`.catch((e) => {
+    if (e.code !== 'CONNECT_TIMEOUT')
+      throw e
+    err = e.message
+  })
+  server.close()
+  return [['write CONNECT_TIMEOUT 127.0.0.1:', port].join(''), err]
+})
 
 t('requests works after single connect_timeout', async() => {
   let first = true
@@ -1748,17 +1997,16 @@ t('multiple queries before connect', async() => {
 t('subscribe', { timeout: 2 }, async() => {
   const sql = postgres({
     database: 'postgres_js_test',
-    publications: 'alltables',
-    fetch_types: false
+    publications: 'alltables'
   })
 
   await sql.unsafe('create publication alltables for all tables')
 
   const result = []
 
-  const { unsubscribe } = await sql.subscribe('*', (row, { command, old }) =>
-    result.push(command, row.name || row.id, old && old.name)
-  )
+  const { unsubscribe } = await sql.subscribe('*', (row, { command, old }) => {
+    result.push(command, row.name, row.id, old && old.name, old && old.id)
+  })
 
   await sql`
     create table test (
@@ -1770,6 +2018,7 @@ t('subscribe', { timeout: 2 }, async() => {
   await sql`alter table test replica identity default`
   await sql`insert into test (name) values ('Murray')`
   await sql`update test set name = 'Rothbard'`
+  await sql`update test set id = 2`
   await sql`delete from test`
   await sql`alter table test replica identity full`
   await sql`insert into test (name) values ('Murray')`
@@ -1778,6 +2027,53 @@ t('subscribe', { timeout: 2 }, async() => {
   await delay(10)
   await unsubscribe()
   await sql`insert into test (name) values ('Oh noes')`
+  await delay(10)
+  return [
+    'insert,Murray,1,,,update,Rothbard,1,,,update,Rothbard,2,,1,delete,,2,,,insert,Murray,2,,,update,Rothbard,2,Murray,2,delete,Rothbard,2,,', // eslint-disable-line
+    result.join(','),
+    await sql`drop table test`,
+    await sql`drop publication alltables`,
+    await sql.end()
+  ]
+})
+
+t('subscribe with transform', { timeout: 2 }, async() => {
+  const sql = postgres({
+    transform: {
+      column: {
+        from: postgres.toCamel,
+        to: postgres.fromCamel
+      }
+    },
+    database: 'postgres_js_test',
+    publications: 'alltables'
+  })
+
+  await sql.unsafe('create publication alltables for all tables')
+
+  const result = []
+
+  const { unsubscribe } = await sql.subscribe('*', (row, { command, old }) =>
+    result.push(command, row.nameInCamel || row.id, old && old.nameInCamel)
+  )
+
+  await sql`
+    create table test (
+      id serial primary key,
+      name_in_camel text
+    )
+  `
+
+  await sql`insert into test (name_in_camel) values ('Murray')`
+  await sql`update test set name_in_camel = 'Rothbard'`
+  await sql`delete from test`
+  await sql`alter table test replica identity full`
+  await sql`insert into test (name_in_camel) values ('Murray')`
+  await sql`update test set name_in_camel = 'Rothbard'`
+  await sql`delete from test`
+  await delay(10)
+  await unsubscribe()
+  await sql`insert into test (name_in_camel) values ('Oh noes')`
   await delay(10)
   return [
     'insert,Murray,,update,Rothbard,,delete,1,,insert,Murray,,update,Rothbard,Murray,delete,Rothbard,',
@@ -1840,16 +2136,16 @@ t('Execute', async() => {
 
 t('Cancel running query', async() => {
   const query = sql`select pg_sleep(2)`
-  setTimeout(() => query.cancel(), 200)
+  setTimeout(() => query.cancel(), 500)
   const error = await query.catch(x => x)
   return ['57014', error.code]
 })
 
-t('Cancel piped query', async() => {
+t('Cancel piped query', { timeout: 5 }, async() => {
   await sql`select 1`
-  const last = sql`select pg_sleep(0.2)`.execute()
+  const last = sql`select pg_sleep(1)`.execute()
   const query = sql`select pg_sleep(2) as dig`
-  setTimeout(() => query.cancel(), 100)
+  setTimeout(() => query.cancel(), 500)
   const error = await query.catch(x => x)
   await last
   return ['57014', error.code]
@@ -1859,7 +2155,7 @@ t('Cancel queued query', async() => {
   const query = sql`select pg_sleep(2) as nej`
   const tx = sql.begin(sql => (
     query.cancel(),
-    sql`select pg_sleep(0.1) as hej, 'hejsa'`
+    sql`select pg_sleep(0.5) as hej, 'hejsa'`
   ))
   const error = await query.catch(x => x)
   await tx
@@ -1894,15 +2190,15 @@ t('Describe a statement', async() => {
 })
 
 t('Include table oid and column number in column details', async() => {
-    await sql`create table tester (name text, age int)`
-    const r = await sql`select name, age from tester where name like $1 and age > $2`.describe();
-    const [{ oid }] = await sql`select oid from pg_class where relname = 'tester'`;
+  await sql`create table tester (name text, age int)`
+  const r = await sql`select name, age from tester where name like $1 and age > $2`.describe()
+  const [{ oid }] = await sql`select oid from pg_class where relname = 'tester'`
 
-    return [
-        `table:${oid},number:1|table:${oid},number:2`,
-        `${ r.columns.map(c => `table:${c.table},number:${c.number}`).join('|') }`,
-        await sql`drop table tester`
-    ]
+  return [
+    `table:${oid},number:1|table:${oid},number:2`,
+    `${ r.columns.map(c => `table:${c.table},number:${c.number}`).join('|') }`,
+    await sql`drop table tester`
+  ]
 })
 
 t('Describe a statement without parameters', async() => {
@@ -2054,11 +2350,22 @@ t('Ensure reconnect after max_lifetime with transactions', { timeout: 5 }, async
   return [true, true]
 })
 
+
+t('Ensure transactions throw if connection is closed dwhile there is no query', async() => {
+  const sql = postgres(options)
+  const x = await sql.begin(async() => {
+    setTimeout(() => sql.end({ timeout: 0 }), 10)
+    await new Promise(r => setTimeout(r, 200))
+    return sql`select 1`
+  }).catch(x => x)
+  return ['CONNECTION_CLOSED', x.code]
+})
+
 t('Custom socket', {}, async() => {
   let result
   const sql = postgres({
     socket: () => new Promise((resolve, reject) => {
-      const socket = net.Socket()
+      const socket = new net.Socket()
       socket.connect(5432)
       socket.once('data', x => result = x[0])
       socket.on('error', reject)
@@ -2197,4 +2504,57 @@ t('Insert array with undefined transform', async() => {
     await sql`drop table test`
   ]
 })
+
+t('concurrent cursors', async() => {
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.join('')]
+})
+
+t('concurrent cursors multiple connections', async() => {
+  const sql = postgres({ ...options, max: 2 })
+  const xs = []
+
+  await Promise.all([...Array(7)].map((x, i) => [
+    sql`select ${ i }::int as a, generate_series(1, 2) as x`.cursor(([x]) => xs.push(x.a + x.x))
+  ]).flat())
+
+  return ['12233445566778', xs.sort().join('')]
+})
+
+t('reserve connection', async() => {
+  const reserved = await sql.reserve()
+
+  setTimeout(() => reserved.release(), 510)
+
+  const xs = await Promise.all([
+    reserved`select 1 as x`.then(([{ x }]) => ({ time: Date.now(), x })),
+    sql`select 2 as x`.then(([{ x }]) => ({ time: Date.now(), x })),
+    reserved`select 3 as x`.then(([{ x }]) => ({ time: Date.now(), x }))
+  ])
+
+  if (xs[1].time - xs[2].time < 500)
+    throw new Error('Wrong time')
+
+  return [
+    '123',
+    xs.map(x => x.x).join('')
+  ]
+})
+
+t('arrays in reserved connection', async() => {
+  const reserved = await sql.reserve()
+  const [{ x }] = await reserved`select array[1, 2, 3] as x`
+  reserved.release()
+
+  return [
+    '123',
+    x.join('')
+  ]
+})
+
 ;window.addEventListener("unload", () => Deno.exit(process.exitCode))
