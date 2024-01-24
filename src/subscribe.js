@@ -47,7 +47,7 @@ export default function Subscribe(postgres, options) {
 
   return subscribe
 
-  async function subscribe(event, fn, onsubscribe = noop) {
+  async function subscribe(event, fn, onsubscribe = noop, onerror = noop) {
     event = parseEvent(event)
 
     if (!connection)
@@ -66,6 +66,7 @@ export default function Subscribe(postgres, options) {
     return connection.then(x => {
       connected(x)
       onsubscribe()
+      stream && stream.on('error', onerror)
       return { unsubscribe, state, sql }
     })
   }
