@@ -110,8 +110,10 @@ export default function Subscribe(postgres, options) {
     function data(x) {
       if (x[0] === 0x77)
         parse(x.subarray(25), state, sql.options.parsers, handle, options.transform)
-      else if (x[0] === 0x6b && x[17])
+      else if (x[0] === 0x6b && x[17]) {
+        state.lsn = x.subarray(1, 9)
         pong()
+      }
     }
 
     function handle(a, b) {
