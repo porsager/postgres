@@ -270,7 +270,7 @@ const users = [
 ]
 
 await sql`
-  update users set name = update_data.name, (age = update_data.age)::int
+  update users set name = update_data.name, age = (update_data.age)::int
   from (values ${sql(users)}) as update_data (id, name, age)
   where users.id = (update_data.id)::int
   returning users.id, users.name, users.age
@@ -290,7 +290,7 @@ const users = await sql`
 
 or
 ```js
-const [{ a, b, c }] => await sql`
+const [{ a, b, c }] = await sql`
   select
     *
   from (values ${ sql(['a', 'b', 'c']) }) as x(a, b, c)
