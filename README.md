@@ -1103,10 +1103,10 @@ export default async fetch(req: Request, env: Env, ctx: ExecutionContext) {
 }
 ```
 
-In `wrangler.toml` you will need to enable `node_compat` to allow Postgres.js to operate in the Workers environment:
+In `wrangler.toml` you will need to enable the `nodejs_compat` compatibility flag to allow Postgres.js to operate in the Workers environment:
 
 ```toml
-node_compat = true # required for database drivers to function
+compatibility_flags = ["nodejs_compat"]
 ```
 
 ### Auto fetching of array types
