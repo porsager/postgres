@@ -887,6 +887,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function NoticeResponse(x) {
+    if (onnotice === false) {
+        return
+    }
     onnotice
       ? onnotice(parseError(x))
       : console.log(parseError(x)) // eslint-disable-line
