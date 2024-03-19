@@ -73,7 +73,7 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
    * Called when a notice is received
    * @default console.log
    */
-  onnotice: (notice: postgres.Notice) => void;
+  onnotice: false | (notice: postgres.Notice) => void;
   /** (key; value) when a server param change */
   onparameter: (key: string, value: any) => void;
   /** Is called with (connection; query; parameters) */
