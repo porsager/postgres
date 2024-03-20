@@ -788,7 +788,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     const error = Errors.postgres(parseError(x))
     query && query.retried
       ? errored(query.retried)
-      : query && query.prepare && retryRoutines.has(error.routine)
+      : query && query.prepared && retryRoutines.has(error.routine)
         ? retry(query, error)
         : errored(error)
   }
