@@ -47,7 +47,7 @@ module.exports = Subscribe;function Subscribe(postgres, options) {
 
   return subscribe
 
-  async function subscribe(event, fn, onsubscribe = noop) {
+  async function subscribe(event, fn, onsubscribe = noop, onerror = noop) {
     event = parseEvent(event)
 
     if (!connection)
@@ -66,6 +66,7 @@ module.exports = Subscribe;function Subscribe(postgres, options) {
     return connection.then(x => {
       connected(x)
       onsubscribe()
+      stream && stream.on('error', onerror)
       return { unsubscribe, state, sql }
     })
   }
@@ -109,8 +110,10 @@ module.exports = Subscribe;function Subscribe(postgres, options) {
     function data(x) {
       if (x[0] === 0x77)
         parse(x.subarray(25), state, sql.options.parsers, handle, options.transform)
-      else if (x[0] === 0x6b && x[17])
+      else if (x[0] === 0x6b && x[17]) {
+        state.lsn = x.subarray(1, 9)
         pong()
+      }
     }
 
     function handle(a, b) {
