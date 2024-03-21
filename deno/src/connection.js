@@ -959,7 +959,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function Execute(portal = '', rows = 0) {
     return Buffer.concat([
       b().E().str(portal + b.N).i32(rows).end(),
-      Flush
+      rows === 0 ? Sync : Flush
     ])
   }
 
