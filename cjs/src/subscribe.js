@@ -104,13 +104,13 @@ module.exports = Subscribe;function Subscribe(postgres, options) {
     return { stream, state: xs.state }
 
     function error(e) {
-      console.error('Unexpected error during logical streaming - reconnecting', e)
+      console.error('Unexpected error during logical streaming - reconnecting', e) // eslint-disable-line
     }
 
     function data(x) {
-      if (x[0] === 0x77)
+      if (x[0] === 0x77) {
         parse(x.subarray(25), state, sql.options.parsers, handle, options.transform)
-      else if (x[0] === 0x6b && x[17]) {
+      } else if (x[0] === 0x6b && x[17]) {
         state.lsn = x.subarray(1, 9)
         pong()
       }
