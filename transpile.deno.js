@@ -1,8 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 
-const std = 'https://deno.land/std@0.132.0/'
-    , empty = x => fs.readdirSync(x).forEach(f => fs.unlinkSync(path.join(x, f)))
+const empty = x => fs.readdirSync(x).forEach(f => fs.unlinkSync(path.join(x, f)))
     , ensureEmpty = x => !fs.existsSync(x) ? fs.mkdirSync(x) : empty(x)
     , root = 'deno'
     , src = path.join(root, 'src')
@@ -21,7 +20,7 @@ fs.writeFileSync(
 fs.writeFileSync(
   path.join(root, 'README.md'),
   fs.readFileSync('README.md', 'utf8')
-    .replace(/### Installation(\n.*){4}/, '')
+    .replace(/### Installation[\s\S]*?(?=\n##)/m, '')
     .replace(
       'import postgres from \'postgres\'',
       'import postgres from \'https://deno.land/x/postgresjs/mod.js\''
@@ -59,34 +58,23 @@ function transpile(x, name, folder) {
   }
 
   const buffer = x.includes('Buffer')
-    ? 'import { Buffer } from \'' + std + 'node/buffer.ts\'\n'
+    ? 'import { Buffer } from \'node:buffer\'\n'
     : ''
 
   const process = x.includes('process.')
-    ? 'import process from \'' + std + 'node/process.ts\'\n'
+    ? 'import process from \'node:process\'\n'
     : ''
 
   const timers = x.includes('setImmediate')
-    ? 'import { setImmediate, clearImmediate } from \'../polyfills.js\'\n'
+    ? 'import { setImmediate, clearImmediate } from \'node:timers\'\n'
     : ''
 
-  const hmac = x.includes('createHmac')
-    ? 'import { HmacSha256 } from \'' + std + 'hash/sha256.ts\'\n'
-    : ''
-
-  return hmac + buffer + process + timers + x
-    .replace(
-      'crypto.createHmac(\'sha256\', key).update(x).digest()',
-      'Buffer.from(new HmacSha256(key).update(x).digest())'
-    )
+  return buffer + process + timers + x
     .replace(
       'query.writable.push({ chunk, callback })',
       '(query.writable.push({ chunk }), callback())'
     )
     .replace('socket.setKeepAlive(true, 1000 * keep_alive)', 'socket.setKeepAlive(true)')
-    .replace('node:stream', std + 'node/stream.ts')
-    .replace('import net from \'net\'', 'import { net } from \'../polyfills.js\'')
-    .replace('import tls from \'tls\'', 'import { tls } from \'../polyfills.js\'')
     .replace('import { performance } from \'perf_hooks\'', '')
-    .replace(/ from '([a-z_]+)'/g, ' from \'' + std + 'node/$1.ts\'')
+    .replace(/ from '([a-z_]+)'/g, ' from \'node:$1\'')
 }
