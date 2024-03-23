@@ -1588,7 +1588,7 @@ t('Error contains query string', async() => [
 ])
 
 t('Error contains query serialized parameters', async() => [
-  1,
+  '1',
   (await sql`selec ${ 1 }`.catch(err => err.parameters[0]))
 ])
 

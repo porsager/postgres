@@ -93,6 +93,17 @@ export function handleValue(x, parameters, types, options) {
   ))
 }
 
+export function typesMapped(args, types) {
+  if (types.length < args.length) return false;
+  for(let i = 0; i < args.length; i++) {
+    let val = args[i] instanceof Parameter ? args[i].value : args[i]
+    if (types[i] === 0 && typeof val !== 'number') {
+      return false;
+    }
+  }
+  return true;
+}
+
 const defaultHandlers = typeHandlers(types)
 
 export function stringify(q, string, value, parameters, types, options) { // eslint-disable-line
