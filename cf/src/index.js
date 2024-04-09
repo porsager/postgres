@@ -455,6 +455,7 @@ function parseOptions(a, b) {
     backoff         : backoff,
     keep_alive      : 60,
     prepare         : true,
+    describe        : true,
     debug           : false,
     fetch_types     : true,
     publications    : 'alltables',
