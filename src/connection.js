@@ -211,8 +211,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function unnamed(q) {
     return Buffer.concat([
       Parse(q.statement.string, q.parameters, q.statement.types),
+      Bind(q.parameters, q.statement.types, q.statement.name, q.cursorName),
       DescribeUnnamed,
-      prepared(q)
+      q.cursorFn
+        ? Execute('', q.cursorRows)
+        : ExecuteUnnamed
     ])
   }
 
@@ -230,7 +233,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     q.onlyDescribe && (delete statements[q.signature])
     q.parameters = q.parameters || parameters
     q.prepared = q.prepare && q.signature in statements
-    q.describeFirst = q.onlyDescribe || (parameters.length && !q.prepared)
+    q.describeFirst = options.describe !== false && (q.onlyDescribe || (parameters.length && !q.prepared))
     q.statement = q.prepared
       ? statements[q.signature]
       : { string, types, name: q.prepare ? statementId + statementCount++ : '' }
