@@ -8,7 +8,6 @@
   "exports": {
     "types": "./types/index.d.ts",
     "bun": "./src/index.js",
-    "worker": "./cf/src/index.js",
     "workerd": "./cf/src/index.js",
     "import": "./src/index.js",
     "default": "./cjs/src/index.js"
