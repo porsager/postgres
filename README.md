@@ -371,7 +371,7 @@ select "id" from "users"
 
 ### Quick primer on interpolation
 
-Here's a quick oversight over all the ways to do interpolation in a query template string:
+Here's a quick overview over all the ways to do interpolation in a query template string:
 
 | Interpolation syntax       | Usage                         | Example                                                   |
 | -------------              | -------------                 | -------------                                             |
@@ -379,6 +379,15 @@ Here's a quick oversight over all the ways to do interpolation in a query templa
 | `${ sql(string) }`         | for identifiers               | ``await sql`SELECT * FROM ${sql('table_name')` ``               |
 | `${ sql([] or {}, ...) }`  | for helpers                   | ``await sql`INSERT INTO users ${sql({ name: 'Peter'})}` ``      |
 | `${ 'somevalue' }`         | for values                    | ``await sql`SELECT * FROM users WHERE age = ${42}` ``           |
+
+### Interpolation Type-Specific Helpers
+
+#### Array Formatting with ```sql.array```
+
+The following example allows the input of multi-dimensional arrays:
+
+`await sql`select ${ sql.array([[[1, 2]], [[3, 4]], [[5, 6]]]) } as x`
+
 
 ## Advanced query methods
 
