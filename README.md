@@ -387,7 +387,7 @@ Here's a quick overview over all the ways to do interpolation in a query templat
 The following example allows the input of multi-dimensional arrays:
 
 ```typescript
-await sql`select ${ sql.array([[[1, 2]], [[3, 4]], [[5, 6]]]) } as x
+await sql`select ${ sql.array([[[1, 2]], [[3, 4]], [[5, 6]]]) }`
 ```
 
 
