@@ -431,10 +431,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     lifeTimer.cancel()
     connectTimer.cancel()
 
-    if (socket.encrypted) {
-      socket.removeAllListeners()
-      socket = null
-    }
+    socket.removeAllListeners()
+    socket = null
 
     if (initial)
       return reconnect()
@@ -792,7 +790,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     const error = Errors.postgres(parseError(x))
     query && query.retried
       ? errored(query.retried)
-      : query && retryRoutines.has(error.routine)
+      : query && query.prepared && retryRoutines.has(error.routine)
         ? retry(query, error)
         : errored(error)
   }

@@ -1789,6 +1789,32 @@ t('Recreate prepared statements on RevalidateCachedQuery error', async() => {
   ]
 })
 
+t('Properly throws routine error on not prepared statements', async() => {
+  await sql`create table x (x text[])`
+  const { routine } = await sql.unsafe(`
+    insert into x(x) values (('a', 'b'))
+  `).catch(e => e)
+
+  return ['transformAssignedExpr', routine, await sql`drop table x`]
+})
+
+t('Properly throws routine error on not prepared statements in transaction', async() => {
+  const { routine } = await sql.begin(sql => [
+    sql`create table x (x text[])`,
+    sql`insert into x(x) values (('a', 'b'))`
+  ]).catch(e => e)
+
+  return ['transformAssignedExpr', routine]
+})
+
+t('Properly throws routine error on not prepared statements using file', async() => {
+  const { routine } = await sql.unsafe(`
+    create table x (x text[]);
+    insert into x(x) values (('a', 'b'));
+  `, { prepare: true }).catch(e => e)
+
+  return ['transformAssignedExpr', routine]
+})
 
 t('Catches connection config errors', async() => {
   const sql = postgres({ ...options, user: { toString: () => { throw new Error('wat') } }, database: 'prut' })

@@ -270,7 +270,7 @@ const users = [
 ]
 
 await sql`
-  update users set name = update_data.name, (age = update_data.age)::int
+  update users set name = update_data.name, age = (update_data.age)::int
   from (values ${sql(users)}) as update_data (id, name, age)
   where users.id = (update_data.id)::int
   returning users.id, users.name, users.age
@@ -290,7 +290,7 @@ const users = await sql`
 
 or
 ```js
-const [{ a, b, c }] => await sql`
+const [{ a, b, c }] = await sql`
   select
     *
   from (values ${ sql(['a', 'b', 'c']) }) as x(a, b, c)
@@ -917,7 +917,7 @@ The `Result` Array returned from queries is a custom array allowing for easy des
 
 ### .count
 
-The `count` property is the number of affected rows returned by the database. This is usefull for insert, update and delete operations to know the number of rows since .length will be 0 in these cases if not using `RETURNING ...`.
+The `count` property is the number of affected rows returned by the database. This is useful for insert, update and delete operations to know the number of rows since .length will be 0 in these cases if not using `RETURNING ...`.
 
 ### .command
 
@@ -1103,10 +1103,10 @@ export default async fetch(req: Request, env: Env, ctx: ExecutionContext) {
 }
 ```
 
-In `wrangler.toml` you will need to enable `node_compat` to allow Postgres.js to operate in the Workers environment:
+In `wrangler.toml` you will need to enable the `nodejs_compat` compatibility flag to allow Postgres.js to operate in the Workers environment:
 
 ```toml
-node_compat = true # required for database drivers to function
+compatibility_flags = ["nodejs_compat"]
 ```
 
 ### Auto fetching of array types
