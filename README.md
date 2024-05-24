@@ -1140,6 +1140,10 @@ const sql = postgres()
 
 Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `prepare: false` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93#issuecomment-656290493).
 
+**update**: [since 1.21.0](https://www.pgbouncer.org/2023/10/pgbouncer-1-21-0)
+PGBouncer supports protocol-level named prepared statements when [configured
+properly](https://www.pgbouncer.org/config.html#max_prepared_statements)
+
 ## Custom Types
 
 You can add ergonomic support for custom types, or simply use `sql.typed(value, type)` inline, where type is the PostgreSQL `oid` for the type and the correctly serialized string. _(`oid` values for types can be found in the `pg_catalog.pg_type` table.)_
