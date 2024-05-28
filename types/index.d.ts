@@ -34,12 +34,12 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
    * Name of database to connect to
    * @default process.env['PGDATABASE'] || options.user
    */
-  database: string;
+  database: Resolver<T, string>;
   /**
    * Username of database user
    * @default process.env['PGUSERNAME'] || process.env['PGUSER'] || require('os').userInfo().username
    */
-  user: string;
+  user: Resolver<T, string>;
   /**
    * How to deal with ssl (can be a tls.connect option object)
    * @default false
@@ -124,6 +124,10 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
   keep_alive: number | null;
 }
 
+
+type Resolver<T extends Record<string, postgres.PostgresType>, U> =
+  | U
+  | ((this: postgres.Options<T>, options: postgres.Options<T>) => U)
 
 declare const PRIVATE: unique symbol;
 
@@ -356,7 +360,7 @@ declare namespace postgres {
      * Password of database user
      * @default process.env['PGPASSWORD']
      */
-    password?: string | (() => string | Promise<string>) | undefined;
+    password?: Resolver<T, string> | undefined;
     /** Name of database to connect to (an alias for `database`) */
     db?: Options<T>['database'] | undefined;
     /** Username of database user (an alias for `user`) */
