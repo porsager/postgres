@@ -726,4 +726,4 @@ declare namespace postgres {
   }
 }
 
-export = postgres;
+export default postgres;
