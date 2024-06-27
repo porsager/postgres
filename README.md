@@ -340,6 +340,7 @@ await sql`
 select * from users
 // Or
 select * from users where user_id = $1
+```
 
 Multiple fragments can be joined together with `sql.join` to create more complex dynamic queries:
 
