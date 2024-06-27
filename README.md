@@ -340,12 +340,13 @@ await sql`
 select * from users
 // Or
 select * from users where user_id = $1
-```
 
 Multiple fragments can be joined together with `sql.join` to create more complex dynamic queries:
+
 ```js
 const columns = ['id', 'name', 'age'].map(name => sql(name))
 sql`select ${sql.join(sql`, `, columns)} from users where
+```
 
 ### SQL functions
 Using keywords or calling functions dynamically is also possible by using ``` sql`` ``` fragments.
