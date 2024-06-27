@@ -347,9 +347,11 @@ Multiple fragments can be joined together with `sql.join` to create more complex
 
 ```js
 // this could be built dynamically
-const expressions = [sql`name is not null`, sql`age > 50`]
+let expressions = [sql`name is not null`, sql`age > 50`]
 const separator = and ? sql` and ` : sql` or `
-sql`select * from from users where ${sql.join(separator, expressions)}`
+sql`select * from from users where ${
+  sql.join(separator, expressions)
+}`
 ```
 
 ### SQL functions
