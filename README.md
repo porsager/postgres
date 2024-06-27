@@ -346,7 +346,7 @@ Multiple fragments can be joined together with `sql.join` to create more complex
 
 ```js
 const columns = ['id', 'name', 'age'].map(name => sql(name))
-sql`select ${sql.join(sql`, `, columns)} from users where
+sql`select ${sql.join(sql`, `, columns)} from users where`
 ```
 
 ### SQL functions
