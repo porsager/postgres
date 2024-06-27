@@ -320,7 +320,11 @@ function Postgres(a, b) {
   }
 
   function join(sep, xs) {
-    return xs.flatMap((x, i) => i ? Array.isArray(x) ? [sep, ...x] : [sep, x])
+    return xs.flatMap((x, i) => {
+      if (i === 0) return x
+      if (Array.isArray(x)) return [sep, ...x]
+      return [sep, x]
+    })
   }
 
   function array(x, type) {
