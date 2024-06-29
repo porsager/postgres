@@ -702,7 +702,8 @@ declare namespace postgres {
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: (ParameterOrJSON<TTypes[keyof TTypes]>)[], options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
     json(value: JSONValue): Parameter;
-    join<T extends any[], U extends any[]>(a: PendingQuery<T>, p: PendingQuery<U>): PendingQuery<T>
+    join<T extends any[]>(a: TemplateStringsArray): (p: PendingQuery<T>[]) => PendingQuery<T>
+    join<T extends any[]>(a: TemplateStringsArray): (...p: PendingQuery<T>[]) => PendingQuery<T>
 
     reserve(): Promise<ReservedSql<TTypes>>
   }

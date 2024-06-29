@@ -2472,7 +2472,7 @@ t('Supports arrays of fragments', async() => {
 t("Joins fragments with a separator", () => {
   const fs = [sql`a = ${1}`, sql`b = ${"test"}`]
   return [
-    sql`select * from t where ${ sql.join(sql` and `, fs) }`.describe().string,
+    sql`select * from t where ${ sql.join` and `(fs) }`.describe().string,
     'select * from t where a = $1 and b = $2'
   ]
 });

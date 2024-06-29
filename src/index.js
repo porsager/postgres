@@ -319,11 +319,12 @@ function Postgres(a, b) {
     return new Parameter(x, 3802)
   }
 
-  function join(sep, xs) {
-    return xs.flatMap((x, i) => {
+  function join(sep) {
+    return xs => xs.flatMap((x, i) => {
       if (i === 0) return x
-      if (Array.isArray(x)) return [sep, ...x]
-      return [sep, x]
+      const s = new Builder([sep], [])
+      if (Array.isArray(x)) return [s, ...x]
+      return [s, x]
     })
   }
 
