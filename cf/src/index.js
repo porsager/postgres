@@ -69,6 +69,7 @@ function Postgres(a, b) {
 
   Object.assign(sql, {
     get parameters() { return options.parameters },
+    get availableConnections() { return options.max - (connecting.length + reserved.length + busy.length) },
     largeObject: largeObject.bind(null, sql),
     subscribe,
     CLOSE,
