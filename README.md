@@ -1125,15 +1125,16 @@ It is also possible to connect to the database without a connection string or an
 const sql = postgres()
 ```
 
-| Option            | Environment Variables    |
-| ----------------- | ------------------------ |
-| `host`            | `PGHOST`                 |
-| `port`            | `PGPORT`                 |
-| `database`        | `PGDATABASE`             |
-| `username`        | `PGUSERNAME` or `PGUSER` |
-| `password`        | `PGPASSWORD`             |
-| `idle_timeout`    | `PGIDLE_TIMEOUT`         |
-| `connect_timeout` | `PGCONNECT_TIMEOUT`      |
+| Option             | Environment Variables    |
+| ------------------ | ------------------------ |
+| `host`             | `PGHOST`                 |
+| `port`             | `PGPORT`                 |
+| `database`         | `PGDATABASE`             |
+| `username`         | `PGUSERNAME` or `PGUSER` |
+| `password`         | `PGPASSWORD`             |
+| `application_name` | `PGAPPNAME`              |
+| `idle_timeout`     | `PGIDLE_TIMEOUT`         |
+| `connect_timeout`  | `PGCONNECT_TIMEOUT`      |
 
 ### Prepared statements
 
