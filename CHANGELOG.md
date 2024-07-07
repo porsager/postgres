@@ -1,8 +1,5 @@
 # Changelog
 
-## v3.3.0 - 9 July 2024
-- Adding support for the PGAPPNAME environment variable
-
 ## v3.2.4 - 25 May 2022
 - Allow setting keep_alive: false  bee62f3
 - Fix support for null in arrays - fixes #371  b04c853
