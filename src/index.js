@@ -430,7 +430,7 @@ function parseOptions(a, b) {
   if (a && a.shared)
     return a
 
-  const env = process.env // eslint-disable-line
+  const env = (a.no_env || b.no_env) ? {} : process.env // eslint-disable-line
       , o = (!a || typeof a === 'string' ? b : a) || {}
       , { url, multihost } = parseUrl(a)
       , query = [...url.searchParams].reduce((a, [b, c]) => (a[b] = c, a), {})
