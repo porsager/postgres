@@ -21,7 +21,11 @@ $ npm install postgres
 ```
 
 ### Usage
+There are two ways of importing the library in your code; either in ECMAScript or CommonJS module system
+
 Create your `sql` database instance
+
+##### ECMAScript
 ```js
 // db.js
 import postgres from 'postgres'
@@ -29,6 +33,13 @@ import postgres from 'postgres'
 const sql = postgres({ /* options */ }) // will use psql environment variables
 
 export default sql
+```
+##### CommonJS
+```js
+const postgres = require('postgres')
+
+const sql = postgres({ /* options */ }) // will use psql environment variables
+export default SQL
 ```
 
 Simply import for use elsewhere
