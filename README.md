@@ -39,7 +39,7 @@ export default sql
 const postgres = require('postgres')
 
 const sql = postgres({ /* options */ }) // will use psql environment variables
-export default SQL
+module.exports = sql
 ```
 
 Simply import for use elsewhere
