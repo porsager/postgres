@@ -45,7 +45,8 @@ module.exports = sql
 Simply import for use elsewhere
 ```js
 // users.js
-import sql from './db.js'
+// const sql = require('./db.js')
+import sql from './db.js'  
 
 async function getUsersOver(age) {
   const users = await sql`
