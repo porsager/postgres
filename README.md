@@ -568,6 +568,17 @@ If you know what you're doing, you can use `unsafe` to pass any string you'd lik
 sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 ```
 
+`unsafe` accepts the following arguments:
+
+- `query` - The query in the form of an ordinary string. It may include positional parameters (e.g. `$1`, `$2`, etc.) for the Postgres database to substitute with arguments.
+- `args` - When present, this is an array of the values of the query parameters. The value at index 0 corresponds to argument `$1`. You do not need to escape these values, as the database will safely substitute them into the query.
+- `options` - When present, this is an object containing one of the following two key/value pairs:
+
+| Option | Description |
+| --- | --- |
+| `prepare` | Creates a prepared statement with the query string as key for an automatically generated id. This is `false` by default because we can't know if the user is generating millions of different queries causing the DB to bloat in memory. Hence it's something the user explicitly needs to choose. (Mutually exclusive with `simple`.) |
+| `simple` | Changes the query to use the simple protocol which doesn't allow parameters or prepared statements. But it does allow multiple statements. I'm thinking of deprecating this in favor of the `.simple()` chained method which will then work for both tagged queries and unsafe queries. (Mutually exclusive with `prepare`.) |
+
 You can also nest `sql.unsafe` within a safe `sql` expression.  This is useful if only part of your fraction has unsafe elements.
 
 ```js
