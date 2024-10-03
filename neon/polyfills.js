@@ -137,7 +137,6 @@ function Socket() {
     write,
     end,
     destroy,
-    read,
   });
 
   return tcp;
@@ -175,7 +174,6 @@ function Socket() {
       tcp.ws = new WebSocket(socketURL);
       configureWebSocket(tcp.ws);
     } catch (err) {
-      console.log("err", err);
       error(err);
     }
   }
@@ -210,11 +208,6 @@ function Socket() {
     return true;
   }
 
-  async function read() {
-    // Nothing to do?
-    console.log("read");
-  }
-
   function end(data) {
     return data ? tcp.write(data, () => tcp.ws.close()) : tcp.ws.close();
   }
@@ -225,7 +218,6 @@ function Socket() {
   }
 
   function error(err) {
-    console.log("errfn", err);
     tcp.emit("error", err);
     tcp.emit("close");
   }

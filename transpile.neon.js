@@ -1,6 +1,11 @@
 import fs from "fs";
 import path from "path";
 
+const skipLogic = `    if (canSkipReadyForQuery) {
+      canSkipReadyForQuery = false;
+      return;
+    }`;
+
 const empty = (x) =>
     fs.readdirSync(x).forEach((f) => fs.unlinkSync(path.join(x, f))),
   ensureEmpty = (x) => (!fs.existsSync(x) ? fs.mkdirSync(x) : empty(x)),
@@ -47,5 +52,17 @@ function transpile(x) {
         "import { performance } from '../polyfills.js'",
       )
       .replace(/ from '([a-z_]+)'/g, " from 'node:$1'")
+      // this change "pipelines" the cleartext password and ready for query
+      // *before* postgres actually asks for it to speed up connection time
+      // by reducing the number of round-trips
+      .replace(
+        /const s = StartupMessage\(\)\n(\s*)write\(s\)\n/gm,
+        "$&$1AuthenticationCleartextPassword()\n$1ReadyForQuery()\n$1canSkipReadyForQuery = true\n",
+      )
+      // we already sent the password (see above) so we can safely ignore this request
+      .replace("x === 82 ? Authentication :", "x === 82 ? noop :          ")
+      // simularly, we can also skip the "ReadyForQuery" message when we've already sent it
+      .replace(/function ReadyForQuery\(x\) {/g, `$&\n${skipLogic}`)
+      .replace("let uid = 1", "$&\nlet canSkipReadyForQuery = false")
   );
 }

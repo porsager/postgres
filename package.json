@@ -7,7 +7,7 @@
   "main": "cjs/src/index.js",
   "exports": {
     "types": "./types/index.d.ts",
-    "./neon": "./neon/src/index.js",
+    "/neon": "./neon/src/index.js",
     "bun": "./src/index.js",
     "workerd": "./cf/src/index.js",
     "import": "./src/index.js",

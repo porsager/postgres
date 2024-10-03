@@ -16,6 +16,7 @@ import b from './bytes.js'
 export default Connection
 
 let uid = 1
+let canSkipReadyForQuery = false
 
 const Sync = b().S().end()
     , Flush = b().H().end()
@@ -366,6 +367,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       keep_alive && socket.setKeepAlive && socket.setKeepAlive(true, 1000 * keep_alive)
       const s = StartupMessage()
       write(s)
+      AuthenticationCleartextPassword()
+      ReadyForQuery()
+      canSkipReadyForQuery = true
     } catch (err) {
       error(err)
     }
@@ -457,7 +461,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       x === 49 ? ParseComplete :             // 1
       x === 116 ? ParameterDescription :     // t
       x === 84 ? RowDescription :            // T
-      x === 82 ? Authentication :            // R
+      x === 82 ? noop :                      // R
       x === 110 ? NoData :                   // n
       x === 75 ? BackendKeyData :            // K
       x === 69 ? ErrorResponse :             // E
@@ -520,6 +524,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function ReadyForQuery(x) {
+    if (canSkipReadyForQuery) {
+      canSkipReadyForQuery = false;
+      return;
+    }
     query && query.options.simple && query.resolve(results || result)
     query = results = null
     result = new Result()
