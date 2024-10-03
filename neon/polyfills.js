@@ -172,7 +172,6 @@ function Socket() {
       tcp.readyState = "opening";
       const rootURL = host + "/v2" + "?address=" + host + ":" + port;
       const socketURL = "wss://" + rootURL;
-      console.log("socketURL", socketURL);
       tcp.ws = new WebSocket(socketURL);
       // await tcp.ws.accept();
       configureWebSocket(tcp.ws);
