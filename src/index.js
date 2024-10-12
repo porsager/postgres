@@ -98,7 +98,8 @@ function Postgres(a, b) {
       notify,
       array,
       json,
-      file
+      file,
+      addType
     })
 
     return sql
@@ -562,4 +563,13 @@ function osUsername() {
   } catch (_) {
     return process.env.USERNAME || process.env.USER || process.env.LOGNAME  // eslint-disable-line
   }
+}
+
+async function addType(name, { serializer, parser }) {
+  const [{ oid }] = await this`
+    select oid from pg_type where typname = ${name} 
+  `;
+  this.typed[name] = (x) => this.typed(x, oid);
+  this.options.serializers[oid] = serializer;
+  this.options.parsers[oid] = parser;
 }
