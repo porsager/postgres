@@ -139,6 +139,8 @@ function Socket() {
     write,
     end,
     destroy,
+    pause,
+    resume,
     read
   })
 
@@ -193,6 +195,10 @@ function Socket() {
     tcp.destroyed = true
     tcp.end()
   }
+
+  function pause() {}
+
+  function resume() {}
 
   async function read() {
     try {
