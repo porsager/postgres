@@ -1,3 +1,4 @@
+import { Socket } from "node:net"
 import { Readable, Writable } from 'node:stream'
 
 /**
@@ -122,6 +123,8 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
   backoff: boolean | ((attemptNum: number) => number);
   max_lifetime: number | null;
   keep_alive: number | null;
+  /** fn returning custom socket to use */
+  socket: (options: postgres.ParsedOptions<T>) => Socket | Promise<Socket>
 }
 
 
