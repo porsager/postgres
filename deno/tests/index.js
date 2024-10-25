@@ -2583,4 +2583,4 @@ t('arrays in reserved connection', async() => {
   ]
 })
 
-;window.addEventListener("unload", () => Deno.exit(process.exitCode))
+;globalThis.addEventListener("unload", () => Deno.exit(process.exitCode))
