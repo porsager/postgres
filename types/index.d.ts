@@ -704,6 +704,8 @@ declare namespace postgres {
     json(value: JSONValue): Parameter;
 
     reserve(): Promise<ReservedSql<TTypes>>
+
+    addType<T>(name: string, handler: { serializer: (x: T) => any, parser: (x: any) => T}): void;
   }
 
   interface UnsafeQueryOptions {
