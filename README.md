@@ -342,6 +342,18 @@ select * from users
 select * from users where user_id = $1
 ```
 
+### Dynamic fragments
+Multiple fragments can be joined together with `sql.join` to create more complex dynamic queries:
+
+```js
+// this could be built dynamically
+let expressions = [sql`name is not null`, sql`age > 50`]
+const separator = and ? sql` and ` : sql` or `
+sql`select * from from users where ${
+  sql.join(separator, expressions)
+}`
+```
+
 ### SQL functions
 Using keywords or calling functions dynamically is also possible by using ``` sql`` ``` fragments.
 ```js
