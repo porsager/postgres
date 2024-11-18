@@ -537,7 +537,7 @@ for await (const chunk of readableStream) {
 }
 ```
 
-> **NOTE** This is a low-level API which does not provide any type safety. To make this work, you must match your [`copy query` parameters](https://www.postgresql.org/docs/14/sql-copy.html) correctly to your [Node.js stream read or write](https://nodejs.org/api/stream.html) code. Ensure [Node.js stream backpressure](https://nodejs.org/en/docs/guides/backpressuring-in-streams/) is handled correctly to avoid memory exhaustion.
+> **NOTE** This is a low-level API which does not provide any type safety. To make this work, you must match your [`copy query` parameters](https://www.postgresql.org/docs/14/sql-copy.html) correctly to your [Node.js stream read or write](https://nodejs.org/api/stream.html) code. Ensure [Node.js stream backpressure](https://nodejs.org/en/learn/modules/backpressuring-in-streams) is handled correctly to avoid memory exhaustion.
 
 ### Canceling Queries in Progress
 
@@ -1125,15 +1125,16 @@ It is also possible to connect to the database without a connection string or an
 const sql = postgres()
 ```
 
-| Option            | Environment Variables    |
-| ----------------- | ------------------------ |
-| `host`            | `PGHOST`                 |
-| `port`            | `PGPORT`                 |
-| `database`        | `PGDATABASE`             |
-| `username`        | `PGUSERNAME` or `PGUSER` |
-| `password`        | `PGPASSWORD`             |
-| `idle_timeout`    | `PGIDLE_TIMEOUT`         |
-| `connect_timeout` | `PGCONNECT_TIMEOUT`      |
+| Option             | Environment Variables    |
+| ------------------ | ------------------------ |
+| `host`             | `PGHOST`                 |
+| `port`             | `PGPORT`                 |
+| `database`         | `PGDATABASE`             |
+| `username`         | `PGUSERNAME` or `PGUSER` |
+| `password`         | `PGPASSWORD`             |
+| `application_name` | `PGAPPNAME`              |
+| `idle_timeout`     | `PGIDLE_TIMEOUT`         |
+| `connect_timeout`  | `PGCONNECT_TIMEOUT`      |
 
 ### Prepared statements
 

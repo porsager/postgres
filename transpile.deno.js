@@ -55,7 +55,7 @@ function transpile(x, name, folder) {
            .replace('{ spawnSync }', '{ spawn }')
     }
     if (name === 'index.js')
-      x += '\n;window.addEventListener("unload", () => Deno.exit(process.exitCode))'
+      x += '\n;globalThis.addEventListener("unload", () => Deno.exit(process.exitCode))'
   }
 
   const buffer = x.includes('Buffer')
