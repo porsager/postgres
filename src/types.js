@@ -136,7 +136,9 @@ function values(first, rest, parameters, types, options) {
 function select(first, rest, parameters, types, options) {
   typeof first === 'string' && (first = [first].concat(rest))
   if (Array.isArray(first))
-    return escapeIdentifiers(first, options)
+    return first.map(x =>
+      Array.isArray(x) [escapeIdentifier(x[0], options),escapeIdentifier(x[1], options)].join(" AS ") : escapeIdentifier(x, options)
+    )
 
   let value
   const columns = rest.length ? rest.flat() : Object.keys(first)
