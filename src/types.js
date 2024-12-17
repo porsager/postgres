@@ -137,7 +137,7 @@ function select(first, rest, parameters, types, options) {
   typeof first === 'string' && (first = [first].concat(rest))
   if (Array.isArray(first))
     return first.map(x =>
-      Array.isArray(x) [escapeIdentifiers([x[0]], options),escapeIdentifier(x[1], options)].join(" AS ") : escapeIdentifiers([x], options)
+      Array.isArray(x) ? [escapeIdentifiers([x[0]], options),escapeIdentifier(x[1], options)].join(" AS ") : escapeIdentifiers([x], options)
     )
 
   let value
