@@ -971,7 +971,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   connect_timeout      : 30,            // Connect timeout in seconds
   prepare              : true,          // Automatic creation of prepared statements
   types                : [],            // Array of custom types, see more below
-  onnotice             : fn,            // Default console.log, set false to silence NOTICE
+  onnotice             : fn,            // Default console.log, set to `() => {}` to silence NOTICE
   onparameter          : fn,            // (key, value) when server param change
   debug                : fn,            // Is called with (connection, query, params, types)
   socket               : fn,            // fn returning custom socket to use
