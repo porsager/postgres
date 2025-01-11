@@ -316,9 +316,16 @@ function arrayParserLoop(s, x, parser, typarray) {
 }
 
 export const toCamel = x => {
-  let str = x[0]
-  for (let i = 1; i < x.length; i++)
-    str += x[i] === '_' ? x[++i].toUpperCase() : x[i]
+  let str = x[0] === '_' ? '' : x[0]
+
+  for (let i = 1; i < x.length; i++) {
+    if (x[i] === '_') {
+      while (i < x.length && x[i] === '_') i++
+      if (i < x.length) str += x[i].toUpperCase()
+    } else {
+      str += x[i]
+    }
+  }
   return str
 }
 
