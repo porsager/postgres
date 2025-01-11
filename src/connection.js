@@ -92,6 +92,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     , delay = 0
     , rows = 0
     , serverSignature = null
+    , saslMechanism = null
     , nextWriteTimer = null
     , terminated = false
     , incomings = null
@@ -678,11 +679,24 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     )
   }
 
-  async function SASL() {
+  async function SASL(x) {
+    const length = x.readUInt32BE(1)
+    const mechanisms = x.subarray(9, length - 1).toString('utf8').split('\x00')  // `length - 1` excludes 2 terminal nulls (string and list)
+
+    for (const m of mechanisms) {
+      if (m === 'SCRAM-SHA-256-PLUS' && socket instanceof tls.TLSSocket) {
+        saslMechanism = m
+        break
+      }
+      if (m === 'SCRAM-SHA-256') saslMechanism = m
+    }
+    if (!saslMechanism) errored(Errors.generic('SASL_MECHANISMS_UNSUPPORTED', 'No supported SASL mechanism was offered'))
+
+    const gs2Header = saslMechanism === 'SCRAM-SHA-256-PLUS' ? 'p=tls-server-end-point' : 'y'
     nonce = (await crypto.randomBytes(18)).toString('base64')
-    b().p().str('SCRAM-SHA-256' + b.N)
+    b().p().str(saslMechanism + b.N)
     const i = b.i
-    write(b.inc(4).str('n,,n=*,r=' + nonce).i32(b.i - i - 4, i).end())
+    write(b.inc(4).str(gs2Header + ',,n=*,r=' + nonce).i32(b.i - i - 4, i).end())
   }
 
   async function SASLContinue(x) {
@@ -697,13 +711,27 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
     const clientKey = await hmac(saltedPassword, 'Client Key')
 
+    let channelBinding = 'eSws' // 'y,,' base64-encoded
+    if (saslMechanism === 'SCRAM-SHA-256-PLUS') {
+      const peerCert = socket.getPeerCertificate().raw
+      const x509 = await import('@peculiar/x509')
+      const parsedCert = new x509.X509Certificate(peerCert)
+      const sigAlgo = parsedCert.signatureAlgorithm
+      if (!sigAlgo || !sigAlgo.hash || !sigAlgo.hash.name) errored(Errors.generic('SASL_CERT_ERROR', 'Unable to identify certificate digest type for channel binding'))
+      let hashName = sigAlgo.hash.name;
+      if (/^(md5)|(sha-?1)$/i.test(hashName)) hashName = 'sha256'  // for MD5 and SHA-1, we substitute SHA-256
+      const certHash = await namedDigest(hashName, peerCert)
+      const bindingData = Buffer.concat([Buffer.from('p=tls-server-end-point,,'), Buffer.from(certHash)])
+      channelBinding = bindingData.toString('base64')
+    }
+
     const auth = 'n=*,r=' + nonce + ','
                + 'r=' + res.r + ',s=' + res.s + ',i=' + res.i
-               + ',c=biws,r=' + res.r
+               + ',c=' + channelBinding + ',r=' + res.r
 
     serverSignature = (await hmac(await hmac(saltedPassword, 'Server Key'), auth)).toString('base64')
 
-    const payload = 'c=biws,r=' + res.r + ',p=' + xor(
+    const payload = 'c=' + channelBinding + ',r=' + res.r + ',p=' + xor(
       clientKey, Buffer.from(await hmac(await sha256(clientKey), auth))
     ).toString('base64')
 
@@ -1003,6 +1031,10 @@ function hmac(key, x) {
 
 function sha256(x) {
   return crypto.createHash('sha256').update(x).digest()
+}
+
+function namedDigest(name, x) {
+  return crypto.createHash(name).update(x).digest()
 }
 
 function xor(a, b) {
