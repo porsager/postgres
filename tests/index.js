@@ -1914,6 +1914,45 @@ t('Copy read', async() => {
   ]
 })
 
+t('Copy read with back-pressure', async() => {
+  await sql`create table test (x int)`
+
+  // Make sure there are enough rows in the table to fill the buffer
+  // so that `CopyDone` message is handled while the socket is paused
+  await sql`insert into test select * from generate_series(1,12774)`
+
+  let result = 0
+  const readable = await sql`copy test to stdout`.readable()
+  readable.on('data', _ => result++)
+
+  // Pause the stream so that the entire buffer fills up
+  readable.pause()
+
+  await Promise.all([
+    // Wait until the stream has been consumed
+    new Promise(r => readable.on('end', r)),
+    (async() => {
+      // Wait until the entire buffer fills up,
+      await new Promise(r => readable.on('readable', () => {
+        if (readable.readableBuffer.length === 12774)
+          r()
+      }))
+      // Switch the stream back to flowing mode (allowing it to be consumed)
+      readable.removeAllListeners('readable')
+    })()
+  ])
+
+  // This is the actual test, the copy stream is done
+  // we should be able to run a new query
+  await sql`SELECT 1`
+
+  return [
+    result,
+    12774,
+    await sql`drop table test`
+  ]
+})
+
 t('Copy write', { timeout: 2 }, async() => {
   await sql`create table test (x int)`
   const writable = await sql`copy test from stdin`.writable()
