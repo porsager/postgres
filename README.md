@@ -1303,8 +1303,8 @@ This error is thrown if the user has called [`sql.end()`](#teardown--cleanup) an
 
 This error is thrown for any queries that were pending when the timeout to [`sql.end({ timeout: X })`](#teardown--cleanup) was reached.
 
-##### CONNECTION_CONNECT_TIMEOUT
-> write CONNECTION_CONNECT_TIMEOUT host:port
+##### CONNECT_TIMEOUT
+> write CONNECT_TIMEOUT host:port
 
 This error is thrown if the startup phase of the connection (tcp, protocol negotiation, and auth) took more than the default 30 seconds or what was specified using `connect_timeout` or `PGCONNECT_TIMEOUT`.
 
