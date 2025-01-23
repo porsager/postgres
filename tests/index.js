@@ -4,6 +4,7 @@ import { t, nt, ot } from './test.js' // eslint-disable-line
 import net from 'net'
 import fs from 'fs'
 import crypto from 'crypto'
+import stream from 'stream'
 
 import postgres from '../src/index.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))
@@ -1919,11 +1920,12 @@ t('Copy read with back-pressure', async() => {
 
   // Make sure there are enough rows in the table to fill the buffer
   // so that `CopyDone` message is handled while the socket is paused
-  await sql`insert into test select * from generate_series(1,12774)`
+  const bufferSize = Math.ceil((stream.getDefaultHighWaterMark || (() => 16384))() / 6)
+  await sql`insert into test select * from generate_series(10000,${9999 + bufferSize})`
 
   let result = 0
   const readable = await sql`copy test to stdout`.readable()
-  readable.on('data', _ => result++)
+  readable.on('data', () => result++)
 
   // Pause the stream so that the entire buffer fills up
   readable.pause()
@@ -1934,7 +1936,7 @@ t('Copy read with back-pressure', async() => {
     (async() => {
       // Wait until the entire buffer fills up,
       await new Promise(r => readable.on('readable', () => {
-        if (readable.readableBuffer.length === 12774)
+        if (readable.readableBuffer.length === bufferSize)
           r()
       }))
       // Switch the stream back to flowing mode (allowing it to be consumed)
@@ -1948,7 +1950,7 @@ t('Copy read with back-pressure', async() => {
 
   return [
     result,
-    12774,
+    bufferSize,
     await sql`drop table test`
   ]
 })
