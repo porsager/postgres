@@ -204,9 +204,10 @@ function Postgres(a, b) {
     const queue = Queue()
     const c = open.length
       ? open.shift()
-      : await new Promise(r => {
-        queries.push({ reserve: r })
-        closed.length && connect(closed.shift())
+      : await new Promise((resolve, reject) => {
+        const q = { reserve: resolve, reject, origin: 'reserve() call', statement: {} };
+        queries.push(q);
+        closed.length && connect(closed.shift(), q)
       })
 
     move(c, reserved)
