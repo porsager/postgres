@@ -1,10 +1,9 @@
-import { HmacSha256 } from 'https://deno.land/std@0.132.0/hash/sha256.ts'
-import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
+import { Buffer } from 'node:buffer'
 import { setImmediate, clearImmediate } from '../polyfills.js'
 import { net } from '../polyfills.js'
 import { tls } from '../polyfills.js'
-import crypto from 'https://deno.land/std@0.132.0/node/crypto.ts'
-import Stream from 'https://deno.land/std@0.132.0/node/stream.ts'
+import crypto from 'node:crypto'
+import Stream from 'node:stream'
 
 
 import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
@@ -1000,8 +999,30 @@ function md5(x) {
   return crypto.createHash('md5').update(x).digest('hex')
 }
 
-function hmac(key, x) {
-  return Buffer.from(new HmacSha256(key).update(x).digest())
+const UTF8 = new TextEncoder();
+
+const hmac = async (key, x) => {
+  if (key.constructor == String) {
+    key = UTF8.encode(key);
+  }
+  
+  if (x.constructor == String) {
+    x = UTF8.encode(x);
+  }
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  return Buffer.from(await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    x
+  ));
 }
 
 function sha256(x) {
