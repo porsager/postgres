@@ -342,6 +342,27 @@ select * from users
 select * from users where user_id = $1
 ```
 
+### Dynamic ordering
+
+```js
+const id = 1
+const order = {
+  username: 'asc'
+  created_at: 'desc'
+}
+await sql`
+  select 
+    * 
+  from ticket 
+  where account = ${ id }  
+  order by ${
+    Object.entries(order).flatMap(([column, order], i) =>
+      [i ? sql`,` : sql``, sql`${ sql(column) } ${ order === 'desc' ? sql`desc` : sql`asc` }`]
+    )
+  }
+`
+```
+
 ### SQL functions
 Using keywords or calling functions dynamically is also possible by using ``` sql`` ``` fragments.
 ```js
