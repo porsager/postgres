@@ -13,6 +13,9 @@ const Query = module.exports.Query = class Query extends Promise {
       reject = b
     })
 
+    this.resolver = resolve
+    this.rejecter = reject
+
     this.tagged = Array.isArray(strings.raw)
     this.strings = strings
     this.args = args
@@ -23,17 +26,27 @@ const Query = module.exports.Query = class Query extends Promise {
     this.state = null
     this.statement = null
 
-    this.resolve = x => (this.active = false, resolve(x))
-    this.reject = x => (this.active = false, reject(x))
-
     this.active = false
     this.cancelled = null
     this.executed = false
     this.signature = ''
+    this.onquery = this.handler.onquery
 
     this[originError] = this.handler.debug
       ? new Error()
       : this.tagged && cachedError(this.strings)
+  }
+
+  resolve(x) {
+    this.active = false
+    this.onquery && (this.onquery = this.onquery(x))
+    this.resolver(x)
+  }
+
+  reject(x) {
+    this.active = false
+    this.onquery && (this.onquery = this.onquery(x))
+    this.rejecter(x)
   }
 
   get origin() {
@@ -137,7 +150,13 @@ const Query = module.exports.Query = class Query extends Promise {
   }
 
   async handle() {
-    !this.executed && (this.executed = true) && await 1 && this.handler(this)
+    if (this.executed)
+      return
+
+    this.executed = true
+    await 1
+    this.onquery && (this.onquery = this.onquery(this))
+    this.handler(this)
   }
 
   execute() {
