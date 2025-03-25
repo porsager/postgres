@@ -1121,19 +1121,24 @@ It is also possible to connect to the database without a connection string or an
 const sql = postgres()
 ```
 
-| Option            | Environment Variables    |
-| ----------------- | ------------------------ |
-| `host`            | `PGHOST`                 |
-| `port`            | `PGPORT`                 |
-| `database`        | `PGDATABASE`             |
-| `username`        | `PGUSERNAME` or `PGUSER` |
-| `password`        | `PGPASSWORD`             |
-| `idle_timeout`    | `PGIDLE_TIMEOUT`         |
-| `connect_timeout` | `PGCONNECT_TIMEOUT`      |
+| Option             | Environment Variables    |
+| ------------------ | ------------------------ |
+| `host`             | `PGHOST`                 |
+| `port`             | `PGPORT`                 |
+| `database`         | `PGDATABASE`             |
+| `username`         | `PGUSERNAME` or `PGUSER` |
+| `password`         | `PGPASSWORD`             |
+| `application_name` | `PGAPPNAME`              |
+| `idle_timeout`     | `PGIDLE_TIMEOUT`         |
+| `connect_timeout`  | `PGCONNECT_TIMEOUT`      |
 
 ### Prepared statements
 
 Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `prepare: false` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93#issuecomment-656290493).
+
+**update**: [since 1.21.0](https://www.pgbouncer.org/2023/10/pgbouncer-1-21-0)
+PGBouncer supports protocol-level named prepared statements when [configured
+properly](https://www.pgbouncer.org/config.html#max_prepared_statements)
 
 ## Custom Types
 
@@ -1294,8 +1299,8 @@ This error is thrown if the user has called [`sql.end()`](#teardown--cleanup) an
 
 This error is thrown for any queries that were pending when the timeout to [`sql.end({ timeout: X })`](#teardown--cleanup) was reached.
 
-##### CONNECTION_CONNECT_TIMEOUT
-> write CONNECTION_CONNECT_TIMEOUT host:port
+##### CONNECT_TIMEOUT
+> write CONNECT_TIMEOUT host:port
 
 This error is thrown if the startup phase of the connection (tcp, protocol negotiation, and auth) took more than the default 30 seconds or what was specified using `connect_timeout` or `PGCONNECT_TIMEOUT`.
 
