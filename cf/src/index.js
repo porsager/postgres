@@ -86,6 +86,7 @@ function Postgres(a, b) {
 
   function Sql(handler) {
     handler.debug = options.debug
+    handler.onquery = options.onquery
 
     Object.entries(options.types).reduce((acc, [name, type]) => {
       acc[name] = (x) => new Parameter(x, type.to)
@@ -481,7 +482,7 @@ function parseOptions(a, b) {
       {}
     ),
     connection      : {
-      application_name: 'postgres.js',
+      application_name: env.PGAPPNAME || 'postgres.js',
       ...o.connection,
       ...Object.entries(query).reduce((acc, [k, v]) => (k in defaults || (acc[k] = v), acc), {})
     },
@@ -491,6 +492,7 @@ function parseOptions(a, b) {
     onnotify        : o.onnotify,
     onclose         : o.onclose,
     onparameter     : o.onparameter,
+    onquery         : o.onquery,
     socket          : o.socket,
     transform       : parseTransform(o.transform || { undefined: undefined }),
     parameters      : {},

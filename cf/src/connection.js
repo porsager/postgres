@@ -167,6 +167,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         : (query = q, query.active = true)
 
       build(q)
+      q.onquery && (q.onquery = q.onquery(q))
       return write(toBuffer(q))
         && !q.describeFirst
         && !q.cursorFn
