@@ -98,6 +98,7 @@ function Postgres(a, b) {
       notify,
       array,
       json,
+      join,
       file
     })
 
@@ -316,6 +317,14 @@ function Postgres(a, b) {
 
   function json(x) {
     return new Parameter(x, 3802)
+  }
+
+  function join(sep, xs) {
+    return xs.flatMap((x, i) => {
+      if (i === 0) return x
+      if (Array.isArray(x)) return [sep, ...x]
+      return [sep, x]
+    })
   }
 
   function array(x, type) {
