@@ -1121,19 +1121,24 @@ It is also possible to connect to the database without a connection string or an
 const sql = postgres()
 ```
 
-| Option            | Environment Variables    |
-| ----------------- | ------------------------ |
-| `host`            | `PGHOST`                 |
-| `port`            | `PGPORT`                 |
-| `database`        | `PGDATABASE`             |
-| `username`        | `PGUSERNAME` or `PGUSER` |
-| `password`        | `PGPASSWORD`             |
-| `idle_timeout`    | `PGIDLE_TIMEOUT`         |
-| `connect_timeout` | `PGCONNECT_TIMEOUT`      |
+| Option             | Environment Variables    |
+| ------------------ | ------------------------ |
+| `host`             | `PGHOST`                 |
+| `port`             | `PGPORT`                 |
+| `database`         | `PGDATABASE`             |
+| `username`         | `PGUSERNAME` or `PGUSER` |
+| `password`         | `PGPASSWORD`             |
+| `application_name` | `PGAPPNAME`              |
+| `idle_timeout`     | `PGIDLE_TIMEOUT`         |
+| `connect_timeout`  | `PGCONNECT_TIMEOUT`      |
 
 ### Prepared statements
 
 Prepared statements will automatically be created for any queries where it can be inferred that the query is static. This can be disabled by using the `prepare: false` option. For instance — this is useful when [using PGBouncer in `transaction mode`](https://github.com/porsager/postgres/issues/93#issuecomment-656290493).
+
+**update**: [since 1.21.0](https://www.pgbouncer.org/2023/10/pgbouncer-1-21-0)
+PGBouncer supports protocol-level named prepared statements when [configured
+properly](https://www.pgbouncer.org/config.html#max_prepared_statements)
 
 ## Custom Types
 
