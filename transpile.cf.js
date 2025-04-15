@@ -36,4 +36,5 @@ function transpile(x) {
     .replace('import fs from \'fs\'', 'import { fs } from \'../polyfills.js\'')
     .replace('import { performance } from \'perf_hooks\'', 'import { performance } from \'../polyfills.js\'')
     .replace(/ from '([a-z_]+)'/g, ' from \'node:$1\'')
+    .replace(/(\s*max\s*:\s*)10+/, '$13') // https://github.com/porsager/postgres/issues/1023
 }

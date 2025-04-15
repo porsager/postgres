@@ -446,7 +446,7 @@ function parseOptions(a, b) {
 
   const ints = ['idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive']
   const defaults = {
-    max             : 10,
+    max             : 3,
     ssl             : false,
     idle_timeout    : null,
     connect_timeout : 30,
@@ -481,7 +481,7 @@ function parseOptions(a, b) {
       {}
     ),
     connection      : {
-      application_name: 'postgres.js',
+      application_name: env.PGAPPNAME || 'postgres.js',
       ...o.connection,
       ...Object.entries(query).reduce((acc, [k, v]) => (k in defaults || (acc[k] = v), acc), {})
     },
