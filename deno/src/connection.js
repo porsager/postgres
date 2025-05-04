@@ -1,10 +1,9 @@
-import { HmacSha256 } from 'https://deno.land/std@0.132.0/hash/sha256.ts'
-import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
-import { setImmediate, clearImmediate } from '../polyfills.js'
-import { net } from '../polyfills.js'
-import { tls } from '../polyfills.js'
-import crypto from 'https://deno.land/std@0.132.0/node/crypto.ts'
-import Stream from 'https://deno.land/std@0.132.0/node/stream.ts'
+import { Buffer } from 'node:buffer'
+import { setImmediate, clearImmediate } from 'node:timers'
+import net from 'node:net'
+import tls from 'node:tls'
+import crypto from 'node:crypto'
+import Stream from 'node:stream'
 
 
 import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
@@ -1001,7 +1000,7 @@ function md5(x) {
 }
 
 function hmac(key, x) {
-  return Buffer.from(new HmacSha256(key).update(x).digest())
+  return crypto.createHmac('sha256', key).update(x).digest()
 }
 
 function sha256(x) {
