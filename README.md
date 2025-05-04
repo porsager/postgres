@@ -568,6 +568,8 @@ If you know what you're doing, you can use `unsafe` to pass any string you'd lik
 sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 ```
 
+By default, `sql.unsafe` assumes the `query` string is sufficiently dynamic that prepared statements do not make sense, and so defaults them to off. If you'd like to re-enable prepared statements, you can pass `{ prepare: true }`.
+
 You can also nest `sql.unsafe` within a safe `sql` expression.  This is useful if only part of your fraction has unsafe elements.
 
 ```js
