@@ -2580,3 +2580,21 @@ t('arrays in reserved connection', async() => {
     x.join('')
   ]
 })
+
+t('addType', async () => {
+  const sql = postgres(options)
+  await sql.addType('point', {
+    serializer: (v) => `(${v.x},${v.y})`,
+    parser: (v) => {
+      const [x, y] = v.slice(1, -1).split(',')
+      return { x: parseFloat(x), y: parseFloat(y) }
+    }
+  })
+  await sql`create table test (p point)`
+  const data = { x: 1, y: 2 }
+  await sql`insert into test values(${sql.typed.point(data)})`
+
+  const [{ p }] = await sql`select p from test`
+  const equal = p.x === data.x && p.y === data.y
+  return [equal, true, await sql`drop table test`]
+})
