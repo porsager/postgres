@@ -293,7 +293,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (incomings) {
       incomings.push(x)
       remaining -= x.length
-      if (remaining >= 0)
+      if (remaining > 0)
         return
     }
 
