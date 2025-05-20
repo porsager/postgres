@@ -445,6 +445,14 @@ t('Proper handling of null Errors', async() => {
   ]
 })
 
+t('Ensure reserve throws proper error', async() => {
+  const sql = postgres({ socket: () => { throw 'wat' }, idle_timeout })
+
+  return [
+    'wat', await sql.reserve().catch(e => e)
+  ]
+})
+
 t('Login without password', async() => {
   return [true, (await postgres({ ...options, ...login })`select true as x`)[0].x]
 })
