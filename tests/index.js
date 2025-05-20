@@ -430,7 +430,7 @@ t('Reconnect using SSL', { timeout: 2 }, async() => {
 })
 
 t('Proper handling of non object Errors', async() => {
-  const sql = postgres({ socket: () => { throw 'wat' } })
+  const sql = postgres({ socket: () => { throw 'wat' } }) // eslint-disable-line
 
   return [
     'wat', await sql`select 1 as x`.catch(e => e.message)
@@ -438,7 +438,7 @@ t('Proper handling of non object Errors', async() => {
 })
 
 t('Proper handling of null Errors', async() => {
-  const sql = postgres({ socket: () => { throw null } })
+  const sql = postgres({ socket: () => { throw null } }) // eslint-disable-line
 
   return [
     'null', await sql`select 1 as x`.catch(e => e.message)
@@ -446,7 +446,7 @@ t('Proper handling of null Errors', async() => {
 })
 
 t('Ensure reserve throws proper error', async() => {
-  const sql = postgres({ socket: () => { throw 'wat' }, idle_timeout })
+  const sql = postgres({ socket: () => { throw 'wat' }, idle_timeout }) // eslint-disable-line
 
   return [
     'wat', await sql.reserve().catch(e => e)

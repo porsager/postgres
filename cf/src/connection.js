@@ -295,7 +295,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (incomings) {
       incomings.push(x)
       remaining -= x.length
-      if (remaining >= 0)
+      if (remaining > 0)
         return
     }
 
@@ -383,10 +383,13 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function errored(err) {
     stream && (stream.destroy(err), stream = null)
     query && queryError(query, err)
-    initial && (queryError(initial, err), initial = null)
+    initial && (initial.reserve ? initial.reject(err) : queryError(initial, err), initial = null)
   }
 
   function queryError(query, err) {
+    if (!err || typeof err !== 'object')
+      err = new Error(err)
+
     'query' in err || 'parameters' in err || Object.defineProperties(err, {
       stack: { value: err.stack + query.origin.replace(/.*\n/, '\n'), enumerable: options.debug },
       query: { value: query.string, enumerable: options.debug },
