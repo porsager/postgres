@@ -429,6 +429,22 @@ t('Reconnect using SSL', { timeout: 2 }, async() => {
   return [1, (await sql`select 1 as x`)[0].x]
 })
 
+t('Proper handling of non object Errors', async() => {
+  const sql = postgres({ socket: () => { throw 'wat' } })
+
+  return [
+    'wat', await sql`select 1 as x`.catch(e => e.message)
+  ]
+})
+
+t('Proper handling of null Errors', async() => {
+  const sql = postgres({ socket: () => { throw null } })
+
+  return [
+    'null', await sql`select 1 as x`.catch(e => e.message)
+  ]
+})
+
 t('Login without password', async() => {
   return [true, (await postgres({ ...options, ...login })`select true as x`)[0].x]
 })
