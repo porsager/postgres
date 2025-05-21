@@ -109,7 +109,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     queue: queues.closed,
     idleTimer,
     connect(query) {
-      initial = query || true
+      initial = query
       reconnect()
     },
     terminate,
@@ -381,10 +381,13 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function errored(err) {
     stream && (stream.destroy(err), stream = null)
     query && queryError(query, err)
-    initial && (initial.reserve ? initial.reject(err) : queryError(initial, err), initial = null)
+    initial && (queryError(initial, err), initial = null)
   }
 
   function queryError(query, err) {
+    if (query.reserve)
+      return query.reject(err)
+
     if (!err || typeof err !== 'object')
       err = new Error(err)
 
@@ -535,11 +538,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       }
 
       if (needsTypes) {
-        initial === true && (initial = null)
+        initial.reserve && (initial = null)
         return fetchArrayTypes()
       }
 
-      initial !== true && execute(initial)
+      initial && !initial.reserve && execute(initial)
       options.shared.retries = retries = 0
       initial = null
       return

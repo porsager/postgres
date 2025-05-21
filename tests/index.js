@@ -445,7 +445,7 @@ t('Proper handling of null Errors', async() => {
   ]
 })
 
-t('Ensure reserve throws proper error', async() => {
+t('Ensure reserve on connection throws proper error', async() => {
   const sql = postgres({ socket: () => { throw 'wat' }, idle_timeout }) // eslint-disable-line
 
   return [
@@ -2602,5 +2602,15 @@ t('arrays in reserved connection', async() => {
   return [
     '123',
     x.join('')
+  ]
+})
+
+t('Ensure reserve on query throws proper error', async() => {
+  const sql = postgres({ idle_timeout }) // eslint-disable-line
+  const reserved = await sql.reserve()
+  const [{ x }] = await reserved`select 'wat' as x`
+
+  return [
+    'wat', x, reserved.release()
   ]
 })
