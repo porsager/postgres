@@ -84,6 +84,7 @@ function transpile(x, name, folder) {
       '(query.writable.push({ chunk }), callback())'
     )
     .replace('socket.setKeepAlive(true, 1000 * keep_alive)', 'socket.setKeepAlive(true)')
+    .replace('node:net', std + 'node/net.ts')
     .replace('node:stream', std + 'node/stream.ts')
     .replace('import net from \'net\'', 'import { net } from \'../polyfills.js\'')
     .replace('import tls from \'tls\'', 'import { tls } from \'../polyfills.js\'')
