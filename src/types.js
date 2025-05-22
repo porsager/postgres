@@ -317,16 +317,26 @@ function arrayParserLoop(s, x, parser, typarray) {
 
 export const toCamel = x => {
   let str = x[0]
-  for (let i = 1; i < x.length; i++)
-    str += x[i] === '_' ? x[++i].toUpperCase() : x[i]
-  return str
+  for (let i = 1; i < x.length; i++) {
+    if (x[i] === '_' && i + 1 < x.length) {
+      str += x[++i].toUpperCase()
+    } else if (x[i] !== '_') {
+      str += x[i]
+    }   
+  }
+  return str 
 }
 
 export const toPascal = x => {
   let str = x[0].toUpperCase()
-  for (let i = 1; i < x.length; i++)
-    str += x[i] === '_' ? x[++i].toUpperCase() : x[i]
-  return str
+  for (let i = 1; i < x.length; i++) {
+    if (x[i] === '_' && i + 1 < x.length) {
+      str += x[++i].toUpperCase()
+    } else if (x[i] !== '_') {
+      str += x[i]
+    }   
+  }
+  return str 
 }
 
 export const toKebab = x => x.replace(/_/g, '-')
