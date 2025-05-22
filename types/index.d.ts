@@ -456,7 +456,8 @@ declare namespace postgres {
     | 'NOT_TAGGED_CALL'
     | 'UNDEFINED_VALUE'
     | 'MAX_PARAMETERS_EXCEEDED'
-    | 'SASL_SIGNATURE_MISMATCH';
+    | 'SASL_SIGNATURE_MISMATCH'
+    | 'UNSAFE_TRANSACTION';
     message: string;
   }
 

@@ -112,7 +112,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     queue: queues.closed,
     idleTimer,
     connect(query) {
-      initial = query || true
+      initial = query
       reconnect()
     },
     terminate,
@@ -296,7 +296,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (incomings) {
       incomings.push(x)
       remaining -= x.length
-      if (remaining >= 0)
+      if (remaining > 0)
         return
     }
 
@@ -388,6 +388,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function queryError(query, err) {
+    if (query.reserve)
+      return query.reject(err)
+
+    if (!err || typeof err !== 'object')
+      err = new Error(err)
+
     'query' in err || 'parameters' in err || Object.defineProperties(err, {
       stack: { value: err.stack + query.origin.replace(/.*\n/, '\n'), enumerable: options.debug },
       query: { value: query.string, enumerable: options.debug },
@@ -535,11 +541,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       }
 
       if (needsTypes) {
-        initial === true && (initial = null)
+        initial.reserve && (initial = null)
         return fetchArrayTypes()
       }
 
-      initial !== true && execute(initial)
+      initial && !initial.reserve && execute(initial)
       options.shared.retries = retries = 0
       initial = null
       return

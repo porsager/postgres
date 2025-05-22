@@ -431,6 +431,30 @@ t('Reconnect using SSL', { timeout: 2 }, async() => {
   return [1, (await sql`select 1 as x`)[0].x]
 })
 
+t('Proper handling of non object Errors', async() => {
+  const sql = postgres({ socket: () => { throw 'wat' } }) // eslint-disable-line
+
+  return [
+    'wat', await sql`select 1 as x`.catch(e => e.message)
+  ]
+})
+
+t('Proper handling of null Errors', async() => {
+  const sql = postgres({ socket: () => { throw null } }) // eslint-disable-line
+
+  return [
+    'null', await sql`select 1 as x`.catch(e => e.message)
+  ]
+})
+
+t('Ensure reserve on connection throws proper error', async() => {
+  const sql = postgres({ socket: () => { throw 'wat' }, idle_timeout }) // eslint-disable-line
+
+  return [
+    'wat', await sql.reserve().catch(e => e)
+  ]
+})
+
 t('Login without password', async() => {
   return [true, (await postgres({ ...options, ...login })`select true as x`)[0].x]
 })
@@ -2580,6 +2604,16 @@ t('arrays in reserved connection', async() => {
   return [
     '123',
     x.join('')
+  ]
+})
+
+t('Ensure reserve on query throws proper error', async() => {
+  const sql = postgres({ idle_timeout }) // eslint-disable-line
+  const reserved = await sql.reserve()
+  const [{ x }] = await reserved`select 'wat' as x`
+
+  return [
+    'wat', x, reserved.release()
   ]
 })
 

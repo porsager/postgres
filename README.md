@@ -342,6 +342,27 @@ select * from users
 select * from users where user_id = $1
 ```
 
+### Dynamic ordering
+
+```js
+const id = 1
+const order = {
+  username: 'asc'
+  created_at: 'desc'
+}
+await sql`
+  select 
+    * 
+  from ticket 
+  where account = ${ id }  
+  order by ${
+    Object.entries(order).flatMap(([column, order], i) =>
+      [i ? sql`,` : sql``, sql`${ sql(column) } ${ order === 'desc' ? sql`desc` : sql`asc` }`]
+    )
+  }
+`
+```
+
 ### SQL functions
 Using keywords or calling functions dynamically is also possible by using ``` sql`` ``` fragments.
 ```js
@@ -567,6 +588,8 @@ If you know what you're doing, you can use `unsafe` to pass any string you'd lik
 ```js
 sql.unsafe('select ' + danger + ' from users where id = ' + dragons)
 ```
+
+By default, `sql.unsafe` assumes the `query` string is sufficiently dynamic that prepared statements do not make sense, and so defaults them to off. If you'd like to re-enable prepared statements, you can pass `{ prepare: true }`.
 
 You can also nest `sql.unsafe` within a safe `sql` expression.  This is useful if only part of your fraction has unsafe elements.
 
