@@ -18,6 +18,7 @@
     "node": ">=12"
   },
   "scripts": {
+    "deno:publish": "cd deno && deno publish --unstable-sloppy-imports",
     "build": "npm run build:cjs && npm run build:deno && npm run build:cf",
     "build:cjs": "node transpile.cjs",
     "build:deno": "node transpile.deno.js",

@@ -1,0 +1,6 @@
+{
+  "name": "@y0/postgres",
+  "version": "3.4.5",
+  "exports": "./src/index.js",
+  "license": "MulanPSL-2.0"
+}
