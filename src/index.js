@@ -252,8 +252,7 @@ function Postgres(a, b) {
       const sql = Sql(handler)
       sql.savepoint = savepoint
       sql.prepare = x => prepare = x.replace(/[^a-z0-9$-_. ]/gi)
-      let uncaughtError
-        , result
+      let result
 
       name && await sql`savepoint ${ sql(name) }`
       try {
@@ -261,15 +260,12 @@ function Postgres(a, b) {
           const x = fn(sql)
           Promise.resolve(Array.isArray(x) ? Promise.all(x) : x).then(resolve, reject)
         })
-
-        if (uncaughtError)
-          throw uncaughtError
       } catch (e) {
         await (name
           ? sql`rollback to ${ sql(name) }`
           : sql`rollback`
         )
-        throw e instanceof PostgresError && e.code === '25P02' && uncaughtError || e
+        throw e
       }
 
       if (!name) {
@@ -289,7 +285,6 @@ function Postgres(a, b) {
       }
 
       function handler(q) {
-        q.catch(e => uncaughtError || (uncaughtError = e))
         c.queue === full
           ? queries.push(q)
           : c.execute(q) || move(c, full)
