@@ -139,8 +139,12 @@ function Socket() {
     write,
     end,
     destroy,
-    read
+    read,
+    pause,
+    resume
   })
+
+  let pauseState = null
 
   return tcp
 
@@ -183,6 +187,7 @@ function Socket() {
     return true
   }
 
+
   function end(data) {
     return data
       ? tcp.write(data, () => tcp.raw.close())
@@ -198,8 +203,12 @@ function Socket() {
     try {
       let done
         , value
-      while (({ done, value } = await tcp.reader.read(), !done))
+      while (({ done, value } = await tcp.reader.read(), !done)) {
+        if (pauseState) {
+          await pauseState.promise
+        }
         tcp.emit('data', Buffer.from(value))
+      }
     } catch (err) {
       error(err)
     }
@@ -208,6 +217,22 @@ function Socket() {
   async function readFirst() {
     const { value } = await tcp.reader.read()
     tcp.emit('data', Buffer.from(value))
+  }
+
+
+  function pause() {
+    if (pauseState) return
+    pauseState = { }
+    pauseState.promise = new Promise((resolve) => {
+      pauseState.resolve = resolve
+    })
+  }
+  
+  function resume() {
+    if (!pauseState) return
+    const s = pauseState
+    pauseState = null
+    s.resolve()
   }
 
   function error(err) {
