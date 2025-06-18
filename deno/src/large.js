@@ -1,4 +1,4 @@
-import Stream from 'https://deno.land/std@0.132.0/node/stream.ts'
+import Stream from 'node:stream'
 
 export default function largeObject(sql, oid, mode = 0x00020000 | 0x00040000) {
   return new Promise(async(resolve, reject) => {
