@@ -1,4 +1,4 @@
-import { Buffer } from 'node:buffer'
+import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
 const noop = () => { /* noop */ }
 
 export default function Subscribe(postgres, options) {
