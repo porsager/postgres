@@ -83,6 +83,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     , result = new Result()
     , incoming = Buffer.alloc(0)
     , needsTypes = options.fetch_types
+    , typesPromise = null
     , backendParameters = {}
     , statements = {}
     , statementId = Math.random().toString(36).slice(2)
@@ -542,12 +543,23 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
       if (needsTypes) {
         initial.reserve && (initial = null)
-        return fetchArrayTypes()
+
+        // Prevent duplicate requests
+        needsTypes = false
+
+        // Store the promise so concurrent requests can wait for type initialization to complete
+        typesPromise = fetchArrayTypes().finally(() => {
+          typesPromise = null
+        })
+        return
       }
 
-      initial && !initial.reserve && execute(initial)
-      options.shared.retries = retries = 0
-      initial = null
+      // If there is a pending types request, trigger the execution after it's complete
+      (typesPromise || Promise.resolve()).then(() => {
+        initial && !initial.reserve && execute(initial)
+        options.shared.retries = retries = 0
+        initial = null
+      })
       return
     }
 
