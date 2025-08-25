@@ -352,7 +352,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function reconnect() {
-    setTimeout(connect, closedDate ? closedDate + delay - performance.now() : 0)
+    setTimeout(connect, Math.max(closedDate ? closedDate + delay - performance.now() : 0, 0))
   }
 
   function connected() {
