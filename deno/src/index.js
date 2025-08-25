@@ -482,8 +482,8 @@ function parseOptions(a, b) {
       {}
     ),
     connection      : {
-      application_name: env.PGAPPNAME || 'postgres.js',
       ...o.connection,
+      application_name: o.connection?.application_name ?? env.PGAPPNAME ?? 'postgres.js',
       ...Object.entries(query).reduce((acc, [k, v]) => (k in defaults || (acc[k] = v), acc), {})
     },
     types           : o.types || {},
