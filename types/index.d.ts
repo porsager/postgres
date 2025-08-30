@@ -44,7 +44,7 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
    * How to deal with ssl (can be a tls.connect option object)
    * @default false
   */
-  ssl: 'require' | 'allow' | 'prefer' | 'verify-full' | boolean | object;
+  ssl: 'require' | 'allow' | 'prefer' | 'verify-full' | 'direct' | boolean | object;
   /**
    * Max number of connections
    * @default 10

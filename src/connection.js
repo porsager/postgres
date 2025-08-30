@@ -336,7 +336,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (options.socket)
       return ssl ? secure() : connected()
 
-    socket.on('connect', ssl ? secure : connected)
+    if (ssl === 'direct') {
+      socket.on('connect', directTLS)
+    } else {
+      socket.on('connect', ssl ? secure : connected)
+    }
 
     if (options.path)
       return socket.connect(options.path)
@@ -348,6 +352,20 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
     hostIndex = (hostIndex + 1) % port.length
   }
+
+    function directTLS() {
+        socket.removeAllListeners()
+        socket = tls.connect({
+            socket,
+            servername: net.isIP(socket.host) ? undefined : socket.host,
+            ALPNProtocols: ['postgresql'],
+            rejectUnauthorized: false
+        })
+        socket.on('secureConnect', connected)
+        socket.on('error', error)
+        socket.on('close', closed)
+        socket.on('drain', drain)
+    }
 
   function reconnect() {
     setTimeout(connect, closedDate ? closedDate + delay - performance.now() : 0)
