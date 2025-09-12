@@ -101,10 +101,6 @@ export const fs = {
   }
 }
 
-export const net = {
-  isIP: (x) => IPv4Reg.test(x) ? 4 : IPv6Reg.test(x) ? 6 : 0,
-  Socket
-}
 
 export { setImmediate, clearImmediate }
 
