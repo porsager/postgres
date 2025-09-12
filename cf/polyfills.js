@@ -108,3 +108,19 @@ export const net = {
 
 export { setImmediate, clearImmediate }
 
+function setImmediate(fn) {
+  const id = ids++
+  tasks.add(id)
+  queueMicrotask(() => {
+    if (tasks.has(id)) {
+      fn()
+      tasks.delete(id)
+    }
+  })
+  return id
+}
+
+function clearImmediate(id) {
+  tasks.delete(id)
+}
+
