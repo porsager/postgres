@@ -20,6 +20,15 @@ declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(
   parse: (raw: any) => infer R
 } ? R : never }>
 
+// Disposable type for `using sql = ...` syntax.
+// If typescript doesn't know about `Symbol.dispose`, fallback to an empty interface.
+type Disposable = typeof Symbol extends {
+  dispose: symbol;
+} //@ts-ignore
+  ? {[Symbol.dispose]: () => void;
+  }
+  : {};
+
 /**
  * Connection options of Postgres.
  */
@@ -722,7 +731,7 @@ declare namespace postgres {
     prepare<T>(name: string): Promise<UnwrapPromiseArray<T>>;
   }
 
-  interface ReservedSql<TTypes extends Record<string, unknown> = {}> extends Sql<TTypes> {
+  interface ReservedSql<TTypes extends Record<string, unknown> = {}> extends Sql<TTypes>, Disposable {
     release(): void;
   }
 }
