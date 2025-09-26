@@ -26,9 +26,7 @@ import Subscribe from './subscribe.js'
 import largeObject from './large.js'
 
 // Polyfill for `Symbol.dispose`. We don't need asyncDispose as sql.release() is not async.
-if (!('dispose' in Symbol)) {
-  Symbol.dispose = Symbol('dispose')
-}
+Symbol.dispose ??= Symbol("Symbol.dispose")
 
 Object.assign(Postgres, {
   PostgresError,
