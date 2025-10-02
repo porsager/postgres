@@ -715,7 +715,20 @@ declare namespace postgres {
     prepare?: boolean | undefined;
   }
 
-  interface TransactionSql<TTypes extends Record<string, unknown> = {}> extends Sql<TTypes> {
+  interface TransactionSql<TTypes extends Record<string, unknown> = {}> extends Omit<Sql<TTypes>,
+      'parameters' |
+      'largeObject' |
+      'subscribe' |
+      'CLOSE' |
+      'END' |
+      'PostgresError' |
+      'options' |
+      'reserve' |
+      'listen' |
+      'begin' |
+      'close' |
+      'end'
+  > {
     savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 
