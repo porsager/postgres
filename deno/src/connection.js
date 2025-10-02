@@ -529,6 +529,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function ReadyForQuery(x) {
     query && query.options.simple && query.resolve(results || result)
     query = results = null
+    rows = 0
     result = new Result()
     connectTimer.cancel()
 
