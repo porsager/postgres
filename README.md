@@ -342,6 +342,44 @@ select * from users
 select * from users where user_id = $1
 ```
 
+Use a combination of `sql()` and ` sql`` ` to filter against JSON(B):
+
+```js
+const filter = someCondition
+  ? sql`${sql('notifications')}->>'email' = TRUE`
+  : sql`${sql('2FA')}->>'email' = TRUE`;
+
+await sql`
+  select * from users
+    where ${filter};
+`
+
+// which results in:
+select * from users where "notifications"->>'email' = TRUE;
+// OR
+select * from users where "2FA"->>'email' = TRUE;
+```
+
+To dynamically combine multiple conditions, use [Array `reduce`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce); [Array `join`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/join) does not work because its output is a string (an interpolated value) instead of a `Fragment`:
+
+```js
+const conditions = []
+
+if (foo) conditions.push(sql`foo = ${foo}`)
+
+switch (bar) {
+  case A:
+    conditions.push(sql`bar IS NOT NULL`)
+    break
+  // …
+}
+
+await sql`
+  select * from users
+    where ${conditions.reduce((clause, condition) => sql`${clause} AND ${condition}`)};
+`
+```
+
 ### Dynamic ordering
 
 ```js
