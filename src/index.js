@@ -537,9 +537,20 @@ function parseUrl(x) {
   if (!x || typeof x !== 'string')
     return { url: { searchParams: new Map() } }
 
-  const url = new URL(x.replace(/^postgres(ql)?:/, 'http:'))
+  let str = x.replace(/^postgres(ql)?:/, 'http:')
+  if (str.startsWith('http:') && !str.startsWith('http://')) {
+    str = 'http://' + str.substring(5);
+  }
+  let multihost = false
 
-  const multihost = url.hostname.includes(',') && decodeURIComponent(url.hostname)
+  const hostPartMatch = str.match(/\/\/([^@/?#]*@)?([^/?#]+)/)
+  if (hostPartMatch && hostPartMatch[2].includes(',')) {
+    const hosts = hostPartMatch[2]
+    multihost = decodeURIComponent(hosts)
+    str = str.replace(hosts, hosts.split(',')[0])
+  }
+
+  const url = new URL(str)
 
   return {
     url: {
