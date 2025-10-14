@@ -342,7 +342,7 @@ select * from users
 select * from users where user_id = $1
 ```
 
-Use a combination of `sql()` and ` sql`` ` to filter against JSON(B):
+Use a combination of `sql()` and ` sql`` ` to access fields in `json` or `jsonb`:
 
 ```js
 const filter = someCondition
@@ -354,7 +354,7 @@ await sql`
     where ${filter};
 `
 
-// which results in:
+// Which results in:
 select * from users where "notifications"->>'email' = TRUE;
 // OR
 select * from users where "2FA"->>'email' = TRUE;
@@ -366,13 +366,6 @@ To dynamically combine multiple conditions, use [Array `reduce`](https://develop
 const conditions = []
 
 if (foo) conditions.push(sql`foo = ${foo}`)
-
-switch (bar) {
-  case A:
-    conditions.push(sql`bar IS NOT NULL`)
-    break
-  // …
-}
 
 await sql`
   select * from users
