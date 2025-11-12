@@ -446,7 +446,7 @@ function parseOptions(a, b) {
 
   const ints = ['idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive']
   const defaults = {
-    max             : 10,
+    max             : globalThis.Cloudflare ? 3 : 10,
     ssl             : false,
     sslnegotiation  : null,
     idle_timeout    : null,
