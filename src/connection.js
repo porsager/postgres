@@ -51,6 +51,7 @@ const errorFields = {
 
 function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop } = {}) {
   const {
+    sslnegotiation,
     ssl,
     max,
     user,
@@ -262,25 +263,29 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   async function secure() {
-    write(SSLRequest)
-    const canSSL = await new Promise(r => socket.once('data', x => r(x[0] === 83))) // S
-
-    if (!canSSL && ssl === 'prefer')
-      return connected()
-
-    socket.removeAllListeners()
-    socket = tls.connect({
+    if (sslnegotiation !== 'direct') {
+      write(SSLRequest)
+      const canSSL = await new Promise(r => socket.once('data', x => r(x[0] === 83))) // S
+  
+      if (!canSSL && ssl === 'prefer')
+        return connected()
+    }
+    
+    const options = {
       socket,
       servername: net.isIP(socket.host) ? undefined : socket.host,
-      ...(ssl === 'require' || ssl === 'allow' || ssl === 'prefer'
-        ? { rejectUnauthorized: false }
-        : ssl === 'verify-full'
-          ? {}
-          : typeof ssl === 'object'
-            ? ssl
-            : {}
-      )
-    })
+    }
+    
+    if (sslnegotiation === 'direct')
+      options.ALPNProtocols = ['postgresql']
+    
+    if (ssl === 'require' || ssl === 'allow' || ssl === 'prefer')
+      options.rejectUnauthorized = false
+    else if (typeof ssl === 'object')
+      Object.assign(options, ssl)
+    
+    socket.removeAllListeners()
+    socket = tls.connect(options)
     socket.on('secureConnect', connected)
     socket.on('error', error)
     socket.on('close', closed)

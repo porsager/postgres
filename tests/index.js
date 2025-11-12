@@ -401,6 +401,17 @@ t('Connect using SSL require', async() =>
   }))]
 )
 
+t('Connect using SSL direct', async() => {
+  const [{ supported }] = await sql`select current_setting('server_version_num')::int >= 180000 as supported`
+  return [true, !supported || (await new Promise((resolve, reject) => {
+    postgres({
+      ssl: 'require',
+      sslnegotiation: 'direct',
+      idle_timeout
+    })`select 1`.then(() => resolve(true), reject)
+  }))]
+})
+
 t('Connect using SSL prefer', async() => {
   await exec('psql', ['-c', 'alter system set ssl=off'])
   await exec('psql', ['-c', 'select pg_reload_conf()'])

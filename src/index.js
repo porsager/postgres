@@ -448,6 +448,7 @@ function parseOptions(a, b) {
   const defaults = {
     max             : 10,
     ssl             : false,
+    sslnegotiation  : null,
     idle_timeout    : null,
     connect_timeout : 30,
     max_lifetime    : max_lifetime,
