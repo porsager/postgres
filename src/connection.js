@@ -899,6 +899,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function CopyDone() {
     stream && stream.push(null)
     stream = null
+    socket.isPaused() && socket.resume()
   }
 
   function NoticeResponse(x) {
