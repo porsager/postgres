@@ -1,7 +1,7 @@
 /* global Deno */
 
-import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
-import { isIP } from 'https://deno.land/std@0.132.0/node/net.ts'
+import { Buffer } from 'node:buffer'
+import { isIP } from 'node:net'
 
 const events = () => ({ data: [], error: [], drain: [], connect: [], secureConnect: [], close: [] })
 
