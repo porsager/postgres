@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { Query } from './query.js'
 import { Errors } from './errors.js'
 

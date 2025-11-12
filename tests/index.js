@@ -1,9 +1,11 @@
+import { Buffer } from 'node:buffer'
+import net from 'node:net'
+import fs from 'node:fs'
+import crypto from 'node:crypto'
+
 import { exec } from './bootstrap.js'
 
 import { t, nt, ot } from './test.js' // eslint-disable-line
-import net from 'net'
-import fs from 'fs'
-import crypto from 'crypto'
 
 import postgres from '../src/index.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))

@@ -1,6 +1,6 @@
 /* eslint no-console: 0 */
 
-import util from 'util'
+import util from 'node:util'
 
 let done = 0
 let only = false
@@ -17,8 +17,8 @@ t.timeout = 5
 
 async function test(o, name, options, fn) {
   typeof options !== 'object' && (fn = options, options = {})
-  const line = new Error().stack.split('\n')[3].match(':([0-9]+):')[1]
-
+  const line = (new Error().stack.split('\n')[3].match(':([0-9]+):?') || [])[1]
+  
   await 1
 
   if (only && !o)

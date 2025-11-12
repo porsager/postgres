@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+
 const size = 256
 let buffer = Buffer.allocUnsafe(size)
 

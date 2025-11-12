@@ -18,14 +18,13 @@
     "node": ">=12"
   },
   "scripts": {
-    "build": "npm run build:cjs && npm run build:deno && npm run build:cf",
+    "build": "npm run build:cjs && npm run build:cf",
     "build:cjs": "node transpile.cjs",
-    "build:deno": "node transpile.deno.js",
     "build:cf": "node transpile.cf.js",
     "test": "npm run test:esm && npm run test:cjs && npm run test:deno",
     "test:esm": "node tests/index.js",
     "test:cjs": "npm run build:cjs && cd cjs/tests && node index.js && cd ../../",
-    "test:deno": "npm run build:deno && cd deno/tests && deno run --no-lock --allow-all --unsafely-ignore-certificate-errors index.js && cd ../../",
+    "test:deno": "deno --allow-all tests/index.js",
     "lint": "eslint src && eslint tests",
     "prepare": "npm run build",
     "prepublishOnly": "npm run lint"

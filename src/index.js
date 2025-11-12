@@ -1,5 +1,5 @@
-import os from 'os'
-import fs from 'fs'
+import os from 'node:os'
+import fs from 'node:fs'
 
 import {
   mergeUserTypes,
