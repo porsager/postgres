@@ -2614,3 +2614,16 @@ t('Ensure reserve on query throws proper error', async() => {
     'wat', x, reserved.release()
   ]
 })
+
+t('query during copy error', async() => {
+  const sql = postgres(options) // eslint-disable-line
+  await sql`create table test (id serial primary key, name text)`
+  const copy = await sql`copy test from stdin`.writable()
+  const error = await sql`select 1`.catch(e => e)
+  await copy.end()
+
+  return [
+    'COPY_IN_PROGRESS', error.code,
+    await sql`drop table test`
+  ]
+})

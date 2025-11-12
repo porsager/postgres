@@ -154,7 +154,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function execute(q) {
     if (terminated)
       return queryError(q, Errors.connection('CONNECTION_DESTROYED', options))
-
+    
+    if (stream)
+      return queryError(q, Errors.generic('COPY_IN_PROGRESS', 'You cannot execute queries during copy'))
+    
     if (q.cancelled)
       return
 
@@ -849,6 +852,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       final(callback) {
         socket.write(b().c().end())
         final = callback
+        stream = null
       }
     })
     query.resolve(stream)
