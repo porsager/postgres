@@ -45,9 +45,9 @@ jobs:
           sudo systemctl status postgresql.service
           pg_isready
           sudo -u postgres psql -c "SHOW hba_file;"
-      - uses: denoland/setup-deno@v1
+      - uses: denoland/setup-deno@v2
         with:
-          deno-version: v1.x
+          deno-version: v2.x
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
