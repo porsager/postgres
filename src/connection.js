@@ -84,7 +84,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     , statements = {}
     , statementId = Math.random().toString(36).slice(2)
     , statementCount = 1
-    , closedDate = 0
+    , closedTime = 0
     , remaining = 0
     , hostIndex = 0
     , retries = 0
@@ -154,7 +154,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function execute(q) {
     if (terminated)
       return queryError(q, Errors.connection('CONNECTION_DESTROYED', options))
-
+    
+    if (stream)
+      return queryError(q, Errors.generic('COPY_IN_PROGRESS', 'You cannot execute queries during copy'))
+    
     if (q.cancelled)
       return
 
@@ -350,7 +353,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function reconnect() {
-    setTimeout(connect, closedDate ? closedDate + delay - performance.now() : 0)
+    setTimeout(connect, closedTime ? Math.max(0, closedTime + delay - performance.now()) : 0)
   }
 
   function connected() {
@@ -442,7 +445,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return reconnect()
 
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
-    closedDate = performance.now()
+    closedTime = performance.now()
     hadError && options.shared.retries++
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
     onclose(connection, Errors.connection('CONNECTION_CLOSED', options, socket))
@@ -850,6 +853,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       final(callback) {
         socket.write(b().c().end())
         final = callback
+        stream = null
       }
     })
     query.resolve(stream)

@@ -1331,6 +1331,11 @@ This error is thrown for any queries that were pending when the timeout to [`sql
 
 This error is thrown if the startup phase of the connection (tcp, protocol negotiation, and auth) took more than the default 30 seconds or what was specified using `connect_timeout` or `PGCONNECT_TIMEOUT`.
 
+##### COPY_IN_PROGRESS
+> You cannot execute queries during copy
+
+This error is thrown if trying to run a query during a copy operation (writable / readable).
+
 ## TypeScript support
 
 `postgres` has TypeScript support. You can pass a row list type for your queries in this way:

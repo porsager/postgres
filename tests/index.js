@@ -2615,6 +2615,19 @@ t('Ensure reserve on query throws proper error', async() => {
   ]
 })
 
+t('query during copy error', async() => {
+  const sql = postgres(options) // eslint-disable-line
+  await sql`create table test (id serial primary key, name text)`
+  const copy = await sql`copy test from stdin`.writable()
+  const error = await sql`select 1`.catch(e => e)
+  await copy.end()
+
+  return [
+    'COPY_IN_PROGRESS', error.code,
+    await sql`drop table test`
+  ]
+})
+
 t('Ensure rows count is cleared before performing new query on a connection', async() => {
   const sql = postgres({ idle_timeout, max: 1 }) // eslint-disable-line
   await sql`create table table_causing_error(name text,age int)`
@@ -2633,6 +2646,7 @@ t('Ensure rows count is cleared before performing new query on a connection', as
   await sql`drop table some_other_table`
 
   return [
-    rows_count_before_error.length, rows_count_after_error.length
+    rows_count_before_error.length, 
+    rows_count_after_error.length
   ]
 })
