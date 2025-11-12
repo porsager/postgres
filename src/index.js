@@ -25,6 +25,9 @@ import { Errors, PostgresError } from './errors.js'
 import Subscribe from './subscribe.js'
 import largeObject from './large.js'
 
+// Polyfill for `Symbol.dispose`. We don't need asyncDispose as sql.release() is not async.
+Symbol.dispose ??= Symbol("Symbol.dispose")
+
 Object.assign(Postgres, {
   PostgresError,
   toPascal,
@@ -221,6 +224,7 @@ function Postgres(a, b) {
       c.reserved = null
       onopen(c)
     }
+    sql[Symbol.dispose] = sql.release;
 
     return sql
 
