@@ -54,10 +54,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     sslnegotiation,
     ssl,
     max,
-    user,
     host,
     port,
-    database,
     parsers,
     transform,
     onnotice,
@@ -72,6 +70,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   const sent = Queue()
       , id = uid++
       , backend = { pid: null, secret: null }
+      , User = Resolve(options.user)
+      , Database = Resolve(options.database)
+      , Pass = Resolve(options.pass)
       , idleTimer = timer(end, options.idle_timeout)
       , lifeTimer = timer(end, options.max_lifetime)
       , connectTimer = timer(connectTimedOut, options.connect_timeout)
@@ -361,7 +362,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     setTimeout(connect, closedTime ? Math.max(0, closedTime + delay - performance.now()) : 0)
   }
 
-  function connected() {
+  async function connected() {
     try {
       statements = {}
       needsTypes = options.fetch_types
@@ -370,7 +371,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       lifeTimer.start()
       socket.on('data', data)
       keep_alive && socket.setKeepAlive && socket.setKeepAlive(true, 1000 * keep_alive)
-      const s = StartupMessage()
+      const s = await StartupMessage()
       write(s)
     } catch (err) {
       error(err)
@@ -679,10 +680,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   async function AuthenticationMD5Password(x) {
+    const [pass, user] = await Promise.all([Pass(), User()])
     const payload = 'md5' + (
-      await md5(
+      md5(
         Buffer.concat([
-          Buffer.from(await md5((await Pass()) + user)),
+          Buffer.from(md5(pass + user)),
           x.subarray(9)
         ])
       )
@@ -734,11 +736,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.destroy()
   }
 
-  function Pass() {
-    return Promise.resolve(typeof options.pass === 'function'
-      ? options.pass()
-      : options.pass
-    )
+  function Resolve(opt) {
+    return async () => typeof opt === 'function'
+      ? opt.apply(options, [options])
+      : opt
   }
 
   function NoData() {
@@ -982,7 +983,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     ])
   }
 
-  function StartupMessage() {
+  async function StartupMessage() {
+    const [user, database] = await Promise.all([User(), Database()])
     return cancelMessage || b().inc(4).i16(3).z(2).str(
       Object.entries(Object.assign({
         user,
