@@ -2617,4 +2617,22 @@ t('Ensure reserve on query throws proper error', async() => {
   ]
 })
 
+t('Ensure rows count is cleared before performing new query on a connection', async() => {
+  const sql = postgres({ idle_timeout, max: 1 }) // eslint-disable-line
+  await sql`create table table_causing_error(name text,age int)`
+  await sql`insert into table_causing_error values('John', 20)`
+  await sql`insert into table_causing_error values('Jane', 21)`
+  await sql`insert into table_causing_error values('Jim', 0)`
+
+  await sql`create table some_other_table(title text,amount int)`
+  await sql`insert into some_other_table values ('a', 100), ('b', 200), ('c', 300), ('d', 400), ('e', 500), ('f', 600)`
+
+  const rows_count_before_error = await sql`select * from some_other_table`
+  await sql`select * from table_causing_error where 1000/age > 0`.catch(e => e)
+  const rows_count_after_error = await sql`select * from some_other_table`
+
+  return [
+    rows_count_before_error, rows_count_after_error
+  ]
+})
 ;globalThis.addEventListener("unload", () => Deno.exit(process.exitCode))
