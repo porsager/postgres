@@ -1,6 +1,6 @@
-import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
-import process from 'https://deno.land/std@0.132.0/node/process.ts'
-import { Readable, Writable } from 'https://deno.land/std@0.132.0/node/stream.ts'
+import { Buffer } from 'node:buffer'
+import process from 'node:process'
+import { Readable, Writable } from 'node:stream'
 
 /**
  * Establish a connection to a PostgreSQL server.
@@ -717,7 +717,20 @@ declare namespace postgres {
     prepare?: boolean | undefined;
   }
 
-  interface TransactionSql<TTypes extends Record<string, unknown> = {}> extends Sql<TTypes> {
+  interface TransactionSql<TTypes extends Record<string, unknown> = {}> extends Omit<Sql<TTypes>,
+      'parameters' |
+      'largeObject' |
+      'subscribe' |
+      'CLOSE' |
+      'END' |
+      'PostgresError' |
+      'options' |
+      'reserve' |
+      'listen' |
+      'begin' |
+      'close' |
+      'end'
+  > {
     savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 

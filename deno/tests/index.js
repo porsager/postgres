@@ -1,11 +1,11 @@
-import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
-import process from 'https://deno.land/std@0.132.0/node/process.ts'
+import { Buffer } from 'node:buffer'
+import process from 'node:process'
 import { exec } from './bootstrap.js'
 
 import { t, nt, ot } from './test.js' // eslint-disable-line
-import { net } from '../polyfills.js'
-import fs from 'https://deno.land/std@0.132.0/node/fs.ts'
-import crypto from 'https://deno.land/std@0.132.0/node/crypto.ts'
+import net from 'node:net'
+import fs from 'node:fs'
+import crypto from 'node:crypto'
 
 import postgres from '../src/index.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))
@@ -402,6 +402,17 @@ t('Connect using SSL require', async() =>
     })`select 1`.then(() => resolve(true), reject)
   }))]
 )
+
+t('Connect using SSL direct', async() => {
+  const [{ supported }] = await sql`select current_setting('server_version_num')::int >= 180000 as supported`
+  return [true, !supported || (await new Promise((resolve, reject) => {
+    postgres({
+      ssl: 'require',
+      sslnegotiation: 'direct',
+      idle_timeout
+    })`select 1`.then(() => resolve(true), reject)
+  }))]
+})
 
 t('Connect using SSL prefer', async() => {
   await exec('psql', ['-c', 'alter system set ssl=off'])
@@ -2617,4 +2628,16 @@ t('Ensure reserve on query throws proper error', async() => {
   ]
 })
 
+t('query during copy error', async() => {
+  const sql = postgres(options) // eslint-disable-line
+  await sql`create table test (id serial primary key, name text)`
+  const copy = await sql`copy test from stdin`.writable()
+  const error = await sql`select 1`.catch(e => e)
+  await copy.end()
+
+  return [
+    'COPY_IN_PROGRESS', error.code,
+    await sql`drop table test`
+  ]
+})
 ;globalThis.addEventListener("unload", () => Deno.exit(process.exitCode))
