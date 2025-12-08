@@ -9,7 +9,7 @@ export const net = {
   createServer() {
     const server =  {
       address() {
-        return { port: 9876, raw: null }
+        return { port: 9876 }
       },
       async listen() {
         server.raw = Deno.listen({ port: 9876, transport: 'tcp' })
