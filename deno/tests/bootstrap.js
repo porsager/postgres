@@ -1,4 +1,4 @@
-import { spawn } from 'https://deno.land/std@0.132.0/node/child_process.ts'
+import { spawn } from 'node:child_process'
 
 await exec('dropdb', ['postgres_js_test'])
 
@@ -20,7 +20,7 @@ await exec('psql', ['-c', 'alter database postgres_js_test owner to postgres_js_
 
 function ignore(cmd, args) {
   const { stderr } = spawnSync(cmd, args, { stdio: 'pipe', encoding: 'utf8' })
-  if (stderr && !stderr.includes('already exists') && !stderr.includes('does not exist'))
+  if (stderr && !stderr.includes('already exists') && !stderr.includes('does not exist') && !stderr.includes('WARNING:'))
     throw stderr
 }
 

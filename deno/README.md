@@ -984,6 +984,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   username             : '',            // Username of database user
   password             : '',            // Password of database user
   ssl                  : false,         // true, prefer, require, tls.connect options
+  sslnegotiation       : null,          // direct
   max                  : 10,            // Max number of connections
   max_lifetime         : null,          // Max lifetime in seconds (more info below)
   idle_timeout         : 0,             // Idle connection timeout in seconds
@@ -1326,6 +1327,11 @@ This error is thrown for any queries that were pending when the timeout to [`sql
 > write CONNECT_TIMEOUT host:port
 
 This error is thrown if the startup phase of the connection (tcp, protocol negotiation, and auth) took more than the default 30 seconds or what was specified using `connect_timeout` or `PGCONNECT_TIMEOUT`.
+
+##### COPY_IN_PROGRESS
+> You cannot execute queries during copy
+
+This error is thrown if trying to run a query during a copy operation (writable / readable).
 
 ## TypeScript support
 
