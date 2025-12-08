@@ -82,8 +82,6 @@ function transpile(x, name, folder) {
       'query.writable.push({ chunk, callback })',
       '(query.writable.push({ chunk }), callback())'
     )
-    .replace('import net from \'net\'', 'import { net } from \'../polyfills.js\'')
-    .replace('import tls from \'tls\'', 'import { tls } from \'../polyfills.js\'')
     .replace('import { performance } from \'perf_hooks\'', '')
     .replace(/ from '([a-z_]+)'/g, ' from \'' + 'node:$1\'')
 }

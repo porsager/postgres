@@ -1,33 +1,6 @@
 /* global Deno */
 
-import { isIP, Socket } from 'node:net'
-import { connect } from 'node:tls'
 import { Buffer } from 'node:buffer'
-
-export const net = {
-  isIP,
-  createServer() {
-    const server =  {
-      address() {
-        return { port: 9876 }
-      },
-      async listen() {
-        server.raw = Deno.listen({ port: 9876, transport: 'tcp' })
-        for await (const conn of server.raw)
-          setTimeout(() => conn.close(), 500)
-      },
-      close() {
-        server.raw.close()
-      }
-    }
-    return server
-  },
-  Socket
-}
-
-export const tls = {
-  connect,
-}
 
 const enc = new TextEncoder()
 

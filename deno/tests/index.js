@@ -3,7 +3,7 @@ import process from 'node:process'
 import { exec } from './bootstrap.js'
 
 import { t, nt, ot } from './test.js' // eslint-disable-line
-import { net } from '../polyfills.js'
+import net from 'node:net'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 
