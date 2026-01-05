@@ -2638,3 +2638,42 @@ t('query during copy error', async() => {
     await sql`drop table test`
   ]
 })
+
+t('end() completes after ECONNRESET error', { timeout: 5 }, async() => {
+  // Create a real connection, then terminate the backend to simulate ECONNRESET
+  const sql = postgres({ ...options, max: 1 })
+  const sql2 = postgres({ ...options, max: 1 })
+  
+  // Get the connection's backend PID
+  const [{ pid }] = await sql`select pg_backend_pid() as pid`
+  
+  // Start a query and immediately terminate the backend connection
+  const queryPromise = sql.unsafe('SELECT pg_sleep(1)').catch(e => e)
+  
+  // Terminate the backend right after query starts using a different connection
+  await delay(10)
+  await sql2`select pg_terminate_backend(${ pid })`
+  
+  // Wait for the query to fail with ECONNRESET
+  const error = await queryPromise
+  
+  // Verify we got a connection error (57P01 = terminating connection, ECONNRESET, or CONNECTION_CLOSED)
+  if (!error || (error.code !== 'ECONNRESET' && error.code !== 'CONNECTION_CLOSED' && error.code !== '57P01' && !error.message.includes('terminated'))) {
+    await sql.end()
+    await sql2.end()
+    throw new Error('Expected connection error, got: ' + (error ? (error.code || error.message) : 'no error'))
+  }
+  
+  // Now try to end the connection - this should complete, not hang
+  const endStart = Date.now()
+  await sql.end()
+  const endDuration = Date.now() - endStart
+  
+  await sql2.end()
+  
+  // end() should complete quickly (within 1 second), not hang forever
+  return [
+    true,
+    endDuration < 1000
+  ]
+})

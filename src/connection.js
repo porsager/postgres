@@ -388,7 +388,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   function errored(err) {
     stream && (stream.destroy(err), stream = null)
-    query && queryError(query, err)
+    query && (queryError(query, err), query = null)
     initial && (queryError(initial, err), initial = null)
   }
 
@@ -449,7 +449,14 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (initial)
       return reconnect()
 
-    !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
+    if (hadError) {
+      // Clear query when connection closes with error (e.g., ECONNRESET)
+      query && (queryError(query, Errors.connection('CONNECTION_CLOSED', options, socket)), query = null)
+      while (sent.length)
+        queryError(sent.shift(), Errors.connection('CONNECTION_CLOSED', options, socket))
+    } else {
+      (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
+    }
     closedTime = performance.now()
     hadError && options.shared.retries++
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
