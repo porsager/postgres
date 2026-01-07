@@ -658,8 +658,16 @@ declare namespace postgres {
   | Fragment
   | Fragment[]
 
-  interface Sql<TTypes extends Record<string, unknown> = {}> {
+  interface UnsafeQueryOptions {
     /**
+     * When executes query as prepared statement.
+     * @default false
+     */
+    prepare?: boolean | undefined;
+  }
+
+  interface ISql<TTypes extends Record<string, unknown> = {}> {
+        /**
      * Query helper
      * @param first Define how the helper behave
      * @param rest Other optional arguments, depending on the helper type
@@ -675,22 +683,32 @@ declare namespace postgres {
      */
     <T extends readonly (object | undefined)[] = Row[]>(template: TemplateStringsArray, ...parameters: readonly (ParameterOrFragment<TTypes[keyof TTypes]>)[]): PendingQuery<T>;
 
-    CLOSE: {};
-    END: this['CLOSE'];
-    PostgresError: typeof PostgresError;
-
-    options: ParsedOptions<TTypes>;
-    parameters: ConnectionParameters;
     types: this['typed'];
     typed: (<T>(value: T, oid: number) => Parameter<T>) & {
       [name in keyof TTypes]: (value: TTypes[name]) => postgres.Parameter<TTypes[name]>
     };
 
     unsafe<T extends any[] = (Row & Iterable<Row>)[]>(query: string, parameters?: (ParameterOrJSON<TTypes[keyof TTypes]>)[] | undefined, queryOptions?: UnsafeQueryOptions | undefined): PendingQuery<T>;
+
+    notify(channel: string, payload: string): PendingRequest;
+
+    array<T extends SerializableParameter<TTypes[keyof TTypes]>[] = SerializableParameter<TTypes[keyof TTypes]>[]>(value: T, type?: number | undefined): ArrayParameter<T>;
+    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
+    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: (ParameterOrJSON<TTypes[keyof TTypes]>)[], options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
+    json(value: JSONValue): Parameter;
+  }
+
+  interface Sql<TTypes extends Record<string, unknown> = {}> extends ISql<TTypes> {
+    CLOSE: {};
+    END: this['CLOSE'];
+    PostgresError: typeof PostgresError;
+
+    options: ParsedOptions<TTypes>;
+    parameters: ConnectionParameters;
+
     end(options?: { timeout?: number | undefined } | undefined): Promise<void>;
 
     listen(channel: string, onnotify: (value: string) => void, onlisten?: (() => void) | undefined): ListenRequest;
-    notify(channel: string, payload: string): PendingRequest;
 
     subscribe(event: string, cb: (row: Row | null, info: ReplicationEvent) => void, onsubscribe?: (() => void), onerror?: (() => any)): Promise<SubscriptionHandle>;
 
@@ -699,36 +717,10 @@ declare namespace postgres {
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 
-    array<T extends SerializableParameter<TTypes[keyof TTypes]>[] = SerializableParameter<TTypes[keyof TTypes]>[]>(value: T, type?: number | undefined): ArrayParameter<T>;
-    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
-    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: (ParameterOrJSON<TTypes[keyof TTypes]>)[], options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
-    json(value: JSONValue): Parameter;
-
     reserve(): Promise<ReservedSql<TTypes>>
   }
 
-  interface UnsafeQueryOptions {
-    /**
-     * When executes query as prepared statement.
-     * @default false
-     */
-    prepare?: boolean | undefined;
-  }
-
-  interface TransactionSql<TTypes extends Record<string, unknown> = {}> extends Omit<Sql<TTypes>,
-      'parameters' |
-      'largeObject' |
-      'subscribe' |
-      'CLOSE' |
-      'END' |
-      'PostgresError' |
-      'options' |
-      'reserve' |
-      'listen' |
-      'begin' |
-      'close' |
-      'end'
-  > {
+  interface TransactionSql<TTypes extends Record<string, unknown> = {}> extends ISql<TTypes>  {
     savepoint<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     savepoint<T>(name: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 
