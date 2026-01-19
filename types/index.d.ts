@@ -6,8 +6,8 @@ import { Readable, Writable } from 'node:stream'
  * @returns An utility function to make queries to the server
  */
 declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(options?: postgres.Options<T> | undefined): postgres.Sql<Record<string, postgres.PostgresType> extends T ? {} : { [type in keyof T]: T[type] extends {
-  serialize: (value: infer R) => any,
-  parse: (raw: any) => infer R
+  serialize: (value: infer R) => unknown,
+  parse: (raw: unknown) => infer R
 } ? R : never }>
 /**
  * Establish a connection to a PostgreSQL server.
@@ -16,8 +16,8 @@ declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(
  * @returns An utility function to make queries to the server
  */
 declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(url: string, options?: postgres.Options<T> | undefined): postgres.Sql<Record<string, postgres.PostgresType> extends T ? {} : { [type in keyof T]: T[type] extends {
-  serialize: (value: infer R) => any,
-  parse: (raw: any) => infer R
+  serialize: (value: infer R) => unknown,
+  parse: (raw: unknown) => infer R
 } ? R : never }>
 
 /**
@@ -73,13 +73,13 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
    */
   onnotice: (notice: postgres.Notice) => void;
   /** (key; value) when a server param change */
-  onparameter: (key: string, value: any) => void;
+  onparameter: (key: string, value: unknown) => void;
   /** Is called with (connection; query; parameters) */
-  debug: boolean | ((connection: number, query: string, parameters: any[], paramTypes: any[]) => void);
+  debug: boolean | ((connection: number, query: string, parameters: unknown[], paramTypes: unknown[]) => void);
   /** Transform hooks */
   transform: {
     /** Transforms outcoming undefined values */
-    undefined?: any
+    undefined?: unknown
 
     /** Transforms incoming and outgoing column names */
     column?: ((column: string) => string) | {
@@ -89,16 +89,16 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
       to?: ((column: string) => string) | undefined;
     } | undefined;
     /** Transforms incoming and outgoing row values */
-    value?: ((value: any) => any) | {
+    value?: ((value: unknown) => unknown) | {
       /** Transform function for values in result rows */
-      from?: ((value: unknown, column: postgres.Column<string>) => any) | undefined;
-      // to?: ((value: unknown) => any) | undefined; // unused
+      from?: ((value: unknown, column: postgres.Column<string>) => unknown) | undefined;
+      // to?: ((value: unknown) => unknown) | undefined; // unused
     } | undefined;
     /** Transforms entire rows */
-    row?: ((row: postgres.Row) => any) | {
+    row?: ((row: postgres.Row) => unknown) | {
       /** Transform function for entire result rows */
-      from?: ((row: postgres.Row) => any) | undefined;
-      // to?: ((row: postgres.Row) => any) | undefined; // unused
+      from?: ((row: postgres.Row) => unknown) | undefined;
+      // to?: ((row: postgres.Row) => unknown) | undefined; // unused
     } | undefined;
   };
   /** Connection parameters */
@@ -147,27 +147,27 @@ declare class NotAPromise {
   private finally(): never;
 }
 
-type UnwrapPromiseArray<T> = T extends any[] ? {
+type UnwrapPromiseArray<T> = T extends unknown[] ? {
   [k in keyof T]: T[k] extends Promise<infer R> ? R : T[k]
 } : T;
 
 type Keys = string
 
-type SerializableObject<T, K extends readonly any[], TT> =
+type SerializableObject<T, K extends readonly unknown[], TT> =
   number extends K['length'] ? {} :
-  Partial<(Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.ParameterOrJSON<TT> | undefined> & Record<string, any>)>
+  Partial<(Record<Keys & (keyof T) & (K['length'] extends 0 ? string : K[number]), postgres.ParameterOrJSON<TT> | undefined> & Record<string, unknown>)>
 
-type First<T, K extends readonly any[], TT> =
+type First<T, K extends readonly unknown[], TT> =
   // Tagged template string call
   T extends TemplateStringsArray ? TemplateStringsArray :
   // Identifiers helper
   T extends string ? string :
   // Dynamic values helper (depth 2)
-  T extends readonly any[][] ? readonly postgres.EscapableArray[] :
+  T extends readonly unknown[][] ? readonly postgres.EscapableArray[] :
   // Insert/update helper (depth 2)
   T extends readonly (object & infer R)[] ? (R extends postgres.SerializableParameter<TT> ? readonly postgres.SerializableParameter<TT>[] : readonly SerializableObject<R, K, TT>[]) :
-  // Dynamic values/ANY helper (depth 1)
-  T extends readonly any[] ? (readonly postgres.SerializableParameter<TT>[]) :
+  // Dynamic values/unknown helper (depth 1)
+  T extends readonly unknown[] ? (readonly postgres.SerializableParameter<TT>[]) :
   // Insert/update helper (depth 1)
   T extends object ? SerializableObject<T, K, TT> :
   // Unexpected type
@@ -176,23 +176,23 @@ type First<T, K extends readonly any[], TT> =
 type Rest<T> =
   T extends TemplateStringsArray ? never : // force fallback to the tagged template function overload
   T extends string ? readonly string[] :
-  T extends readonly any[][] ? readonly [] :
+  T extends readonly unknown[][] ? readonly [] :
   T extends readonly (object & infer R)[] ? (
     readonly (Keys & keyof R)[]   // sql(data, "prop", "prop2") syntax
     |
     [readonly (Keys & keyof R)[]] // sql(data, ["prop", "prop2"]) syntax
   ) :
-  T extends readonly any[] ? readonly [] :
+  T extends readonly unknown[] ? readonly [] :
   T extends object ? (
     readonly (Keys & keyof T)[]   // sql(data, "prop", "prop2") syntax
     |
     [readonly (Keys & keyof T)[]] // sql(data, ["prop", "prop2"]) syntax
   ) :
-  any
+  unknown
 
-type Return<T, K extends readonly any[]> =
+type Return<T, K extends readonly unknown[]> =
   [T] extends [TemplateStringsArray] ?
-  [unknown] extends [T] ? postgres.Helper<T, K> : // ensure no `PendingQuery` with `any` types
+  [unknown] extends [T] ? postgres.Helper<T, K> : // ensure no `PendingQuery` with `unknown` types
   [TemplateStringsArray] extends [T] ? postgres.PendingQuery<postgres.Row[]> :
   postgres.Helper<T, K> :
   postgres.Helper<T, K>
@@ -223,7 +223,7 @@ declare namespace postgres {
     /** Only set when debug is enabled */
     query: string;
     /** Only set when debug is enabled */
-    parameters: any[];
+    parameters: unknown[];
   }
 
   /**
@@ -316,11 +316,11 @@ declare namespace postgres {
 
   const BigInt: PostgresType<bigint>;
 
-  interface PostgresType<T = any> {
+  interface PostgresType<T = unknown> {
     to: number;
     from: number[];
     serialize: (value: T) => unknown;
-    parse: (raw: any) => T;
+    parse: (raw: unknown) => T;
   }
 
   interface ConnectionParameters {
@@ -384,13 +384,13 @@ declare namespace postgres {
     pass: null;
     /** @inheritdoc */
     transform: Transform;
-    serializers: Record<number, (value: any) => unknown>;
-    parsers: Record<number, (value: any) => unknown>;
+    serializers: Record<number, (value: unknown) => unknown>;
+    parsers: Record<number, (value: unknown) => unknown>;
   }
 
   interface Transform {
     /** Transforms outcoming undefined values */
-    undefined: any
+    undefined: unknown
 
     column: {
       /** Transform function for column names in result rows */
@@ -400,14 +400,14 @@ declare namespace postgres {
     };
     value: {
       /** Transform function for values in result rows */
-      from: ((value: any, column?: Column<string>) => any) | undefined;
+      from: ((value: unknown, column?: Column<string>) => unknown) | undefined;
       /** Transform function for interpolated values passed to tagged template literal */
-      to: undefined; // (value: any) => any
+      to: undefined; // (value: unknown) => unknown
     };
     row: {
       /** Transform function for entire result rows */
-      from: ((row: postgres.Row) => any) | undefined;
-      to: undefined; // (row: postgres.Row) => any
+      from: ((row: postgres.Row) => unknown) | undefined;
+      to: undefined; // (row: postgres.Row) => unknown
     };
   }
 
@@ -430,7 +430,7 @@ declare namespace postgres {
     raw: T | null;
   }
 
-  interface ArrayParameter<T extends readonly any[] = readonly any[]> extends Parameter<T | T[]> {
+  interface ArrayParameter<T extends readonly unknown[] = readonly unknown[]> extends Parameter<T | T[]> {
     array: true;
   }
 
@@ -531,8 +531,8 @@ declare namespace postgres {
   type SerializableParameter<T = never> = never
     | T
     | Serializable
-    | Helper<any>
-    | Parameter<any>
+    | Helper<unknown>
+    | Parameter<unknown>
     | ArrayParameter
     | readonly SerializableParameter<T>[];
 
@@ -543,16 +543,16 @@ declare namespace postgres {
     | boolean
     | Date // serialized as `string`
     | readonly JSONValue[]
-    | { toJSON(): any } // `toJSON` called by `JSON.stringify`; not typing the return type, types definition is strict enough anyway
+    | { toJSON(): unknown } // `toJSON` called by `JSON.stringify`; not typing the return type, types definition is strict enough unknownway
     | {
       readonly [prop: string | number]:
       | undefined
       | JSONValue
-      | ((...args: any) => any) // serialized as `undefined`
+      | ((...args: unknown) => unknown) // serialized as `undefined`
     };
 
   interface Row {
-    [column: string]: any;
+    [column: string]: unknown;
   }
 
   type MaybeRow = Row | undefined;
@@ -595,11 +595,11 @@ declare namespace postgres {
   }
 
   type ExecutionResult<T> = [] & ResultQueryMeta<number, keyof NonNullable<T>>;
-  type ValuesRowList<T extends readonly any[]> = T[number][keyof T[number]][][] & ResultQueryMeta<T['length'], keyof T[number]>;
-  type RawRowList<T extends readonly any[]> = Buffer[][] & Iterable<Buffer[][]> & ResultQueryMeta<T['length'], keyof T[number]>;
-  type RowList<T extends readonly any[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
+  type ValuesRowList<T extends readonly unknown[]> = T[number][keyof T[number]][][] & ResultQueryMeta<T['length'], keyof T[number]>;
+  type RawRowList<T extends readonly unknown[]> = Buffer[][] & Iterable<Buffer[][]> & ResultQueryMeta<T['length'], keyof T[number]>;
+  type RowList<T extends readonly unknown[]> = T & Iterable<NonNullable<T[number]>> & ResultQueryMeta<T['length'], keyof T[number]>;
 
-  interface PendingQueryModifiers<TRow extends readonly any[]> {
+  interface PendingQueryModifiers<TRow extends readonly unknown[]> {
     simple(): this;
     readable(): Promise<Readable>;
     writable(): Promise<Writable>;
@@ -642,12 +642,12 @@ declare namespace postgres {
     unlisten(): Promise<void>
   }
 
-  interface Helper<T, U extends readonly any[] = T[]> extends NotAPromise {
+  interface Helper<T, U extends readonly unknown[] = T[]> extends NotAPromise {
     first: T;
     rest: U;
   }
 
-  type Fragment = PendingQuery<any>
+  type Fragment = PendingQuery<unknown>
 
   type ParameterOrJSON<T> =
   | SerializableParameter<T>
@@ -686,13 +686,13 @@ declare namespace postgres {
       [name in keyof TTypes]: (value: TTypes[name]) => postgres.Parameter<TTypes[name]>
     };
 
-    unsafe<T extends any[] = (Row & Iterable<Row>)[]>(query: string, parameters?: (ParameterOrJSON<TTypes[keyof TTypes]>)[] | undefined, queryOptions?: UnsafeQueryOptions | undefined): PendingQuery<T>;
+    unsafe<T extends unknown[] = (Row & Iterable<Row>)[]>(query: string, parameters?: (ParameterOrJSON<TTypes[keyof TTypes]>)[] | undefined, queryOptions?: UnsafeQueryOptions | undefined): PendingQuery<T>;
     end(options?: { timeout?: number | undefined } | undefined): Promise<void>;
 
     listen(channel: string, onnotify: (value: string) => void, onlisten?: (() => void) | undefined): ListenRequest;
     notify(channel: string, payload: string): PendingRequest;
 
-    subscribe(event: string, cb: (row: Row | null, info: ReplicationEvent) => void, onsubscribe?: (() => void), onerror?: (() => any)): Promise<SubscriptionHandle>;
+    subscribe(event: string, cb: (row: Row | null, info: ReplicationEvent) => void, onsubscribe?: (() => void), onerror?: (() => unknown)): Promise<SubscriptionHandle>;
 
     largeObject(oid?: number | undefined, /** @default 0x00020000 | 0x00040000 */ mode?: number | undefined): Promise<LargeObject>;
 
@@ -700,8 +700,8 @@ declare namespace postgres {
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 
     array<T extends SerializableParameter<TTypes[keyof TTypes]>[] = SerializableParameter<TTypes[keyof TTypes]>[]>(value: T, type?: number | undefined): ArrayParameter<T>;
-    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
-    file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: (ParameterOrJSON<TTypes[keyof TTypes]>)[], options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
+    file<T extends readonly unknown[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
+    file<T extends readonly unknown[] = Row[]>(path: string | Buffer | URL | number, args: (ParameterOrJSON<TTypes[keyof TTypes]>)[], options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
     json(value: JSONValue): Parameter;
 
     reserve(): Promise<ReservedSql<TTypes>>
