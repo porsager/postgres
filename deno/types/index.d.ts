@@ -520,7 +520,7 @@ declare namespace postgres {
     size(): Promise<[{ position: bigint, size: bigint }]>;
   }
 
-  type EscapableArray = (string | number | object)[]
+  type EscapableArray = (string | number | Record<string, unknown>)[]
 
   type Serializable = never
     | null
