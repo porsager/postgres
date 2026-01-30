@@ -254,6 +254,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function nextWrite(fn) {
+    if (!socket) {
+      // Connection was closed, cannot write
+      chunk = nextWriteTimer = null
+      return false
+    }
     const x = socket.write(chunk, fn)
     nextWriteTimer !== null && clearImmediate(nextWriteTimer)
     chunk = nextWriteTimer = null
@@ -436,6 +441,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   async function closed(hadError) {
+    terminated = true  // Mark connection as terminated to prevent further query attempts
     incoming = Buffer.alloc(0)
     remaining = 0
     incomings = null
