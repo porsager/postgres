@@ -170,11 +170,20 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         : (query = q, query.active = true)
 
       build(q)
-      return write(toBuffer(q))
+      const written = write(toBuffer(q))
+      if (written && q.options.onexecute) {
+        q.options.onexecute(connection)
+        return false
+      }
+      return written
         && !q.describeFirst
         && !q.cursorFn
         && sent.length < max_pipeline
-        && (!q.options.onexecute || q.options.onexecute(connection))
+        //     return write(toBuffer(q))
+        // && !q.describeFirst
+        // && !q.cursorFn
+        // && sent.length < max_pipeline
+        // && (!q.options.onexecute || q.options.onexecute(connection))
     } catch (error) {
       sent.length === 0 && write(Sync)
       errored(error)
@@ -295,7 +304,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   /* c8 ignore next 3 */
   function drain() {
-    !query && onopen(connection)
+    !query && !connection.reserved && onopen(connection)
   }
 
   function data(x) {
