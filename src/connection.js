@@ -772,16 +772,15 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       from pg_catalog.pg_type
       order by oid
     `], [], execute)
-    types.forEach(({ oid, typname }) => {
+    types.forEach(({ oid, typname, typarray }) => {
       options.shared.typeNameToOid[typname] = oid
       options.shared.typeOidToName[oid] = typname
-    })
-    types.forEach(({ oid, typarray }) => {
-      typarray && addType(oid, typarray)
+
+      if (typarray) addArrayType(oid, typarray)
     })
   }
 
-  function addType(oid, typarray) {
+  function addArrayType(oid, typarray) {
     if (!!options.parsers[typarray] && !!options.serializers[typarray]) return
     const name = options.shared.typeOidToName[oid]
     const parser = options.parsers[oid] || options.parsers[name]
