@@ -552,9 +552,6 @@ t('Point type with named OIDs', async() => {
     }
   })
 
-  sql.options.shared.typeNameToOid['point'] = 600
-  sql.options.shared.typeOidToName[600] = 'point'
-
   await sql`create table test (x point)`
   await sql`insert into test (x) values (${ sql.types.point([10, 20]) })`
   return [20, (await sql`select x from test`)[0].x[1], await sql`drop table test`]

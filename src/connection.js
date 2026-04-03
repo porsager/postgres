@@ -561,7 +561,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
       if (needsTypes) {
         initial.reserve && (initial = null)
-        return fetchArrayTypes()
+        return fetchTypes()
       }
 
       initial && !initial.reserve && execute(initial)
@@ -765,20 +765,23 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     backend.secret = x.readUInt32BE(9)
   }
 
-  async function fetchArrayTypes() {
+  async function fetchTypes() {
     needsTypes = false
     const types = await new Query([`
-      select b.oid, b.typarray
-      from pg_catalog.pg_type a
-      left join pg_catalog.pg_type b on b.oid = a.typelem
-      where a.typcategory = 'A'
-      group by b.oid, b.typarray
-      order by b.oid
+      select oid, typname, typarray
+      from pg_catalog.pg_type
+      order by oid
     `], [], execute)
-    types.forEach(({ oid, typarray }) => addArrayType(oid, typarray))
+    types.forEach(({ oid, typname }) => {
+      options.shared.typeNameToOid[typname] = oid
+      options.shared.typeOidToName[oid] = typname
+    })
+    types.forEach(({ oid, typarray }) => {
+      typarray && addType(oid, typarray)
+    })
   }
 
-  function addArrayType(oid, typarray) {
+  function addType(oid, typarray) {
     if (!!options.parsers[typarray] && !!options.serializers[typarray]) return
     const name = options.shared.typeOidToName[oid]
     const parser = options.parsers[oid] || options.parsers[name]
