@@ -539,6 +539,27 @@ t('Point type array', async() => {
   return [30, (await sql`select x from test`)[0].x[1][1], await sql`drop table test`]
 })
 
+t('Point type with named OIDs', async() => {
+  const sql = postgres({
+    ...options,
+    types: {
+      point: {
+        to: 'point',
+        from: ['point'],
+        serialize: ([x, y]) => '(' + x + ',' + y + ')',
+        parse: (x) => x.slice(1, -1).split(',').map(x => +x)
+      }
+    }
+  })
+
+  sql.options.shared.typeNameToOid['point'] = 600
+  sql.options.shared.typeOidToName[600] = 'point'
+
+  await sql`create table test (x point)`
+  await sql`insert into test (x) values (${ sql.types.point([10, 20]) })`
+  return [20, (await sql`select x from test`)[0].x[1], await sql`drop table test`]
+})
+
 t('sql file', async() =>
   [1, (await sql.file(rel('select.sql')))[0].x]
 )
