@@ -86,7 +86,7 @@ export function handleValue(x, parameters, types, options) {
   return '$' + (types.push(
     x instanceof Parameter
       ? (parameters.push(x.value), x.array
-        ? x.array[x.type || inferType(x.value)] || x.type || firstIsString(x.value)
+        ? x.array[options.shared.typeNameToOid[x.type] || x.type || inferType(x.value)] || x.type || firstIsString(x.value)
         : x.type
       )
       : (parameters.push(x), inferType(x))

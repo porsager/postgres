@@ -319,8 +319,8 @@ declare namespace postgres {
   const BigInt: PostgresType<bigint>;
 
   interface PostgresType<T = any> {
-    to: number;
-    from: number[];
+    to: (number | string);
+    from: (number | string)[];
     serialize: (value: T) => unknown;
     parse: (raw: any) => T;
   }
@@ -386,8 +386,8 @@ declare namespace postgres {
     pass: null;
     /** @inheritdoc */
     transform: Transform;
-    serializers: Record<number, (value: any) => unknown>;
-    parsers: Record<number, (value: any) => unknown>;
+    serializers: Record<number | string, (value: any) => unknown>;
+    parsers: Record<number | string, (value: any) => unknown>;
   }
 
   interface Transform {
@@ -419,9 +419,9 @@ declare namespace postgres {
 
   interface Parameter<T = SerializableParameter> extends NotAPromise {
     /**
-     * PostgreSQL OID of the type
+     * PostgreSQL OID or type name of the type
      */
-    type: number;
+    type: number | string;
     /**
      * Serialized value
      */
@@ -684,7 +684,7 @@ declare namespace postgres {
     options: ParsedOptions<TTypes>;
     parameters: ConnectionParameters;
     types: this['typed'];
-    typed: (<T>(value: T, oid: number) => Parameter<T>) & {
+    typed: (<T>(value: T, type: number | string) => Parameter<T>) & {
       [name in keyof TTypes]: (value: TTypes[name]) => postgres.Parameter<TTypes[name]>
     };
 
@@ -701,7 +701,7 @@ declare namespace postgres {
     begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
     begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>;
 
-    array<T extends SerializableParameter<TTypes[keyof TTypes]>[] = SerializableParameter<TTypes[keyof TTypes]>[]>(value: T, type?: number | undefined): ArrayParameter<T>;
+    array<T extends SerializableParameter<TTypes[keyof TTypes]>[] = SerializableParameter<TTypes[keyof TTypes]>[]>(value: T, type?: number | string | undefined): ArrayParameter<T>;
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, args: (ParameterOrJSON<TTypes[keyof TTypes]>)[], options?: { cache?: boolean | undefined } | undefined): PendingQuery<T>;
     json(value: JSONValue): Parameter;

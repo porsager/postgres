@@ -564,7 +564,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
       if (needsTypes) {
         initial.reserve && (initial = null)
-        return fetchArrayTypes()
+        return fetchTypes()
       }
 
       initial && !initial.reserve && execute(initial)
@@ -660,7 +660,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         name: transform.column.from
           ? transform.column.from(x.toString('utf8', start, index - 1))
           : x.toString('utf8', start, index - 1),
-        parser: parsers[type],
+        parser: parsers[type] || parsers[options.shared.typeOidToName[type]],
         table,
         number,
         type
@@ -768,26 +768,29 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     backend.secret = x.readUInt32BE(9)
   }
 
-  async function fetchArrayTypes() {
+  async function fetchTypes() {
     needsTypes = false
     const types = await new Query([`
-      select b.oid, b.typarray
-      from pg_catalog.pg_type a
-      left join pg_catalog.pg_type b on b.oid = a.typelem
-      where a.typcategory = 'A'
-      group by b.oid, b.typarray
-      order by b.oid
+      select oid, typname, typarray
+      from pg_catalog.pg_type
+      order by oid
     `], [], execute)
-    types.forEach(({ oid, typarray }) => addArrayType(oid, typarray))
+    types.forEach(({ oid, typname, typarray }) => {
+      options.shared.typeNameToOid[typname] = oid
+      options.shared.typeOidToName[oid] = typname
+
+      if (typarray) addArrayType(oid, typarray)
+    })
   }
 
   function addArrayType(oid, typarray) {
     if (!!options.parsers[typarray] && !!options.serializers[typarray]) return
-    const parser = options.parsers[oid]
+    const name = options.shared.typeOidToName[oid]
+    const parser = options.parsers[oid] || options.parsers[name]
     options.shared.typeArrayMap[oid] = typarray
     options.parsers[typarray] = (xs) => arrayParser(xs, parser, typarray)
     options.parsers[typarray].array = true
-    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid], options, typarray)
+    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid] || options.serializers[name], options, typarray)
   }
 
   function tryNext(x, xs) {
@@ -974,7 +977,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   function Parse(str, parameters, types, name = '') {
     b().P().str(name + b.N).str(str + b.N).i16(parameters.length)
-    parameters.forEach((x, i) => b.i32(types[i] || 0))
+    parameters.forEach((x, i) => {
+      const type = types[i]
+      b.i32(options.shared.typeNameToOid[type] || type || 0)
+    })
     return b.end()
   }
 
