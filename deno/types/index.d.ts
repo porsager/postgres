@@ -1,5 +1,6 @@
 import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
 import process from 'https://deno.land/std@0.132.0/node/process.ts'
+import { Socket } from "https://deno.land/std@0.132.0/node/net.ts"
 import { Readable, Writable } from 'https://deno.land/std@0.132.0/node/stream.ts'
 
 /**
@@ -124,6 +125,8 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
   backoff: boolean | ((attemptNum: number) => number);
   max_lifetime: number | null;
   keep_alive: number | null;
+  /** fn returning custom socket to use */
+  socket: (options: postgres.ParsedOptions<T>) => Socket | Promise<Socket>
 }
 
 
