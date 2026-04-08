@@ -225,6 +225,7 @@ const inferType = module.exports.inferType = function inferType(x) {
     (x === true || x === false) ? 16 :
     typeof x === 'bigint' ? 20 :
     Array.isArray(x) ? inferType(x[0]) :
+    typeof x === 'object' && x !== null ? 3802 :
     0
   )
 }
