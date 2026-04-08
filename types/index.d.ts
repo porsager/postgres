@@ -119,6 +119,10 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
    */
   publications: string
   onclose: (connId: number) => void;
+  /**
+   * Called when a connection becomes idle and available for new queries
+   */
+  onidle: (connId: number) => void;
   backoff: boolean | ((attemptNum: number) => number);
   max_lifetime: number | null;
   keep_alive: number | null;

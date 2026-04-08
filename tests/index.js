@@ -959,6 +959,107 @@ t('responds with server parameters (application_name)', async() =>
   })`select 1`.catch(reject))]
 )
 
+t('onidle fires for each connection in pool', async() => {
+  const ids = []
+  const sql = postgres({
+    ...options,
+    max: 2,
+    onidle: (id) => ids.push(id)
+  })
+
+  // Run two queries concurrently to use both connections.
+  await Promise.all([
+    sql`select pg_sleep(0.05)`,
+    sql`select pg_sleep(0.05)`
+  ])
+  await sql.end()
+
+  // Both connections should have fired onidle.
+  return [2, ids.length]
+})
+
+t('onidle not called when queries are queued', async() => {
+  let idleCount = 0
+  const sql = postgres({
+    ...options,
+    max: 1,
+    onidle: () => idleCount++
+  })
+
+  // Run two queries concurrently on single connection.
+  await Promise.all([
+    sql`select pg_sleep(0.05)`,
+    sql`select 1`
+  ])
+  await sql.end()
+
+  // Should only fire once after both queries complete and connection returns to idle.
+  return [1, idleCount]
+})
+
+t('onidle receives connection id', async() => {
+  const ids = []
+  const sql = postgres({
+    ...options,
+    max: 2,
+    onidle: (id) => ids.push(id)
+  })
+
+  // Use two connections.
+  await Promise.all([
+    sql`select pg_sleep(0.05)`,
+    sql`select pg_sleep(0.05)`
+  ])
+  await sql.end()
+
+  // Should receive valid integer ids, and they should be different.
+  return [true, ids.length === 2 && ids.every(Number.isInteger) && ids[0] !== ids[1]]
+})
+
+t('onidle can be set after creation', async() => {
+  let called = false
+  const sql = postgres({ ...options, max: 1 })
+
+  sql.options.onidle = () => called = true
+
+  await sql`select 1`
+  await sql.end()
+
+  return [true, called]
+})
+
+t('onidle fires after reserved connection is released', async() => {
+  let idleCount = 0
+  const sql = postgres({
+    ...options,
+    max: 1,
+    onidle: () => idleCount++
+  })
+
+  const reserved = await sql.reserve()
+  await reserved`select 1`
+  reserved.release()
+  await sql.end()
+
+  return [1, idleCount]
+})
+
+t('onidle fires after transaction completes', async() => {
+  let idleCount = 0
+  const sql = postgres({
+    ...options,
+    max: 1,
+    onidle: () => idleCount++
+  })
+
+  await sql.begin(async sql => {
+    await sql`select 1`
+  })
+  await sql.end()
+
+  return [1, idleCount]
+})
+
 t('has server parameters', async() => {
   return ['postgres.js', (await sql`select 1`.then(() => sql.parameters.application_name))]
 })
