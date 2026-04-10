@@ -1,4 +1,4 @@
-import { spawn } from 'https://deno.land/std@0.132.0/node/child_process.ts'
+import { spawn } from 'node:child_process'
 
 await exec('dropdb', ['postgres_js_test'])
 
