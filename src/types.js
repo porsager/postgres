@@ -16,7 +16,7 @@ export const types = {
   json: {
     to: 114,
     from: [114, 3802],
-    serialize: (x, options) => JSON.stringify(options && options.transform.value.to ? options.transform.value.to(x, { type: 3802 }) : x),
+    serialize: (x, options, type) => JSON.stringify(options && options.transform.value.to ? options.transform.value.to(x, { type }) : x),
     parse: x => JSON.parse(x)
   },
   boolean: {
@@ -340,7 +340,9 @@ function createJsonTransform(fn) {
     return typeof x === 'object' && x !== null && (column.type === 114 || column.type === 3802)
       ? Array.isArray(x)
         ? x.map(x => jsonTransform(x, column))
-        : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: jsonTransform(v, column) }), {})
+        : Object.getPrototypeOf(x) === Object.prototype || Object.getPrototypeOf(x) === null
+          ? Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: jsonTransform(v, column) }), {})
+          : x
       : x
   }
 }

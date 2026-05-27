@@ -169,6 +169,16 @@ t('Json transform typed json parameters', async() => {
   return ['1', x]
 })
 
+t('Json transform toJSON parameter values', async() => {
+  const now = new Date()
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ sql.json({ aTest: now }) }->>'a_test' as x`)[0].x
+  return [now.toJSON(), x]
+})
+
 t('implicit json', async() => {
   const x = (await sql`select ${ { a: 'hello', b: 42 } }::json as x`)[0].x
   return ['hello,42', [x.a, x.b].join()]
