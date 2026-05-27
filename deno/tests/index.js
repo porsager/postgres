@@ -133,33 +133,6 @@ t('Json transform nested parameter keys', async() => {
   return ['2', x]
 })
 
-t('Json transform result keys', async() => {
-  const sql = postgres({
-    ...options,
-    transform: postgres.camel
-  })
-  const x = (await sql`select '{"a_test":1}'::jsonb as x`)[0].x
-  return [1, x.aTest]
-})
-
-t('Json transform implicit json parameters', async() => {
-  const sql = postgres({
-    ...options,
-    transform: postgres.camel
-  })
-  const x = (await sql`select ${ { aTest: 1 } }::jsonb->>'a_test' as x`)[0].x
-  return ['1', x]
-})
-
-t('Json transform implicit json type parameters', async() => {
-  const sql = postgres({
-    ...options,
-    transform: postgres.camel
-  })
-  const x = (await sql`select ${ { aTest: 1 } }::json->>'a_test' as x`)[0].x
-  return ['1', x]
-})
-
 t('Json transform typed json parameters', async() => {
   const sql = postgres({
     ...options,
@@ -169,7 +142,34 @@ t('Json transform typed json parameters', async() => {
   return ['1', x]
 })
 
-t('Json transform toJSON parameter values', async() => {
+t('Json transform implicit jsonb parameters', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ { aTest: 1 } }::jsonb->>'a_test' as x`)[0].x
+  return ['1', x]
+})
+
+t('Json transform implicit json parameters', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ { aTest: 1 } }::json->>'a_test' as x`)[0].x
+  return ['1', x]
+})
+
+t('Json transform result keys', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select '{"a_test":1}'::jsonb as x`)[0].x
+  return [1, x.aTest]
+})
+
+t('Json transform does not transform parameter values with .toJSON()', async() => {
   const now = new Date()
   const sql = postgres({
     ...options,
