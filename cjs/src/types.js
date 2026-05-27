@@ -16,7 +16,7 @@ const types = module.exports.types = {
   json: {
     to: 114,
     from: [114, 3802],
-    serialize: x => JSON.stringify(x),
+    serialize: (x, options) => JSON.stringify(options && options.transform.value.to ? options.transform.value.to(x, { type: 3802 }) : x),
     parse: x => JSON.parse(x)
   },
   boolean: {
@@ -348,20 +348,26 @@ function createJsonTransform(fn) {
 toCamel.column = { from: toCamel }
 toCamel.value = { from: createJsonTransform(toCamel) }
 fromCamel.column = { to: fromCamel }
+fromCamel.value = { to: createJsonTransform(fromCamel) }
 
 const camel = module.exports.camel = { ...toCamel }
 camel.column.to = fromCamel
+camel.value.to = fromCamel.value.to
 
 toPascal.column = { from: toPascal }
 toPascal.value = { from: createJsonTransform(toPascal) }
 fromPascal.column = { to: fromPascal }
+fromPascal.value = { to: createJsonTransform(fromPascal) }
 
 const pascal = module.exports.pascal = { ...toPascal }
 pascal.column.to = fromPascal
+pascal.value.to = fromPascal.value.to
 
 toKebab.column = { from: toKebab }
 toKebab.value = { from: createJsonTransform(toKebab) }
 fromKebab.column = { to: fromKebab }
+fromKebab.value = { to: createJsonTransform(fromKebab) }
 
 const kebab = module.exports.kebab = { ...toKebab }
 kebab.column.to = fromKebab
+kebab.value.to = fromKebab.value.to

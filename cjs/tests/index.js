@@ -106,6 +106,67 @@ t('Json', async() => {
   return ['hello,42', [x.a, x.b].join()]
 })
 
+t('Json transform parameter keys', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ sql.json({ firstName: 'Ada' }) }->>'first_name' as x`)[0].x
+  return ['Ada', x]
+})
+
+t('Json transform nested parameter keys', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`
+    select ${ sql.json({ userNames: [{ firstName: 'Ada' }, { firstName: 'Grace' }] }) }#>>'{user_names,1,first_name}' as x
+  `)[0].x
+  return ['Grace', x]
+})
+
+t('Json transform result keys', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select '{"first_name":"Ada"}'::jsonb as x`)[0].x
+  return ['Ada', x.firstName]
+})
+
+t('Json without transform keeps parameter keys', async() => {
+  const x = (await sql`select ${ sql.json({ firstName: 'Ada' }) }->>'firstName' as x`)[0].x
+  return ['Ada', x]
+})
+
+t('Json transform implicit json parameters', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ { firstName: 'Ada' } }::jsonb->>'first_name' as x`)[0].x
+  return ['Ada', x]
+})
+
+t('Json transform implicit json type parameters', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ { firstName: 'Ada' } }::json->>'first_name' as x`)[0].x
+  return ['Ada', x]
+})
+
+t('Json transform typed json parameters', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ sql.typed({ firstName: 'Ada' }, 114) }->>'first_name' as x`)[0].x
+  return ['Ada', x]
+})
+
 t('implicit json', async() => {
   const x = (await sql`select ${ { a: 'hello', b: 42 } }::json as x`)[0].x
   return ['hello,42', [x.a, x.b].join()]

@@ -957,7 +957,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
       type = types[i]
       parameters[i] = x = type in options.serializers
-        ? options.serializers[type](x)
+        ? options.serializers[type](x, options)
         : '' + x
 
       prev = b.i
