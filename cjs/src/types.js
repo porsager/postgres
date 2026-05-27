@@ -16,7 +16,7 @@ const types = module.exports.types = {
   json: {
     to: 114,
     from: [114, 3802],
-    serialize: (x, options, type) => JSON.stringify(options && options.transform.value.to ? options.transform.value.to(x, { type }) : x),
+    serialize: x => JSON.stringify(x),
     parse: x => JSON.parse(x)
   },
   boolean: {

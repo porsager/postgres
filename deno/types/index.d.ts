@@ -333,7 +333,7 @@ declare namespace postgres {
   interface PostgresType<T = any> {
     to: number;
     from: number[];
-    serialize: (value: T, options?: ParsedOptions, type?: number) => unknown;
+    serialize: (value: T) => unknown;
     parse: (raw: any) => T;
   }
 
@@ -398,7 +398,7 @@ declare namespace postgres {
     pass: null;
     /** @inheritdoc */
     transform: Transform;
-    serializers: Record<number, (value: any, options?: ParsedOptions, type?: number) => unknown>;
+    serializers: Record<number, (value: any) => unknown>;
     parsers: Record<number, (value: any) => unknown>;
   }
 

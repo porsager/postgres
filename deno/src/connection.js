@@ -959,8 +959,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         return b.i32(0xFFFFFFFF)
 
       type = types[i]
+      x = options.transform.value.to ? options.transform.value.to(x, { type }) : x
       parameters[i] = x = type in options.serializers
-        ? options.serializers[type](x, options, type)
+        ? options.serializers[type](x)
         : '' + x
 
       prev = b.i
