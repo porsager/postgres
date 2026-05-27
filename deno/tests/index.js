@@ -117,6 +117,11 @@ t('Json transform parameter keys', async() => {
   return ['1', x]
 })
 
+t('Json without transform keeps parameter keys', async() => {
+  const x = (await sql`select ${ sql.json({ aTest: 1 }) }->>'aTest' as x`)[0].x
+  return ['1', x]
+})
+
 t('Json transform nested parameter keys', async() => {
   const sql = postgres({
     ...options,
@@ -135,11 +140,6 @@ t('Json transform result keys', async() => {
   })
   const x = (await sql`select '{"a_test":1}'::jsonb as x`)[0].x
   return [1, x.aTest]
-})
-
-t('Json without transform keeps parameter keys', async() => {
-  const x = (await sql`select ${ sql.json({ aTest: 1 }) }->>'aTest' as x`)[0].x
-  return ['1', x]
 })
 
 t('Json transform implicit json parameters', async() => {
