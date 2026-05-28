@@ -108,6 +108,77 @@ t('Json', async() => {
   return ['hello,42', [x.a, x.b].join()]
 })
 
+t('Json transform parameter keys', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ sql.json({ aTest: 1 }) }->>'a_test' as x`)[0].x
+  return ['1', x]
+})
+
+t('Json without transform keeps parameter keys', async() => {
+  const x = (await sql`select ${ sql.json({ aTest: 1 }) }->>'aTest' as x`)[0].x
+  return ['1', x]
+})
+
+t('Json transform nested parameter keys', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`
+    select ${ sql.json({ aTest: [{ bTest: 1 }, { bTest: 2 }] }) }#>>'{a_test,1,b_test}' as x
+  `)[0].x
+  return ['2', x]
+})
+
+t('Json transform typed json parameters', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ sql.typed({ aTest: 1 }, 114) }->>'a_test' as x`)[0].x
+  return ['1', x]
+})
+
+t('Json transform implicit jsonb parameters', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ { aTest: 1 } }::jsonb->>'a_test' as x`)[0].x
+  return ['1', x]
+})
+
+t('Json transform implicit json parameters', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ { aTest: 1 } }::json->>'a_test' as x`)[0].x
+  return ['1', x]
+})
+
+t('Json transform result keys', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select '{"a_test":1}'::jsonb as x`)[0].x
+  return [1, x.aTest]
+})
+
+t('Json transform does not transform parameter values with .toJSON()', async() => {
+  const now = new Date()
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  const x = (await sql`select ${ sql.json({ aTest: now }) }->>'a_test' as x`)[0].x
+  return [now.toJSON(), x]
+})
+
 t('implicit json', async() => {
   const x = (await sql`select ${ { a: 'hello', b: 42 } }::json as x`)[0].x
   return ['hello,42', [x.a, x.b].join()]

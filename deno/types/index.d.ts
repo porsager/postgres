@@ -236,7 +236,7 @@ declare namespace postgres {
   function toPascal(str: string): string;
   namespace toPascal {
     namespace column { function from(str: string): string; }
-    namespace value { function from(str: unknown, column: Column<string>): string }
+    namespace value { function from(str: unknown, column: Column<string>): unknown }
   }
   /**
    * Convert a PascalCase string to snake_case.
@@ -246,6 +246,7 @@ declare namespace postgres {
   function fromPascal(str: string): string;
   namespace fromPascal {
     namespace column { function to(str: string): string }
+    namespace value { function to(str: unknown, column: Column<string>): unknown }
   }
   /**
    * Convert snake_case to and from PascalCase.
@@ -255,7 +256,10 @@ declare namespace postgres {
       function from(str: string): string;
       function to(str: string): string;
     }
-    namespace value { function from(str: unknown, column: Column<string>): string }
+    namespace value {
+      function from(str: unknown, column: Column<string>): unknown;
+      function to(str: unknown, column: Column<string>): unknown;
+    }
   }
   /**
    * Convert a snake_case string to camelCase.
@@ -265,7 +269,7 @@ declare namespace postgres {
   function toCamel(str: string): string;
   namespace toCamel {
     namespace column { function from(str: string): string; }
-    namespace value { function from(str: unknown, column: Column<string>): string }
+    namespace value { function from(str: unknown, column: Column<string>): unknown }
   }
   /**
    * Convert a camelCase string to snake_case.
@@ -275,6 +279,7 @@ declare namespace postgres {
   function fromCamel(str: string): string;
   namespace fromCamel {
     namespace column { function to(str: string): string }
+    namespace value { function to(str: unknown, column: Column<string>): unknown }
   }
   /**
    * Convert snake_case to and from camelCase.
@@ -284,7 +289,10 @@ declare namespace postgres {
       function from(str: string): string;
       function to(str: string): string;
     }
-    namespace value { function from(str: unknown, column: Column<string>): string }
+    namespace value {
+      function from(str: unknown, column: Column<string>): unknown;
+      function to(str: unknown, column: Column<string>): unknown;
+    }
   }
   /**
    * Convert a snake_case string to kebab-case.
@@ -294,7 +302,7 @@ declare namespace postgres {
   function toKebab(str: string): string;
   namespace toKebab {
     namespace column { function from(str: string): string; }
-    namespace value { function from(str: unknown, column: Column<string>): string }
+    namespace value { function from(str: unknown, column: Column<string>): unknown }
   }
   /**
    * Convert a kebab-case string to snake_case.
@@ -304,6 +312,7 @@ declare namespace postgres {
   function fromKebab(str: string): string;
   namespace fromKebab {
     namespace column { function to(str: string): string }
+    namespace value { function to(str: unknown, column: Column<string>): unknown }
   }
   /**
    * Convert snake_case to and from kebab-case.
@@ -313,7 +322,10 @@ declare namespace postgres {
       function from(str: string): string;
       function to(str: string): string;
     }
-    namespace value { function from(str: unknown, column: Column<string>): string }
+    namespace value {
+      function from(str: unknown, column: Column<string>): unknown;
+      function to(str: unknown, column: Column<string>): unknown;
+    }
   }
 
   const BigInt: PostgresType<bigint>;
@@ -404,7 +416,7 @@ declare namespace postgres {
       /** Transform function for values in result rows */
       from: ((value: any, column?: Column<string>) => any) | undefined;
       /** Transform function for interpolated values passed to tagged template literal */
-      to: undefined; // (value: any) => any
+      to: ((value: any, column?: Column<string>) => any) | undefined;
     };
     row: {
       /** Transform function for entire result rows */

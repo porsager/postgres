@@ -340,7 +340,9 @@ function createJsonTransform(fn) {
     return typeof x === 'object' && x !== null && (column.type === 114 || column.type === 3802)
       ? Array.isArray(x)
         ? x.map(x => jsonTransform(x, column))
-        : Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: jsonTransform(v, column) }), {})
+        : Object.getPrototypeOf(x) === Object.prototype || Object.getPrototypeOf(x) === null
+          ? Object.entries(x).reduce((acc, [k, v]) => Object.assign(acc, { [fn(k)]: jsonTransform(v, column) }), {})
+          : x
       : x
   }
 }
@@ -348,20 +350,26 @@ function createJsonTransform(fn) {
 toCamel.column = { from: toCamel }
 toCamel.value = { from: createJsonTransform(toCamel) }
 fromCamel.column = { to: fromCamel }
+fromCamel.value = { to: createJsonTransform(fromCamel) }
 
 export const camel = { ...toCamel }
 camel.column.to = fromCamel
+camel.value.to = fromCamel.value.to
 
 toPascal.column = { from: toPascal }
 toPascal.value = { from: createJsonTransform(toPascal) }
 fromPascal.column = { to: fromPascal }
+fromPascal.value = { to: createJsonTransform(fromPascal) }
 
 export const pascal = { ...toPascal }
 pascal.column.to = fromPascal
+pascal.value.to = fromPascal.value.to
 
 toKebab.column = { from: toKebab }
 toKebab.value = { from: createJsonTransform(toKebab) }
 fromKebab.column = { to: fromKebab }
+fromKebab.value = { to: createJsonTransform(fromKebab) }
 
 export const kebab = { ...toKebab }
 kebab.column.to = fromKebab
+kebab.value.to = fromKebab.value.to
