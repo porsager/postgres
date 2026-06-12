@@ -345,9 +345,9 @@ declare namespace postgres {
 
   interface Options<T extends Record<string, postgres.PostgresType>> extends Partial<BaseOptions<T>> {
     /** @inheritdoc */
-    host?: string | undefined;
+    host?: string | string[] | undefined;
     /** @inheritdoc */
-    port?: number | undefined;
+    port?: number | number[] | undefined;
     /** @inheritdoc */
     path?: string | undefined;
     /** Password of database user (an alias for `password`) */
