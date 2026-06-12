@@ -69,6 +69,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     target_session_attrs
   } = options
 
+  // prefer-standby does a second pass over the host list accepting any server type (like libpq)
+  const maxHostAttempts = host.length * (target_session_attrs === 'prefer-standby' ? 2 : 1)
+
   const sent = Queue()
       , id = uid++
       , backend = { pid: null, secret: null }
@@ -112,6 +115,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     idleTimer,
     connect(query) {
       initial = query
+      retries = 0
       reconnect()
     },
     terminate,
@@ -259,7 +263,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function connectTimedOut() {
-    errored(Errors.connection('CONNECT_TIMEOUT', options, socket))
+    error(Errors.connection('CONNECT_TIMEOUT', options, socket))
     socket.destroy()
   }
 
@@ -379,7 +383,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function error(err) {
-    if (connection.queue === queues.connecting && options.host[retries + 1])
+    if (connection.queue === queues.connecting && retries + 1 < maxHostAttempts)
       return
 
     errored(err)
@@ -447,8 +451,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.removeAllListeners()
     socket = null
 
-    if (initial)
+    if (initial) {
+      retries++
       return reconnect()
+    }
 
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
     closedTime = performance.now()
@@ -793,7 +799,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       (x === 'read-only' && xs.default_transaction_read_only === 'off') ||
       (x === 'primary' && xs.in_hot_standby === 'on') ||
       (x === 'standby' && xs.in_hot_standby === 'off') ||
-      (x === 'prefer-standby' && xs.in_hot_standby === 'off' && options.host[retries])
+      (x === 'prefer-standby' && xs.in_hot_standby === 'off' && retries < host.length)
     )
   }
 

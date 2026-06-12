@@ -1901,6 +1901,40 @@ t('Multiple hosts', {
   return [[id1, id2, id1].join(','), result.join(',')]
 })
 
+t('Multiple hosts errors when all hosts are down', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, host: ['localhost', 'localhost'], port: [1, 2], connect_timeout: 1 })
+  return ['ECONNREFUSED', await sql`select 1`.catch(e => e.code)]
+})
+
+t('Multiple hosts continues to next host after connect timeout', { timeout: 10 }, async() => {
+  const server = net.createServer()
+  server.listen()
+  const sql = postgres({ ...options, host: ['127.0.0.1', 'localhost'], port: [server.address().port, 5432], connect_timeout: 1 })
+  const x = (await sql`select 1 as x`)[0].x
+  server.close()
+  await sql.end()
+  return [1, x]
+})
+
+t('prefer-standby connects to the primary when the standby host is down', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, host: ['localhost', 'localhost'], port: [1, 5432], target_session_attrs: 'prefer-standby', connect_timeout: 1 })
+  const x = (await sql`select 1 as x`)[0].x
+  await sql.end()
+  return [1, x]
+})
+
+t('prefer-standby connects to a primary when no host is a standby', { timeout: 10 }, async() => {
+  const sql = postgres({ idle_timeout, max: 1, host: ['localhost', 'localhost'], port: [5432, 5433], target_session_attrs: 'prefer-standby' })
+  const x = (await sql`select 1 as x`)[0].x
+  await sql.end()
+  return [1, x]
+})
+
+t('target_session_attrs standby errors when no host is a standby', { timeout: 10 }, async() => {
+  const sql = postgres({ idle_timeout, max: 1, host: ['localhost', 'localhost'], port: [5432, 5433], target_session_attrs: 'standby' })
+  return ['CONNECTION_DESTROYED', await sql`select 1`.catch(e => e.code)]
+})
+
 t('Escaping supports schemas and tables', async() => {
   await sql`create schema a`
   await sql`create table a.b (c int)`
