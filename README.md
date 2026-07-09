@@ -1046,6 +1046,8 @@ const sql =
 
 For more information regarding `ssl` with `postgres`, check out the [Node.js documentation for tls](https://nodejs.org/dist/latest-v16.x/docs/api/tls.html#new-tlstlssocketsocket-options).
 
+Set `sslnegotiation: 'direct'` to skip the PostgreSQL SSLRequest negotiation and start TLS directly with ALPN.
+
 
 ### Multi-host connections - High Availability (HA)
 

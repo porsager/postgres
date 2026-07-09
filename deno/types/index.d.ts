@@ -48,6 +48,11 @@ interface BaseOptions<T extends Record<string, postgres.PostgresType>> {
   */
   ssl: 'require' | 'allow' | 'prefer' | 'verify-full' | boolean | object;
   /**
+   * SSL negotiation mode
+   * @default null
+   */
+  sslnegotiation: 'direct' | null;
+  /**
    * Max number of connections
    * @default 10
    */
