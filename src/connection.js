@@ -389,6 +389,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   function errored(err) {
     stream && (stream.destroy(err), stream = null)
+    final && (final(err), final = null)
     query && queryError(query, err)
     initial && (queryError(initial, err), initial = null)
   }
