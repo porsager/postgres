@@ -101,6 +101,10 @@ t('Date', async() => {
   return [0, now - (await sql`select ${ now } as x`)[0].x]
 })
 
+t('Date before year 100', async() =>
+  ['0050-06-15T12:30:00.000Z', (await sql`select '0050-06-15 12:30:00+00'::timestamptz as x`)[0].x.toISOString()]
+)
+
 t('Json', async() => {
   const x = (await sql`select ${ sql.json({ a: 'hello', b: 42 }) } as x`)[0].x
   return ['hello,42', [x.a, x.b].join()]
