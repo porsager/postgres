@@ -768,15 +768,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   async function fetchArrayTypes() {
       needsTypes = false
       const [types, domains] = await new Query([`
-        select b.oid, b.typarray
-        from pg_catalog.pg_type a
-        left join pg_catalog.pg_type b on b.oid = a.typelem
-        where a.typcategory = 'A'
-        group by b.oid, b.typarray
-        order by b.oid;
-        select oid, typbasetype
-        from pg_catalog.pg_type
-        where typtype = 'd'
+          select b.oid, b.typarray
+          from pg_catalog.pg_type a
+          left join pg_catalog.pg_type b on b.oid = a.typelem
+          where a.typcategory = 'A'
+          group by b.oid, b.typarray
+          order by b.oid;
+          select oid, typbasetype
+          from pg_catalog.pg_type
+          where typtype = 'd'
+          order by oid
       `], [], execute, null, { simple: true })
       types.forEach(({ oid, typarray }) => addArrayType(oid, typarray))
       domains.forEach(({ oid, typbasetype }) => addDomainType(oid, typbasetype))

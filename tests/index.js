@@ -166,6 +166,21 @@ t('Domain type wrapping an array resolves to the base type serializer', async() 
   ]
 })
 
+t('Nested domain types resolve through to their base type serializer', async() => {
+  await sql`drop domain if exists pg_test_domain_nested_child cascade`
+  await sql`drop domain if exists pg_test_domain_nested_parent cascade`
+  await sql`create domain pg_test_domain_nested_parent as text[]`
+  await sql`create domain pg_test_domain_nested_child as pg_test_domain_nested_parent`
+  await sql`create table test (x pg_test_domain_nested_child)`
+  return [
+    'a,b',
+    (await sql`insert into test values (${ sql.array(['a', 'b']) }) returning x`)[0].x.join(','),
+    await sql`drop table test`,
+    await sql`drop domain pg_test_domain_nested_child`,
+    await sql`drop domain pg_test_domain_nested_parent`
+  ]
+})
+
 t('Escapes', async() => {
   return ['hej"hej', Object.keys((await sql`select 1 as ${ sql('hej"hej') }`)[0])[0]]
 })
