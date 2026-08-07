@@ -154,6 +154,18 @@ t('Escape in arrays', async() =>
   ['Hello "you",c:\\windows', (await sql`select ${ sql.array(['Hello "you"', 'c:\\windows']) } as x`)[0].x.join(',')]
 )
 
+t('Domain type wrapping an array resolves to the base type serializer', async() => {
+  await sql`drop domain if exists pg_test_domain_array cascade`
+  await sql`create domain pg_test_domain_array as text[]`
+  await sql`create table test (x pg_test_domain_array)`
+  return [
+    'a,b',
+    (await sql`insert into test values (${ sql.array(['a', 'b']) }) returning x`)[0].x.join(','),
+    await sql`drop table test`,
+    await sql`drop domain pg_test_domain_array`
+  ]
+})
+
 t('Escapes', async() => {
   return ['hej"hej', Object.keys((await sql`select 1 as ${ sql('hej"hej') }`)[0])[0]]
 })
