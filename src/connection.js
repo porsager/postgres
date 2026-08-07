@@ -447,9 +447,14 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.removeAllListeners()
     socket = null
 
-    if (initial)
-      return reconnect()
+    if (initial) {
+      if (options.host[++retries])
+        return reconnect()
 
+      errored(Errors.connection('CONNECTION_CLOSED', options, socket))
+    }
+
+    retries = 0
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
     closedTime = performance.now()
     hadError && options.shared.retries++
