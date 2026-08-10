@@ -67,6 +67,16 @@ t('Result has command', async() =>
   ['SELECT', (await sql`select 1`).command]
 )
 
+t('Result is not sparse after a query errors mid row-stream', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  // Streams two rows, then errors on the third (division by zero), so the
+  // ErrorResponse arrives after DataRow messages and CommandComplete never fires.
+  await sql`select n, 1 / (3 - n) as boom from generate_series(1, 5) n`.catch(() => {})
+  const result = await sql`select x from generate_series(1, 3) x`
+  await sql.end()
+  return ['3:1,2,3', result.length + ':' + result.map(r => r.x).join(',')]
+})
+
 t('Create table', async() =>
   ['CREATE TABLE', (await sql`create table test(int int)`).command, await sql`drop table test`]
 )
