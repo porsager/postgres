@@ -76,21 +76,25 @@ export function handleValue(x, parameters, types, options) {
   let value = x instanceof Parameter ? x.value : x
   if (value === undefined) {
     x instanceof Parameter
-      ? x.value = options.transform.undefined
+      ? value = x.value = options.transform.undefined
       : value = x = options.transform.undefined
 
     if (value === undefined)
       throw Errors.generic('UNDEFINED_VALUE', 'Undefined values are not allowed')
   }
 
-  return '$' + (types.push(
+  const type =
     x instanceof Parameter
-      ? (parameters.push(x.value), x.array
-        ? x.array[x.type || inferType(x.value)] || x.type || firstIsString(x.value)
+      ? x.array
+        ? x.array[x.type || inferType(value)] || x.type || firstIsString(value)
         : x.type
-      )
-      : (parameters.push(x), inferType(x))
-  ))
+      : inferType(value)
+
+  for (let i = 0; i < parameters.length; i++)
+    if (parameters[i] === value && types[i] === type) return '$' + (i + 1)
+
+  parameters.push(value)
+  return '$' + types.push(type)
 }
 
 const defaultHandlers = typeHandlers(types)
