@@ -1824,6 +1824,87 @@ t('Recreate prepared statements on RevalidateCachedQuery error', async() => {
   ]
 })
 
+t('Does not re-serialize json parameters when retrying on RevalidateCachedQuery error', async() => {
+  const update = () => sql`update test set config = ${ sql.json({ warmup: 2100000000, ticksLimit: 5000 }) } returning *`
+  await sql`create table test (id int, config jsonb)`
+  await sql`insert into test values (1, '{}')`
+  await update()
+  await sql`alter table test add column extra int`
+  await update()
+  return [
+    'object',
+    (await sql`select jsonb_typeof(config) as type from test`)[0].type,
+    await sql`drop table test`
+  ]
+})
+
+t('Does not re-serialize json parameters when retrying on FetchPreparedStatement error', async() => {
+  const insert = () => sql`insert into test (config) values (${ sql.json({ warmup: 2100000000 }) })`
+  await sql`create table test (config jsonb)`
+  await insert()
+  await sql`deallocate all`
+  await insert()
+  return [
+    'object,object',
+    (await sql`select jsonb_typeof(config) as type from test`).map(x => x.type).join(),
+    await sql`drop table test`
+  ]
+})
+
+t('Does not re-serialize boolean parameters when retrying on RevalidateCachedQuery error', async() => {
+  const update = () => sql`update test set enabled = ${ true } returning *`
+  await sql`create table test (id int, enabled bool)`
+  await sql`insert into test values (1, false)`
+  await update()
+  await sql`alter table test add column extra int`
+  await update()
+  return [
+    true,
+    (await sql`select enabled from test`)[0].enabled,
+    await sql`drop table test`
+  ]
+})
+
+t('Does not re-serialize boolean parameters when retrying on FetchPreparedStatement error', async() => {
+  const insert = () => sql`insert into test (enabled) values (${ true })`
+  await sql`create table test (enabled bool)`
+  await insert()
+  await sql`deallocate all`
+  await insert()
+  return [
+    'true,true',
+    (await sql`select enabled from test`).map(x => x.enabled).join(),
+    await sql`drop table test`
+  ]
+})
+
+t('Does not re-serialize bytea parameters when retrying on RevalidateCachedQuery error', async() => {
+  const update = () => sql`update test set data = ${ Buffer.from('hello') } returning *`
+  await sql`create table test (id int, data bytea)`
+  await sql`insert into test values (1, null)`
+  await update()
+  await sql`alter table test add column extra int`
+  await update()
+  return [
+    'hello',
+    (await sql`select data from test`)[0].data.toString(),
+    await sql`drop table test`
+  ]
+})
+
+t('Does not re-serialize bytea parameters when retrying on FetchPreparedStatement error', async() => {
+  const insert = () => sql`insert into test (data) values (${ Buffer.from('hello') })`
+  await sql`create table test (data bytea)`
+  await insert()
+  await sql`deallocate all`
+  await insert()
+  return [
+    'hello,hello',
+    (await sql`select data from test`).map(x => x.data.toString()).join(),
+    await sql`drop table test`
+  ]
+})
+
 t('Properly throws routine error on not prepared statements', async() => {
   await sql`create table x (x text[])`
   const { routine } = await sql.unsafe(`
