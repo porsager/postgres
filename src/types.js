@@ -128,7 +128,7 @@ function valuesBuilder(first, parameters, types, columns, options) {
 }
 
 function values(first, rest, parameters, types, options) {
-  const multi = Array.isArray(first[0])
+  const multi = Array.isArray(first)
   const columns = rest.length ? rest.flat() : Object.keys(multi ? first[0] : first)
   return valuesBuilder(multi ? first : [first], parameters, types, columns, options)
 }
