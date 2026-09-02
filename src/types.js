@@ -29,7 +29,10 @@ export const types = {
     to: 1184,
     from: [1082, 1114, 1184],
     serialize: x => (x instanceof Date ? x : new Date(x)).toISOString(),
-    parse: x => new Date(x)
+    parse: x => {
+      const iso = x.replace(' ', 'T')
+      return new Date(iso === x ? x : iso.replace(/([+-]\d{2})$/, '$1:00'))
+    }
   },
   bytea: {
     to: 17,
