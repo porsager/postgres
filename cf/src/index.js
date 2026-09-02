@@ -232,6 +232,14 @@ function Postgres(a, b) {
     }
   }
 
+  // Transaction control runs on the simple protocol (a zero-argument unsafe) so that
+  // `prepare: true` never names it. A named `commit` whose Bind reaches a pooler backend
+  // that never parsed it fails with 26000, and the retry of that error re-sends `commit`
+  // on the now aborted transaction, which Postgres answers with ROLLBACK and no error.
+  function quoteIdent(name) {
+    return '"' + name.replace(/"/g, '""') + '"'
+  }
+
   async function begin(options, fn) {
     !fn && (fn = options, options = '')
     const queries = Queue()
@@ -256,7 +264,7 @@ function Postgres(a, b) {
       let uncaughtError
         , result
 
-      name && await sql`savepoint ${ sql(name) }`
+      name && await sql.unsafe('savepoint ' + quoteIdent(name))
       try {
         result = await new Promise((resolve, reject) => {
           const x = fn(sql)
@@ -267,16 +275,16 @@ function Postgres(a, b) {
           throw uncaughtError
       } catch (e) {
         await (name
-          ? sql`rollback to ${ sql(name) }`
-          : sql`rollback`
+          ? sql.unsafe('rollback to ' + quoteIdent(name))
+          : sql.unsafe('rollback')
         )
         throw e instanceof PostgresError && e.code === '25P02' && uncaughtError || e
       }
 
       if (!name) {
         prepare
-          ? await sql`prepare transaction '${ sql.unsafe(prepare) }'`
-          : await sql`commit`
+          ? await sql.unsafe('prepare transaction \'' + prepare.replace(/'/g, '\'\'') + '\'')
+          : await sql.unsafe('commit')
       }
 
       return result
