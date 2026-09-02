@@ -1,11 +1,11 @@
-import { Buffer } from 'https://deno.land/std@0.132.0/node/buffer.ts'
-import process from 'https://deno.land/std@0.132.0/node/process.ts'
+import { Buffer } from 'node:buffer'
+import process from 'node:process'
 import { exec } from './bootstrap.js'
 
 import { t, nt, ot } from './test.js' // eslint-disable-line
-import { net } from '../polyfills.js'
-import fs from 'https://deno.land/std@0.132.0/node/fs.ts'
-import crypto from 'https://deno.land/std@0.132.0/node/crypto.ts'
+import net from 'node:net'
+import fs from 'node:fs'
+import crypto from 'node:crypto'
 
 import postgres from '../src/index.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))
