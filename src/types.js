@@ -28,8 +28,8 @@ export const types = {
   date: {
     to: 1184,
     from: [1082, 1114, 1184],
-    serialize: x => (x instanceof Date ? x : new Date(x)).toISOString(),
-    parse: x => new Date(x)
+    serialize: x => x === Infinity ? 'infinity' : x === -Infinity ? '-infinity' : (x instanceof Date ? x : new Date(x)).toISOString(),
+    parse: x => x === 'infinity' ? Infinity : x === '-infinity' ? -Infinity : new Date(x)
   },
   bytea: {
     to: 17,

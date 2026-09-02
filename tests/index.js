@@ -101,6 +101,22 @@ t('Date', async() => {
   return [0, now - (await sql`select ${ now } as x`)[0].x]
 })
 
+t('Infinity timestamp parses to Infinity', async() =>
+  [Infinity, (await sql`select 'infinity'::timestamptz as x`)[0].x]
+)
+
+t('-Infinity timestamp parses to -Infinity', async() =>
+  [-Infinity, (await sql`select '-infinity'::timestamptz as x`)[0].x]
+)
+
+t('Infinity timestamp round-trips', async() =>
+  [Infinity, (await sql`select ${ sql.typed(Infinity, 1184) } as x`)[0].x]
+)
+
+t('-Infinity timestamp round-trips', async() =>
+  [-Infinity, (await sql`select ${ sql.typed(-Infinity, 1184) } as x`)[0].x]
+)
+
 t('Json', async() => {
   const x = (await sql`select ${ sql.json({ a: 'hello', b: 42 }) } as x`)[0].x
   return ['hello,42', [x.a, x.b].join()]
