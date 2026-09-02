@@ -332,6 +332,27 @@ t('Helpers in Transaction', async() => {
   ))[0].x]
 })
 
+t('Transaction works with max_pipeline 0', async() => {
+  const sql = postgres({ ...options, max: 4, max_pipeline: 0 })
+  return [1, (await sql.begin(sql => sql`select 1 as x`))[0].x, await sql.end()]
+})
+
+t('Transaction with sequential queries works with max_pipeline 0', async() => {
+  const sql = postgres({ ...options, max: 4, max_pipeline: 0 })
+  return ['testing', await sql.begin(async sql => {
+    await sql`select set_config('postgres_js.test', 'testing', true)`
+    return (await sql`select current_setting('postgres_js.test') as x`)[0].x
+  }), await sql.end()]
+})
+
+t('Transaction with concurrent queries works with max_pipeline 0', async() => {
+  const sql = postgres({ ...options, max: 4, max_pipeline: 0 })
+  return ['testing', (await sql.begin(sql => [
+    sql`select set_config('postgres_js.test', 'testing', true)`,
+    sql`select current_setting('postgres_js.test') as x`
+  ]))[1][0].x, await sql.end()]
+})
+
 t('Undefined values throws', async() => {
   let error
 
