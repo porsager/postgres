@@ -336,6 +336,11 @@ function Postgres(a, b) {
     if (closed.length)
       return connect(closed.shift(), query)
 
+    if (query.options.onexecute) {
+      queries.push(query)
+      return
+    }
+
     busy.length
       ? go(busy.shift(), query)
       : queries.push(query)
