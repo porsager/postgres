@@ -252,6 +252,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function nextWrite(fn) {
+    if (!socket) {
+      // closed() nulls the socket and reconnect() only recreates it on a later
+      // timer. write() is also reached from the 'data' handler, so a throw here
+      // has no query to reject and escapes as an uncaughtException. Settle the
+      // pending queries rather than dropping the write, or the caller hangs.
+      nextWriteTimer !== null && clearImmediate(nextWriteTimer)
+      chunk = nextWriteTimer = null
+      error(Errors.connection('CONNECTION_CLOSED', options, socket))
+      return false
+    }
     const x = socket.write(chunk, fn)
     nextWriteTimer !== null && clearImmediate(nextWriteTimer)
     chunk = nextWriteTimer = null

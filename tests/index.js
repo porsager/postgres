@@ -2707,6 +2707,32 @@ t('Ensure reserve on query throws proper error', async() => {
   ]
 })
 
+t('Writing to a closed reserved connection rejects instead of crashing', async() => {
+  let downstream
+  const proxy = net.createServer(x => {
+    downstream = x
+    const upstream = net.connect(5432, '127.0.0.1')
+    x.pipe(upstream).pipe(x)
+    x.on('error', () => upstream.destroy())
+    upstream.on('error', () => x.destroy())
+  })
+
+  await new Promise(r => proxy.listen(0, r))
+
+  const sql = postgres({ ...options, host: '127.0.0.1', port: proxy.address().port, max: 1 })
+      , reserved = await sql.reserve()
+
+  await reserved`select 1`
+  downstream.end()
+  await delay(50)
+
+  const code = await reserved`select 1`.catch(e => e.code)
+  reserved.release()
+  proxy.close()
+
+  return ['CONNECTION_CLOSED', code]
+})
+
 t('query during copy error', async() => {
   const sql = postgres(options) // eslint-disable-line
   await sql`create table test (id serial primary key, name text)`
