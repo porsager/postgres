@@ -84,9 +84,15 @@ export class Query extends Promise {
       return (this.cursorFn = fn, this)
 
     let prev
+      , error = null
     return {
       [Symbol.asyncIterator]: () => ({
         next: () => {
+          if (error) {
+            const err = error
+            error = null
+            return Promise.reject(err)
+          }
           if (this.executed && !this.active)
             return { done: true }
 
@@ -97,7 +103,7 @@ export class Query extends Promise {
               return new Promise(r => prev = r)
             }
             this.resolve = () => (this.active = false, resolve({ done: true }))
-            this.reject = x => (this.active = false, reject(x))
+            this.reject = x => (this.active = false, error = x, reject(x))
           })
           this.execute()
           return promise

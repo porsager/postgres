@@ -1459,6 +1459,21 @@ t('Async Iterator Cursor custom with less results than batch size', async() => {
   return ['20', order.join(',')]
 })
 
+t('Async Iterator Cursor surfaces error arriving between batches', async() => {
+  const query = sql`select * from generate_series(1,5) as x`
+  const iterator = query.cursor(1)[Symbol.asyncIterator]()
+  await iterator.next()
+  query.reject(new Error('between-batch'))
+  let caught
+  try {
+    await iterator.next()
+  } catch (err) {
+    caught = err.message
+  }
+  await iterator.return()
+  return ['between-batch', caught]
+})
+
 t('Transform row', async() => {
   const sql = postgres({
     ...options,
