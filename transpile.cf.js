@@ -29,8 +29,6 @@ function transpile(x) {
     : ''
 
   return process + buffer + timers + x
-    .replace('import net from \'net\'', 'import { net } from \'../polyfills.js\'')
-    .replace('import tls from \'tls\'', 'import { tls } from \'../polyfills.js\'')
     .replace('import crypto from \'crypto\'', 'import { crypto } from \'../polyfills.js\'')
     .replace('import os from \'os\'', 'import { os } from \'../polyfills.js\'')
     .replace('import fs from \'fs\'', 'import { fs } from \'../polyfills.js\'')
