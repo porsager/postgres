@@ -62,7 +62,7 @@ function Postgres(a, b) {
       , full = Queue()
       , queues = { connecting, reserved, closed, ended, open, busy, full }
 
-  const connections = [...Array(options.max)].map(() => Connection(options, queues, { onopen, onend, onclose }))
+  const connections = [...Array(options.max)].map(() => Connection(options, queues, { onopen, onend, onclose, requeue }))
 
   const sql = Sql(handler)
 
@@ -207,7 +207,7 @@ function Postgres(a, b) {
       : await new Promise((resolve, reject) => {
         const query = { reserve: resolve, reject }
         queries.push(query)
-        closed.length && connect(closed.shift(), query)
+        closed.length && throttleAllows() && connect(closed.shift(), query)
       })
 
     move(c, reserved)
@@ -333,7 +333,7 @@ function Postgres(a, b) {
     if (open.length)
       return go(open.shift(), query)
 
-    if (closed.length)
+    if (closed.length && throttleAllows())
       return connect(closed.shift(), query)
 
     busy.length
@@ -388,10 +388,58 @@ function Postgres(a, b) {
     resolve()
   }
 
+  // reject_throttle (opt-in): after a connection fails to ESTABLISH, block new
+  // opens (closed -> connecting) so the pool doesn't stampede a server that is
+  // rejecting connections. Complements `backoff` — backoff only *delays* each
+  // retry, and since its counter is pool-shared every connection waits the same
+  // delay and then fires together (a delayed herd); this instead keeps one failed
+  // connection as the lone prober while the rest block, then admits opens on an
+  // exponentially-growing `allowance` that each prober handshake-success refills
+  // (slow-start), spending one per admitted open. Returns true when a new open may
+  // proceed now (always, when the feature is off or the breaker is idle).
+  function throttleAllows() {
+    const t = options.shared.throttle
+    if (!options.reject_throttle || t.prober === null)
+      return true
+    if (t.allowance > 0)
+      return t.allowance--, true
+    return false
+  }
+
   function connect(c, query) {
     move(c, connecting)
     c.connect(query)
     return c
+  }
+
+  // reject_throttle: hand a query pinned to a stood-down connection back to the pool
+  // (an idle connection serves it, otherwise it waits in the backlog) rather than
+  // having that connection retry — which is what would re-form the herd.
+  function requeue(query) {
+    query.reserve ? queries.push(query) : handler(query)
+  }
+
+  // reject_throttle: a prober's handshake success refilled `allowance` with the next
+  // (doubled) slow-start batch. Open up to that many for the backlog and make the last
+  // one opened the new prober, so exactly one connection keeps probing while the
+  // breaker stays engaged. Backlog dry => nothing opened, prober stays null => the
+  // breaker disengages.
+  function throttleAdmit() {
+    const t = options.shared.throttle
+    if (!options.reject_throttle || t.allowance === 0)
+      return
+    let last = null
+    while (t.allowance > 0 && queries.length && closed.length) {
+      t.allowance--
+      last = connect(closed.shift(), queries.shift())
+    }
+    if (last) {
+      t.prober = last          // hand the baton to the last waiter opened; breaker stays engaged
+    } else {
+      t.prober = null          // nothing left to admit => recovered => disengage, reset to baseline
+      t.ramp = 1
+      t.allowance = 0
+    }
   }
 
   function onend(c) {
@@ -399,8 +447,10 @@ function Postgres(a, b) {
   }
 
   function onopen(c) {
-    if (queries.length === 0)
+    if (queries.length === 0) {
+      throttleAdmit()   // no backlog: disengage the breaker if a prober success granted allowance
       return move(c, open)
+    }
 
     let max = Math.ceil(queries.length / (connecting.length + 1))
       , ready = true
@@ -416,6 +466,8 @@ function Postgres(a, b) {
     ready
       ? move(c, busy)
       : move(c, full)
+
+    throttleAdmit()
   }
 
   function onclose(c, e) {
@@ -423,7 +475,7 @@ function Postgres(a, b) {
     c.reserved = null
     c.onclose && (c.onclose(e), c.onclose = null)
     options.onclose && options.onclose(c.id)
-    queries.length && connect(c, queries.shift())
+    queries.length && throttleAllows() && connect(c, queries.shift())
   }
 }
 
@@ -455,6 +507,7 @@ function parseOptions(a, b) {
     max_pipeline    : 100,
     backoff         : backoff,
     keep_alive      : 60,
+    reject_throttle : false,
     prepare         : true,
     debug           : false,
     fetch_types     : true,
@@ -495,7 +548,7 @@ function parseOptions(a, b) {
     socket          : o.socket,
     transform       : parseTransform(o.transform || { undefined: undefined }),
     parameters      : {},
-    shared          : { retries: 0, typeArrayMap: {} },
+    shared          : { retries: 0, typeArrayMap: {}, throttle: { prober: null, ramp: 1, allowance: 0 } },
     ...mergeUserTypes(o.types)
   }
 }

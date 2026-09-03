@@ -49,7 +49,7 @@ const errorFields = {
   82  : 'routine'            // R
 }
 
-function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop } = {}) {
+function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop, requeue = noop } = {}) {
   const {
     sslnegotiation,
     ssl,
@@ -362,6 +362,58 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     setTimeout(connect, closedTime ? Math.max(0, closedTime + delay - performance.now()) : 0)
   }
 
+  function backOffOnError() {
+    // Escalate the shared backoff on a real error — the increment closed() does on a
+    // drop. Callers recompute `delay` from it unconditionally (as the original does),
+    // so only this escalation is gated: called `hadError && ...` on the drop path, and
+    // unconditionally from our establishment reconnect (a close there is always an error).
+    options.shared.retries++
+  }
+
+  function reconnect_with_reject_throttle() {
+    const t = options.shared.throttle
+    if (t.prober === null || t.prober === connection)
+      prober_reconnect()
+    else
+      stand_down()
+  }
+
+  function prober_reconnect() {
+    // Become / stay the lone prober and pace the retry exactly as closed() paces a
+    // drop; every other establishing connection blocks behind us until we hand off.
+    // closedTime is set by closed() (as for a drop) — reconnect() only reads it.
+    options.shared.throttle.prober = connection
+    backOffOnError()
+    delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
+    reconnect()
+  }
+
+  function stand_down() {
+    // A non-prober open failed (a slow-start admit): collapse the ramp and give up
+    // this slot — hand the query back to the pool instead of retrying (which would
+    // re-form the herd). The prober keeps probing, now paced by the higher retries.
+    const t = options.shared.throttle
+    t.ramp = 1
+    t.allowance = 0
+    requeue(initial)
+    initial = null
+    onclose(connection, Errors.connection('CONNECTION_CLOSED', options, socket))
+  }
+
+  function throttle_on_success() {
+    // Only the prober's success clocks a recovery round: refill the admit allowance
+    // with the current batch and double the ramp (capped at the pool max). We do NOT
+    // null the prober here — it stays engaged (as this now-healthy connection) until
+    // throttleAdmit hands the baton to the next waiter, or to null once the backlog
+    // is drained. Admit successes are silent, else N concurrent successes compound it.
+    const t = options.shared.throttle
+    if (!options.reject_throttle || t.prober !== connection)
+      return
+
+    t.allowance += t.ramp
+    t.ramp = Math.min(t.ramp * 2, options.max)
+  }
+
   function connected() {
     try {
       statements = {}
@@ -447,12 +499,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.removeAllListeners()
     socket = null
 
-    if (initial)
-      return reconnect()
+    if (initial) {
+      if (!options.reject_throttle)
+        return reconnect()
+      closedTime = performance.now()
+      return reconnect_with_reject_throttle()
+    }
 
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
     closedTime = performance.now()
-    hadError && options.shared.retries++
+    hadError && backOffOnError()
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
     onclose(connection, Errors.connection('CONNECTION_CLOSED', options, socket))
   }
@@ -566,6 +622,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
       initial && !initial.reserve && execute(initial)
       options.shared.retries = retries = 0
+      throttle_on_success()
       initial = null
       return
     }
