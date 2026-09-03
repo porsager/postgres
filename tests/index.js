@@ -1982,6 +1982,87 @@ t('Multiple hosts', {
   return [[id1, id2, id1].join(','), result.join(',')]
 })
 
+t('Multiple hosts errors when all hosts are down', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, host: ['localhost', 'localhost'], port: [1, 2], connect_timeout: 1 })
+  return ['ECONNREFUSED', await sql`select 1`.catch(e => e.code)]
+})
+
+t('Multiple hosts continues to next host after connect timeout', { timeout: 10 }, async() => {
+  const server = net.createServer()
+  server.listen()
+  const sql = postgres({ ...options, host: ['127.0.0.1', 'localhost'], port: [server.address().port, 5432], connect_timeout: 1 })
+  const x = (await sql`select 1 as x`)[0].x
+  server.close()
+  await sql.end()
+  return [1, x]
+})
+
+t('prefer-standby connects to the primary when the standby host is down', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, host: ['localhost', 'localhost'], port: [1, 5432], target_session_attrs: 'prefer-standby', connect_timeout: 1 })
+  const x = (await sql`select 1 as x`)[0].x
+  await sql.end()
+  return [1, x]
+})
+
+t('prefer-standby connects to a primary when no host is a standby', { timeout: 10 }, async() => {
+  const sql = postgres({ idle_timeout, max: 1, host: ['localhost', 'localhost'], port: [5432, 5433], target_session_attrs: 'prefer-standby' })
+  const x = (await sql`select 1 as x`)[0].x
+  await sql.end()
+  return [1, x]
+})
+
+t('target_session_attrs standby errors when no host is a standby', { timeout: 10 }, async() => {
+  const sql = postgres({ idle_timeout, max: 1, host: ['localhost', 'localhost'], port: [5432, 5433], target_session_attrs: 'standby' })
+  return ['CONNECTION_DESTROYED', await sql`select 1`.catch(e => e.code)]
+})
+
+t('Multiple hosts rejects within connect_timeout × hosts when every host times out', { timeout: 10 }, async() => {
+  // Two hosts that accept the TCP connection but never speak the Postgres protocol, so each
+  // attempt connect-timeouts (the #988 path, not ECONNREFUSED). When `error()` wrongly assumed
+  // "another host to try", connect_timeout was defeated and the query hung forever. It must now
+  // reject, bounded by ~connect_timeout × hosts, instead of hanging.
+  const connect_timeout = 0.3
+  const a = net.createServer().listen()
+  const b = net.createServer().listen()
+  const host = ['127.0.0.1', '127.0.0.1']
+  const port = [a.address().port, b.address().port]
+  const sql = postgres({ ...options, host, port, connect_timeout })
+
+  const start = Date.now()
+  const code = await sql`select 1`.catch(e => e.code)
+  const elapsed = (Date.now() - start) / 1000
+
+  a.close()
+  b.close()
+  await sql.end()
+
+  const bounded = code === 'CONNECT_TIMEOUT' && elapsed < connect_timeout * host.length + 1
+  return ['CONNECT_TIMEOUT bounded', bounded ? 'CONNECT_TIMEOUT bounded' : `${code} after ${elapsed.toFixed(2)}s`]
+})
+
+t('prefer-standby exhausts the standby-only first pass before accepting a primary', { timeout: 10 }, async() => {
+  // host[0] is the real primary; host[1] is a probe that counts connections and drops them.
+  // With prefer-standby and no standby available, libpq-style semantics require a full first
+  // pass that rejects primaries, then a second pass that accepts any server. So the probe must
+  // be reached exactly once (pass one skips past the primary) before the primary is accepted on
+  // pass two. probe === 0 would mean the primary was wrongly accepted on the first pass; a probe
+  // count that never settles (looping forever) is the original "retries never increments" bug.
+  let probe = 0
+  const server = net.createServer(socket => (probe++, socket.destroy())).listen()
+  const sql = postgres({
+    ...options,
+    host: ['localhost', '127.0.0.1'],
+    port: [5432, server.address().port],
+    target_session_attrs: 'prefer-standby'
+  })
+
+  const x = (await sql`select 1 as x`)[0].x
+  server.close()
+  await sql.end()
+
+  return ['1,1', [x, probe].join(',')]
+})
+
 t('Escaping supports schemas and tables', async() => {
   await sql`create schema a`
   await sql`create table a.b (c int)`
