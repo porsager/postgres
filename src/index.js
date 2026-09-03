@@ -310,7 +310,7 @@ function Postgres(a, b) {
     queue.push(c)
     c.queue = queue
     queue === open
-      ? c.idleTimer.start()
+      ? (c.idleTimer.start(), options.onidle && options.onidle(c.id))
       : c.idleTimer.cancel()
     return c
   }
@@ -492,6 +492,7 @@ function parseOptions(a, b) {
     onnotify        : o.onnotify,
     onclose         : o.onclose,
     onparameter     : o.onparameter,
+    onidle          : o.onidle,
     socket          : o.socket,
     transform       : parseTransform(o.transform || { undefined: undefined }),
     parameters      : {},
