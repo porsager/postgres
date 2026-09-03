@@ -2638,3 +2638,49 @@ t('query during copy error', async() => {
     await sql`drop table test`
   ]
 })
+
+t('idle_in_transaction_session_timeout causes CONNECTION_CLOSED', { timeout: 5 }, async() => {
+  const sql = postgres(options)
+  const error = await sql.begin(async(txSql) => {
+    await txSql`SET LOCAL idle_in_transaction_session_timeout = '1s'`
+    await new Promise(r => setTimeout(r, 2000))
+    await txSql`SELECT 1`
+  }).catch(e => e)
+  await sql.end()
+  return [true, error.code === 'CONNECTION_CLOSED' || error.code === 'CONNECTION_DESTROYED']
+})
+
+t('txSql fails after idle_in_transaction_session_timeout even if callback continues', { timeout: 5 }, async() => {
+  const sql = postgres(options)
+  let failed = false
+  await sql.begin(async(txSql) => {
+    await txSql`SET LOCAL idle_in_transaction_session_timeout = '1s'`
+    await new Promise(r => setTimeout(r, 2000))
+    try { await txSql`SELECT 1` } catch (e) {
+      failed = e.code === 'CONNECTION_CLOSED' || e.code === 'CONNECTION_DESTROYED'
+    }
+  }).catch(() => { /* ignore */ })
+  await new Promise(r => setTimeout(r, 1000))
+  await sql.end()
+  return [true, failed]
+})
+
+t('txSql fails even when pool connection reconnects after idle timeout', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1 })
+  // Queue pool queries to trigger reconnect after connection closes
+  for (let i = 0; i < 3; i++)
+    setTimeout(() => sql`SELECT ${i}`.catch(() => { /* ignore */ }), 1000 + i * 100)
+
+  let txSqlSucceeded = false
+  await sql.begin(async(txSql) => {
+    await txSql`SET LOCAL idle_in_transaction_session_timeout = '1s'`
+    await new Promise(r => setTimeout(r, 2000))
+    try {
+      await txSql`SELECT 'should fail'`
+      txSqlSucceeded = true
+    } catch { /* ignore */ }
+  }).catch(() => { /* ignore */ })
+  await new Promise(r => setTimeout(r, 1000))
+  await sql.end()
+  return [false, txSqlSucceeded]
+})

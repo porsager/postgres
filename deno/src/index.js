@@ -238,12 +238,13 @@ function Postgres(a, b) {
     let savepoints = 0
       , connection
       , prepare = null
+      , closed = false
 
     try {
       await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
       return await Promise.race([
         scope(connection, fn),
-        new Promise((_, reject) => connection.onclose = reject)
+        new Promise((_, reject) => connection.onclose = e => (closed = true, reject(e)))
       ])
     } catch (error) {
       throw error
@@ -290,6 +291,8 @@ function Postgres(a, b) {
       }
 
       function handler(q) {
+        if (closed)
+          return q.reject(Errors.connection('CONNECTION_CLOSED', options))
         q.catch(e => uncaughtError || (uncaughtError = e))
         c.queue === full
           ? queries.push(q)
