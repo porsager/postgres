@@ -2119,6 +2119,37 @@ t('Copy from abort', async() => {
   ]
 })
 
+t('Copy from settles instead of hanging when the server rejects the data', { timeout: 2 }, async() => {
+  await sql`create table test (x int, y int)`
+
+  let error
+  try {
+    await sql.begin(async sql => {
+      const writable = await sql`COPY test FROM STDIN`.writable()
+      await new Promise((resolve, reject) => {
+        writable.on('error', reject)
+        writable.on('finish', resolve)
+        // 3 columns in the row, 2 in the table -> server errors mid copy,
+        // after the writable's final() has already fired (.end() below)
+        writable.end('1\t2\t3\n')
+      })
+    })
+  } catch (err) {
+    error = err
+  }
+
+  const idleInTransaction = await sql`
+    select count(*)::int as count from pg_stat_activity
+    where state = 'idle in transaction (aborted)'
+  `
+
+  return [
+    true,
+    !!error && error.message.includes('extra data') && idleInTransaction[0].count === 0,
+    await sql`drop table test`
+  ]
+})
+
 t('multiple queries before connect', async() => {
   const sql = postgres({ ...options, max: 2 })
   const xs = await Promise.all([
