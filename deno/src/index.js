@@ -247,6 +247,8 @@ function Postgres(a, b) {
       ])
     } catch (error) {
       throw error
+    } finally {
+      connection && (connection.onclose = null)
     }
 
     async function scope(c, fn, name) {

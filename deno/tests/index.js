@@ -2422,6 +2422,21 @@ t('Ensure transactions throw if connection is closed dwhile there is no query', 
   return ['CONNECTION_CLOSED', x.code]
 })
 
+t('Does not reject leftover begin onclose after commit', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const rejections = []
+  const onUnhandled = reason => rejections.push(reason)
+  process.on('unhandledRejection', onUnhandled)
+  try {
+    await sql.begin(sql => sql`select 1`)
+    await sql.end({ timeout: 0 })
+    await delay(50)
+  } finally {
+    process.off('unhandledRejection', onUnhandled)
+  }
+  return [0, rejections.length]
+})
+
 t('Custom socket', {}, async() => {
   let result
   const sql = postgres({
