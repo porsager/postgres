@@ -59,5 +59,8 @@
     "db",
     "pg",
     "database"
-  ]
+  ],
+  "dependencies": {
+    "@peculiar/x509": "^1.12.3"
+  }
 }
