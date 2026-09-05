@@ -463,9 +463,9 @@ function parseOptions(a, b) {
   }
 
   return {
-    host            : Array.isArray(host) ? host : host.split(',').map(x => x.split(':')[0]),
-    port            : Array.isArray(port) ? port : host.split(',').map(x => parseInt(x.split(':')[1] || port)),
-    path            : o.path || host.indexOf('/') > -1 && host + '/.s.PGSQL.' + port,
+    host            : Array.isArray(host) ? host : host.split(',').map(x => parseHost(x)),
+    port            : Array.isArray(port) ? port : host.split(',').map(x => parsePort(x, port)),
+    path            : o.path || (host.indexOf('/') > -1 && host + '/.s.PGSQL.' + port),
     database        : o.database || o.db || (url.pathname || '').slice(1) || env.PGDATABASE || user,
     user            : user,
     pass            : o.pass || o.password || url.password || env.PGPASSWORD || '',
@@ -534,27 +534,36 @@ function parseTransform(x) {
   }
 }
 
-function parseUrl(url) {
-  if (!url || typeof url !== 'string')
+function parseUrl(x) {
+  if (!x || typeof x !== 'string')
     return { url: { searchParams: new Map() } }
 
-  let host = url
-  host = host.slice(host.indexOf('://') + 3).split(/[?/]/)[0]
-  host = decodeURIComponent(host.slice(host.indexOf('@') + 1))
+  let str = x.replace(/^postgres(ql)?:/, 'http:')
+  if (str.startsWith('http:') && !str.startsWith('http://')) {
+    str = 'http://' + str.substring(5);
+  }
+  let multihost = false
 
-  const urlObj = new URL(url.replace(host, host.split(',')[0]))
+  const hostPartMatch = str.match(/\/\/([^@/?#]*@)?([^/?#]+)/)
+  if (hostPartMatch && hostPartMatch[2].includes(',')) {
+    const hosts = hostPartMatch[2]
+    multihost = decodeURIComponent(hosts)
+    str = str.replace(hosts, hosts.split(',')[0])
+  }
+
+  const url = new URL(str)
 
   return {
     url: {
-      username: decodeURIComponent(urlObj.username),
-      password: decodeURIComponent(urlObj.password),
-      host: urlObj.host,
-      hostname: urlObj.hostname,
-      port: urlObj.port,
-      pathname: urlObj.pathname,
-      searchParams: urlObj.searchParams
+      username: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      host: url.host,
+      hostname: multihost ? multihost.split(',')[0] : url.hostname,
+      port: url.port,
+      pathname: url.pathname,
+      searchParams: url.searchParams
     },
-    multihost: host.indexOf(',') > -1 && host
+    multihost: multihost
   }
 }
 
@@ -564,4 +573,24 @@ function osUsername() {
   } catch (_) {
     return process.env.USERNAME || process.env.USER || process.env.LOGNAME  // eslint-disable-line
   }
+}
+
+function parseHost(host) {
+  if (host.charAt(0) === '[')
+    return host.slice(1, -1)
+
+  if (host.includes(':') && host.split(':').length > 2)
+    return ''
+
+  return host.split(':')[0]
+}
+
+function parsePort(host, port) {
+  if (host.charAt(0) === '[' && host.includes(']:'))
+    return parseInt(host.split(']:')[1])
+
+  if (host.includes(':') && host.split(':').length === 2)
+    return parseInt(host.split(':')[1])
+
+  return parseInt(port)
 }
