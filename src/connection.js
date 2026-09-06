@@ -766,17 +766,22 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   async function fetchArrayTypes() {
-    needsTypes = false
-    const types = await new Query([`
-      select b.oid, b.typarray
-      from pg_catalog.pg_type a
-      left join pg_catalog.pg_type b on b.oid = a.typelem
-      where a.typcategory = 'A'
-      group by b.oid, b.typarray
-      order by b.oid
-    `], [], execute)
-    types.forEach(({ oid, typarray }) => addArrayType(oid, typarray))
-  }
+      needsTypes = false
+      const [types, domains] = await new Query([`
+          select b.oid, b.typarray
+          from pg_catalog.pg_type a
+          left join pg_catalog.pg_type b on b.oid = a.typelem
+          where a.typcategory = 'A'
+          group by b.oid, b.typarray
+          order by b.oid;
+          select oid, typbasetype
+          from pg_catalog.pg_type
+          where typtype = 'd'
+          order by oid
+      `], [], execute, null, { simple: true })
+      types.forEach(({ oid, typarray }) => addArrayType(oid, typarray))
+      domains.forEach(({ oid, typbasetype }) => addDomainType(oid, typbasetype))
+    }
 
   function addArrayType(oid, typarray) {
     if (!!options.parsers[typarray] && !!options.serializers[typarray]) return
@@ -785,6 +790,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     options.parsers[typarray] = (xs) => arrayParser(xs, parser, typarray)
     options.parsers[typarray].array = true
     options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid], options, typarray)
+  }
+
+  function addDomainType(oid, basetype) {
+    if (options.parsers[basetype]) options.parsers[oid] = options.parsers[basetype]
+    if (options.serializers[basetype]) options.serializers[oid] = options.serializers[basetype]
   }
 
   function tryNext(x, xs) {
