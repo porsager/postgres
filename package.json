@@ -7,6 +7,7 @@
   "main": "cjs/src/index.js",
   "exports": {
     "types": "./types/index.d.ts",
+    "/neon": "./neon/src/index.js",
     "bun": "./src/index.js",
     "workerd": "./cf/src/index.js",
     "import": "./src/index.js",
@@ -18,10 +19,11 @@
     "node": ">=12"
   },
   "scripts": {
-    "build": "npm run build:cjs && npm run build:deno && npm run build:cf",
+    "build": "npm run build:cjs && npm run build:deno && npm run build:cf && npm run build:neon",
     "build:cjs": "node transpile.cjs",
     "build:deno": "node transpile.deno.js",
     "build:cf": "node transpile.cf.js",
+    "build:neon": "node transpile.neon.js",
     "test": "npm run test:esm && npm run test:cjs && npm run test:deno",
     "test:esm": "node tests/index.js",
     "test:cjs": "npm run build:cjs && cd cjs/tests && node index.js && cd ../../",
@@ -31,6 +33,8 @@
     "prepublishOnly": "npm run lint"
   },
   "files": [
+    "/neon/src",
+    "/neon/polyfills.js",
     "/cf/src",
     "/cf/polyfills.js",
     "/cjs/src",
