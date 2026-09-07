@@ -1060,6 +1060,25 @@ t('Connection errors are caught using begin()', {
   ]
 })
 
+t('Connection errors are caught when all hosts fail', {
+  timeout: 2
+}, async() => {
+  let error
+  try {
+    const sql = postgres({ host: ['localhost', 'localhost'], port: [1, 1] })
+
+    await sql`select 1`
+  } catch (err) {
+    error = err
+  }
+
+  return [
+    true,
+    error.code === 'ECONNREFUSED' ||
+    error.message === 'Connection refused (os error 61)'
+  ]
+})
+
 t('dynamic table name', async() => {
   await sql`create table test(a int)`
   return [
