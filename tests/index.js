@@ -6,6 +6,9 @@ import fs from 'fs'
 import crypto from 'crypto'
 
 import postgres from '../src/index.js'
+import {
+  cleanClose, queuedClose, closeBackoff, closeRecovery, closeReset, reserveCloseReset, closeErrorReset
+} from './connection.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
 const rel = x => new URL(x, import.meta.url)
@@ -1649,6 +1652,14 @@ t('Query and parameters are enumerable if debug is set', async() => {
     (await sql`selec ${ 1 }`.catch(err => err.propertyIsEnumerable('parameters') && err.propertyIsEnumerable('query')))
   ]
 })
+
+t('Clean closes reject the initial query with backoff', cleanClose)
+t('Clean closes settle queued queries and reserves', queuedClose)
+t('Clean closes reject before a backoff beyond connect_timeout', closeBackoff)
+t('Initial query recovers after more than five clean closes', closeRecovery)
+t('Clean close deadline resets after a successful query', closeReset)
+t('Clean close deadline resets after reserve with fetch_types', reserveCloseReset)
+t('Clean close deadline resets after a startup error', closeErrorReset)
 
 t('connect_timeout', { timeout: 20 }, async() => {
   const connect_timeout = 0.2

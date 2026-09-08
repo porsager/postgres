@@ -87,6 +87,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     , statementId = Math.random().toString(36).slice(2)
     , statementCount = 1
     , closedTime = 0
+    , closeRunStart = 0
     , remaining = 0
     , hostIndex = 0
     , retries = 0
@@ -447,13 +448,21 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.removeAllListeners()
     socket = null
 
-    if (initial)
-      return reconnect()
-
-    !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
     closedTime = performance.now()
-    hadError && options.shared.retries++
+    if (hadError || initial)
+      options.shared.retries++
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
+
+    if (initial) {
+      closeRunStart || (closeRunStart = closedTime)
+      // Do not schedule a retry beyond the connection's clean-close budget.
+      if (closedTime + delay <= closeRunStart + (options.connect_timeout || 30) * 1000)
+        return reconnect()
+      errored(Errors.connection('CONNECTION_CLOSED', options, socket))
+    }
+
+    closeRunStart = 0
+    !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
     onclose(connection, Errors.connection('CONNECTION_CLOSED', options, socket))
   }
 
@@ -560,12 +569,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       }
 
       if (needsTypes) {
-        initial.reserve && (initial = null)
+        initial.reserve && (options.shared.retries = retries = closeRunStart = 0, initial = null)
         return fetchArrayTypes()
       }
 
       initial && !initial.reserve && execute(initial)
-      options.shared.retries = retries = 0
+      options.shared.retries = retries = closeRunStart = 0
       initial = null
       return
     }
