@@ -438,6 +438,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     remaining = 0
     incomings = null
     clearImmediate(nextWriteTimer)
+    chunk = nextWriteTimer = null
     socket.removeListener('data', data)
     socket.removeListener('connect', connected)
     idleTimer.cancel()
@@ -451,6 +452,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return reconnect()
 
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
+    query = results = errorResponse = null
+    result = new Result()
+    rows = 0
     closedTime = performance.now()
     hadError && options.shared.retries++
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
