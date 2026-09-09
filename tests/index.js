@@ -300,6 +300,33 @@ t('Many transactions at beginning of connection', async() => {
   return [100, xs.length]
 })
 
+t('Transaction at pipeline boundary is reserved', async() => {
+  const sql = postgres({ ...options, max: 2, max_pipeline: 1, fetch_types: false })
+  await Promise.all([sql`select 1`, sql`select 1`])
+  const inflight = [sql`select pg_sleep(0.1)`.execute(), sql`select pg_sleep(0.1)`.execute()]
+  const x = await sql.begin(sql => sql`select 1 as x`).then(x => x[0].x, x => x.code)
+  await Promise.all(inflight)
+  return [1, x, await sql.end()]
+})
+
+t('Transaction is reserved with pipelining disabled', async() => {
+  const sql = postgres({ ...options, max: 2, max_pipeline: 0, fetch_types: false })
+  const x = await sql.begin(sql => sql`select 1 as x`).then(x => x[0].x, x => x.code)
+  return [1, x, await sql.end()]
+})
+
+t('Query issued while BEGIN is in flight does not join the transaction', async() => {
+  const sql = postgres({ ...options, max: 1, fetch_types: false })
+  await sql`create table test (a int)`
+  const tx = sql.begin(async sql => {
+    await sql`select 1`
+    throw new Error('rollback')
+  }).catch(() => {})
+  const insert = sql`insert into test values (1)`
+  await Promise.all([tx, insert])
+  return [1, (await sql`select count(*)::int as n from test`)[0].n, await sql`drop table test`, await sql.end()]
+})
+
 t('Transactions array', async() => {
   await sql`create table test (a int)`
 
