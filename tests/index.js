@@ -315,6 +315,18 @@ t('Transaction is reserved with pipelining disabled', async() => {
   return [1, x, await sql.end()]
 })
 
+t('Query issued while BEGIN is in flight does not join the transaction', async() => {
+  const sql = postgres({ ...options, max: 1, fetch_types: false })
+  await sql`create table test (a int)`
+  const tx = sql.begin(async sql => {
+    await sql`select 1`
+    throw new Error('rollback')
+  }).catch(() => {})
+  const insert = sql`insert into test values (1)`
+  await Promise.all([tx, insert])
+  return [1, (await sql`select count(*)::int as n from test`)[0].n, await sql`drop table test`, await sql.end()]
+})
+
 t('Transactions array', async() => {
   await sql`create table test (a int)`
 
