@@ -236,13 +236,19 @@ function Postgres(a, b) {
     const queries = Queue()
     let savepoints = 0
       , connection
+      , closedError
       , prepare = null
 
     try {
       await sql.unsafe('begin ' + options.replace(/[^a-z ]/ig, ''), [], { onexecute }).execute()
       return await Promise.race([
         scope(connection, fn),
-        new Promise((_, reject) => connection.onclose = reject)
+        new Promise((_, reject) => connection.onclose = error => {
+          closedError = error
+          while (queries.length)
+            queries.shift().reject(error)
+          reject(error)
+        })
       ])
     } catch (error) {
       throw error
@@ -290,6 +296,8 @@ function Postgres(a, b) {
 
       function handler(q) {
         q.catch(e => uncaughtError || (uncaughtError = e))
+        if (closedError)
+          return q.reject(closedError)
         c.queue === full
           ? queries.push(q)
           : c.execute(q) || move(c, full)

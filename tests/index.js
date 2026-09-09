@@ -2501,6 +2501,81 @@ t('Ensure transactions throw if connection is closed dwhile there is no query', 
   return ['CONNECTION_CLOSED', x.code]
 })
 
+t('Disconnect rejects queued transaction queries and allows reconnect', async() => {
+  const sql = postgres({ ...options, max_pipeline: 1, fetch_types: false })
+  let queries
+
+  try {
+    const error = await sql.begin(sql => {
+      queries = [
+        sql`select pg_terminate_backend(pg_backend_pid())`.execute(),
+        sql`select 1`.execute(),
+        sql`select 2`.execute()
+      ]
+      return Promise.allSettled(queries)
+    }).catch(x => x)
+
+    const results = await Promise.allSettled(queries)
+    const [{ x }] = await sql`select 1 as x`
+    return [
+      'CONNECTION_CLOSED,rejected,rejected,rejected,1',
+      [error.code, ...results.map(x => x.status), x].join(',')
+    ]
+  } finally {
+    await sql.end({ timeout: 0 })
+  }
+})
+
+t('Disconnected transaction cannot query a reused connection', async() =>
+  withDisconnectedTransaction(({ sql, disconnected }) => sql.begin(async sql => {
+    await sql`select set_config('postgres_js.test', 'replacement', true)`
+    const result = await disconnected`select current_setting('postgres_js.test') as x`.catch(x => x)
+    return ['CONNECTION_CLOSED', result.code]
+  }))
+)
+
+t('Disconnected transaction cannot commit a reused connection', async() =>
+  finishDisconnectedTransaction()
+)
+
+t('Disconnected transaction cannot roll back a reused connection', async() =>
+  finishDisconnectedTransaction(new Error('original callback failed'))
+)
+
+function finishDisconnectedTransaction(error) {
+  return withDisconnectedTransaction(({ sql, finish }) => sql.begin(async sql => {
+    const [{ x: before }] = await sql`select txid_current()::text as x`
+    finish(error)
+    await new Promise(resolve => setImmediate(resolve))
+    const [{ x: after }] = await sql`select txid_current()::text as x`
+    return [before, after]
+  }))
+}
+
+async function withDisconnectedTransaction(fn) {
+  const pool = postgres({ ...options, fetch_types: false })
+  let finish
+    , ready
+  const gate = new Promise((resolve, reject) => finish = error => error ? reject(error) : resolve())
+  const connected = new Promise(resolve => ready = resolve)
+  const failed = pool.begin(async sql => {
+    const [{ pid }] = await sql`select pg_backend_pid() as pid`
+    ready({ disconnected: sql, pid })
+    await gate
+  }).catch(x => x)
+
+  try {
+    const { disconnected, pid } = await Promise.race([connected, failed.then(error => { throw error })])
+    await sql`select pg_terminate_backend(${ pid }::int)`
+    await failed
+    return await fn({ sql: pool, disconnected, finish })
+  } finally {
+    finish()
+    await new Promise(resolve => setImmediate(resolve))
+    await pool.end({ timeout: 0 })
+  }
+}
+
 t('Custom socket', {}, async() => {
   let result
   const sql = postgres({
