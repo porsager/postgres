@@ -170,11 +170,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         : (query = q, query.active = true)
 
       build(q)
-      return write(toBuffer(q))
+      const written = write(toBuffer(q))
+      // Run the hook whenever the bytes were written, even if the pipeline is
+      // full or socket.write() reported backpressure. sql.begin() relies on it
+      // to reserve the connection, and its falsy return keeps the connection
+      // out of the busy queue until BEGIN completes.
+      return (!q.options.onexecute || q.options.onexecute(connection))
+        && written
         && !q.describeFirst
         && !q.cursorFn
         && sent.length < max_pipeline
-        && (!q.options.onexecute || q.options.onexecute(connection))
     } catch (error) {
       sent.length === 0 && write(Sync)
       errored(error)

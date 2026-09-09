@@ -300,6 +300,21 @@ t('Many transactions at beginning of connection', async() => {
   return [100, xs.length]
 })
 
+t('Transaction at pipeline boundary is reserved', async() => {
+  const sql = postgres({ ...options, max: 2, max_pipeline: 1, fetch_types: false })
+  await Promise.all([sql`select 1`, sql`select 1`])
+  const inflight = [sql`select pg_sleep(0.1)`.execute(), sql`select pg_sleep(0.1)`.execute()]
+  const x = await sql.begin(sql => sql`select 1 as x`).then(x => x[0].x, x => x.code)
+  await Promise.all(inflight)
+  return [1, x, await sql.end()]
+})
+
+t('Transaction is reserved with pipelining disabled', async() => {
+  const sql = postgres({ ...options, max: 2, max_pipeline: 0, fetch_types: false })
+  const x = await sql.begin(sql => sql`select 1 as x`).then(x => x[0].x, x => x.code)
+  return [1, x, await sql.end()]
+})
+
 t('Transactions array', async() => {
   await sql`create table test (a int)`
 
