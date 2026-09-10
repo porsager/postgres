@@ -727,7 +727,7 @@ declare namespace postgres {
     prepare<T>(name: string): Promise<UnwrapPromiseArray<T>>;
   }
 
-  interface ReservedSql<TTypes extends Record<string, unknown> = {}> extends Sql<TTypes> {
+  interface ReservedSql<TTypes extends Record<string, unknown> = {}> extends ISql<TTypes> {
     release(): void;
   }
 }
