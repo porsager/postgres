@@ -564,10 +564,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         return fetchArrayTypes()
       }
 
-      initial && !initial.reserve && execute(initial)
-      options.shared.retries = retries = 0
+      if (!initial.reserve) {
+        execute(initial)
+        options.shared.retries = retries = 0
+        initial = null
+        return
+      }
+
+      // `fetch_types: false` with a queued `reserve()` — there is nothing to
+      // execute, so fall through and let `onopen(connection)` below resolve it.
       initial = null
-      return
     }
 
     while (sent.length && (query = sent.shift()) && (query.active = true, query.cancelled))

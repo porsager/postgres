@@ -2707,6 +2707,16 @@ t('Ensure reserve on query throws proper error', async() => {
   ]
 })
 
+t('reserve with fetch_types: false on a cold pool', async() => {
+  const sql = postgres({ ...options, fetch_types: false }) // eslint-disable-line
+  const reserved = await sql.reserve()
+  const [{ x }] = await reserved`select 1 as x`
+  reserved.release()
+  await sql.end()
+
+  return [1, x]
+})
+
 t('query during copy error', async() => {
   const sql = postgres(options) // eslint-disable-line
   await sql`create table test (id serial primary key, name text)`
