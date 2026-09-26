@@ -451,6 +451,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return reconnect()
 
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
+    query = results = errorResponse = null
     closedTime = performance.now()
     hadError && options.shared.retries++
     delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000

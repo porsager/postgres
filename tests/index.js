@@ -2666,6 +2666,42 @@ t('concurrent cursors multiple connections', async() => {
   return ['12233445566778', xs.sort().join('')]
 })
 
+t('reserve queued behind a terminated connection', async() => {
+  const pool = postgres(options)
+  const reserved = await pool.reserve()
+  const [{ pid }] = await reserved`select pg_backend_pid() as pid`
+  const pending = pool.reserve()
+
+  await sql`select pg_terminate_backend(${ pid })`
+
+  const next = await pending
+  const [{ x }] = await next`select 1 as x`
+  next.release()
+  await pool.end()
+
+  return [1, x]
+})
+
+t('reserve after a terminated query', async() => {
+  const pool = postgres(options)
+  const reserved = await pool.reserve()
+  const [{ pid }] = await reserved`select pg_backend_pid() as pid`
+  const query = reserved`select pg_sleep(30)`.catch(e => e)
+
+  while (!(await sql`select wait_event = 'PgSleep' as sleeping from pg_stat_activity where pid = ${ pid }`)[0].sleeping)
+    await delay(1)
+
+  await sql`select pg_terminate_backend(${ pid })`
+  await query
+
+  const next = await pool.reserve()
+  const [{ x }] = await next`select 1 as x`
+  next.release()
+  await pool.end()
+
+  return [1, x]
+})
+
 t('reserve connection', async() => {
   const reserved = await sql.reserve()
 
