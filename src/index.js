@@ -205,9 +205,10 @@ function Postgres(a, b) {
     const c = open.length
       ? open.shift()
       : await new Promise((resolve, reject) => {
-        const query = { reserve: resolve, reject }
-        queries.push(query)
-        closed.length && connect(closed.shift(), query)
+        const query = { reserve: resolve, reject: e => (queries.remove(query), reject(e)) }
+        closed.length
+          ? connect(closed.shift(), query)
+          : queries.push(query)
       })
 
     move(c, reserved)
@@ -389,6 +390,7 @@ function Postgres(a, b) {
   }
 
   function connect(c, query) {
+    query.reserve && queries.push(query)
     move(c, connecting)
     c.connect(query)
     return c
