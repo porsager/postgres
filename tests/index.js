@@ -6,6 +6,7 @@ import fs from 'fs'
 import crypto from 'crypto'
 
 import postgres from '../src/index.js'
+import Queue from '../src/queue.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
 const rel = x => new URL(x, import.meta.url)
@@ -2718,4 +2719,27 @@ t('query during copy error', async() => {
     'COPY_IN_PROGRESS', error.code,
     await sql`drop table test`
   ]
+})
+
+t('Queue does not grow when never drained', async() => {
+  let size = 0
+  const q = Queue(new class extends Array { // Queue copies this with .slice(), which keeps the subclass
+    push(x) {
+      const length = super.push(x)
+      size = Math.max(size, length)
+      return length
+    }
+  }())
+
+  q.push('a')
+  q.push('b')
+  q.push('c')
+  for (let i = 0; i < 10000; i++)
+    q.push(q.shift())
+
+  const result = [q.length, q.remove('x'), q.shift(), q.remove('a'), q.length, q.shift(), q.length]
+  q.push('d')
+  q.push('e')
+  result.push(q.remove('d'), q.shift(), size > 0 && size < 1000 || size)
+  return ['3,,b,a,1,c,0,d,e,true', result.join()]
 })
