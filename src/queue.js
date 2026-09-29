@@ -9,10 +9,10 @@ function Queue(initial = []) {
       return xs.length - index
     },
     remove: (x) => {
-      const index = xs.indexOf(x)
-      return index === -1
+      const i = xs.indexOf(x, index)
+      return i === -1
         ? null
-        : (xs.splice(index, 1), x)
+        : (xs.splice(i, 1), x)
     },
     push: (x) => (xs.push(x), x),
     shift: () => {
@@ -21,6 +21,9 @@ function Queue(initial = []) {
       if (index === xs.length) {
         index = 0
         xs = []
+      } else if (index > 64 && index * 2 >= xs.length) {
+        xs = xs.slice(index)
+        index = 0
       } else {
         xs[index - 1] = undefined
       }
