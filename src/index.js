@@ -210,14 +210,23 @@ function Postgres(a, b) {
         closed.length && connect(closed.shift(), query)
       })
 
+    let closedError = null
+
     move(c, reserved)
     c.reserved = () => queue.length
       ? c.execute(queue.shift())
       : move(c, reserved)
     c.reserved.release = true
+    c.reserved.closed = error => {
+      closedError = error
+      while (queue.length)
+        queue.shift().reject(error)
+    }
 
     const sql = Sql(handler)
     sql.release = () => {
+      if (closedError)
+        return
       c.reserved = null
       onopen(c)
     }
@@ -225,6 +234,8 @@ function Postgres(a, b) {
     return sql
 
     function handler(q) {
+      if (closedError)
+        return q.reject(closedError)
       c.queue === full
         ? queue.push(q)
         : c.execute(q) || move(c, full)
@@ -420,6 +431,7 @@ function Postgres(a, b) {
 
   function onclose(c, e) {
     move(c, closed)
+    c.reserved && c.reserved.closed && c.reserved.closed(e)
     c.reserved = null
     c.onclose && (c.onclose(e), c.onclose = null)
     options.onclose && options.onclose(c.id)

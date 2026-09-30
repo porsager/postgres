@@ -889,6 +889,36 @@ t('listen reconnects', { timeout: 2 }, async() => {
   return [connects, 2]
 })
 
+t('Reserved connection rejects queries after its backend is terminated', async() => {
+  const sql = postgres({ ...options, max: 2 })
+  const reserved = await sql.reserve()
+  const [{ pid }] = await reserved`select pg_backend_pid() as pid`
+  await sql`select pg_terminate_backend(${ pid })`
+  await delay(100)
+  const first = await reserved`select 1`.catch(e => e.code)
+  const second = await reserved`select 2`.catch(e => e.code)
+  reserved.release()
+  await sql.end()
+  return ['CONNECTION_CLOSED,CONNECTION_CLOSED', first + ',' + second]
+})
+
+t('Releasing a terminated reserved connection does not return it to the pool', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const killer = postgres(options)
+  const reserved = await sql.reserve()
+  const [{ pid }] = await reserved`select pg_backend_pid() as pid`
+  await killer`select pg_terminate_backend(${ pid })`
+  await delay(100)
+  await reserved`select 1`.catch(() => { /* rejects, connection closed */ })
+  reserved.release()
+  const [{ x }] = await Promise.race([
+    sql`select 1 as x`,
+    delay(2000).then(() => [{ x: 'hung' }])
+  ])
+  await Promise.all([sql.end(), killer.end()])
+  return [1, x]
+})
+
 t('listen result reports correct connection state after reconnection', async() => {
   const sql = postgres(options)
       , xs = []
