@@ -87,6 +87,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     , statementId = Math.random().toString(36).slice(2)
     , statementCount = 1
     , closedTime = 0
+    , closeRunStart = 0
     , remaining = 0
     , hostIndex = 0
     , retries = 0
@@ -447,8 +448,19 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.removeAllListeners()
     socket = null
 
-    if (initial)
-      return reconnect()
+    if (initial) {
+      const err = errorResponse
+      query = errorResponse = null
+      closedTime = performance.now()
+      closeRunStart || (closeRunStart = closedTime)
+      options.shared.retries++
+      delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
+      if (closedTime + delay <= closeRunStart + (options.connect_timeout || 30) * 1000)
+        return reconnect()
+      closeRunStart = 0
+      errored(err || Errors.connection('CONNECTION_CLOSED', options, socket))
+      return onclose(connection, Errors.connection('CONNECTION_CLOSED', options, socket))
+    }
 
     !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
     closedTime = performance.now()
@@ -560,12 +572,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       }
 
       if (needsTypes) {
-        initial.reserve && (initial = null)
-        return fetchArrayTypes()
+        initial.reserve && (closeRunStart = 0, initial = null)
+        return fetchArrayTypes().catch(noop)
       }
 
       initial && !initial.reserve && execute(initial)
-      options.shared.retries = retries = 0
+      options.shared.retries = retries = closeRunStart = 0
       initial = null
       return
     }
