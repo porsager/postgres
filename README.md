@@ -570,6 +570,8 @@ setTimeout(() => query.cancel(), 100)
 const result = await query
 ```
 
+`query.cancel()` returns a promise that settles when the cancel request is done. It rejects if the request could not be sent, for example when a connection for it cannot be opened, so handle it to avoid an unhandled rejection. Calling it again returns the same promise.
+
 ### Execute
 
 #### ```await sql``.execute()```

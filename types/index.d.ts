@@ -605,7 +605,11 @@ declare namespace postgres {
     writable(): Promise<Writable>;
 
     execute(): this;
-    cancel(): void;
+    /**
+     * Sends a cancel request for this query, once, however often it is called
+     * @returns A promise that settles when the cancel request is done, and rejects if it could not be sent
+     */
+    cancel(): Promise<void>;
 
     /**
      * @deprecated `.stream` has been renamed to `.forEach`

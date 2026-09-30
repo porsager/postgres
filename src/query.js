@@ -50,7 +50,7 @@ export class Query extends Promise {
   }
 
   cancel() {
-    return this.canceller && (this.canceller(this), this.canceller = null)
+    return this.cancelling || (this.cancelling = this.canceller && this.canceller(this))
   }
 
   simple() {

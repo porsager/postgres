@@ -2302,6 +2302,31 @@ t('Cancel queued query', async() => {
   return ['57014', error.code]
 })
 
+t('Cancel returns a promise that rejects when the cancel request fails', async() => {
+  let sockets = 0
+  const sql = postgres({
+    ...options,
+    socket: () => {
+      if (sockets++)
+        throw new Error('no socket for the cancel request')
+      return new Promise((resolve, reject) => {
+        const socket = new net.Socket()
+        socket.connect(5432)
+        socket.on('error', reject)
+        socket.on('connect', () => resolve(socket))
+      })
+    }
+  })
+  await sql`select 1`
+  const query = sql`select pg_sleep(0.2)`.execute()
+  await delay(50)
+  const cancelled = query.cancel()
+  const rejected = await cancelled.then(() => false, e => e instanceof Error)
+  await query
+  await sql.end()
+  return ['true,true', [rejected, query.cancel() === cancelled].join()]
+})
+
 t('Fragments', async() => [
   1,
   (await sql`
