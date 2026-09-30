@@ -323,8 +323,24 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       try {
         handle(incoming.subarray(0, length + 1))
       } catch (e) {
-        query && (query.cursorFn || query.describeFirst) && write(Sync)
-        errored(e)
+        if (query && query.describeFirst && !query.onlyDescribe && !query.retried) {
+          // A query new to this connection is bound only once its describe
+          // is answered, so a parameter that fails to serialize throws here,
+          // after its Parse and Describe were sent. A bare Sync would be
+          // answered without an error, letting a transaction the query was
+          // part of commit without it. Bind it with no parameters instead,
+          // which the server refuses since it takes at least one: that aborts
+          // any transaction, answers in the query's place, and the query is
+          // rejected with its own error, as a retried query is. It is no
+          // longer a cursor either, whose error would send a Sync of its own.
+          query.retried = e
+          query.describeFirst = false
+          query.cursorFn = null
+          write(Buffer.concat([Bind([], [], query.statement.name), ExecuteUnnamed]))
+        } else {
+          query && (query.cursorFn || query.describeFirst) && write(Sync)
+          errored(e)
+        }
       }
       incoming = incoming.subarray(length + 1)
       remaining = 0

@@ -977,6 +977,37 @@ t('Throws if more than 65534 parameters', async() => {
   }`.catch(e => e.code)), await sql`drop table test`]
 })
 
+t('Parameter failing to serialize aborts a pipelined transaction on a reserved connection', async() => {
+  const sql = postgres(options)
+  await sql`create table test (x int)`
+  const reserved = await sql.reserve()
+  const results = await Promise.all([
+    reserved`begin`,
+    reserved`insert into test values (1)`,
+    reserved`select ${ new Date(NaN) }::timestamptz as x`,
+    reserved`insert into test values (2)`,
+    reserved`commit`
+  ].map(x => x.then(x => x.command, e => e.code || e.name)))
+  reserved.release()
+  const count = (await sql`select count(*)::int from test`)[0].count
+  await sql`drop table test`
+  await sql.end()
+  return ['BEGIN,INSERT,RangeError,25P02,ROLLBACK,0', [...results, count].join()]
+})
+
+t('Parameter failing to serialize in a pipelined cursor rejects only that query', async() => {
+  const sql = postgres(options)
+  await sql`select 1`
+  const results = await Promise.all([
+    sql`select pg_sleep(0.1), 1 as x`,
+    sql`select ${ new Date(NaN) }::timestamptz as x`.cursor(() => { /* noop */ }),
+    sql`select 3 as x`
+  ].map(x => x.then(x => x.length ? x[0].x : x.command, e => e.name)))
+  const after = (await sql`select 4 as x`)[0].x
+  await sql.end()
+  return ['1,RangeError,3,4', [...results, after].join()]
+})
+
 t('let postgres do implicit cast of unknown types', async() => {
   await sql`create table test (x timestamp with time zone)`
   const [{ x }] = await sql`insert into test values (${ new Date().toISOString() }) returning *`
