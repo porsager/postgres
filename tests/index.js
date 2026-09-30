@@ -1892,6 +1892,43 @@ t('Does not re-serialize bytea parameters when retrying on RevalidateCachedQuery
   ]
 })
 
+t('Stale prepared statements in a transaction returning an array of queries reject and release the connection', async() => {
+  const other = postgres(options)
+  await sql`create table test (id int, a int)`
+  await sql`insert into test values (1, 1)`
+  await other`select * from test where id = ${ 1 }`
+  await other`select id from test where id = ${ 1 } and a > ${ 0 }`
+  await sql`alter table test add column b int`
+  const error = await other.begin(sql => [
+    sql`select * from test where id = ${ 1 }`,
+    sql`select id from test where id = ${ 1 } and a > ${ 0 }`
+  ]).catch(e => e.code)
+  const [row] = await other`select * from test where id = ${ 1 }`
+  await sql`drop table test`
+  await other.end()
+  return ['0A000,true', [error, 'b' in row].join()]
+})
+
+t('Stale prepared statement is not retried after the transaction it was pipelined in ends', async() => {
+  const other = postgres(options)
+  await sql`create table test (id int, a int)`
+  await sql`insert into test values (1, 1)`
+  await other`update test set a = a + ${ 1 } where id = 1 returning *`
+  await sql`alter table test add column b int`
+  const reserved = await other.reserve()
+  const results = await Promise.all([
+    reserved`begin`,
+    reserved`insert into test values (2, 2)`,
+    reserved`update test set a = a + ${ 1 } where id = 1 returning *`,
+    reserved`commit`
+  ].map(x => x.then(x => x.command, e => e.code)))
+  reserved.release()
+  const rows = (await sql`select id, a from test order by id`).map(x => x.id + ':' + x.a)
+  await sql`drop table test`
+  await other.end()
+  return ['BEGIN,INSERT,0A000,ROLLBACK,1:2', [...results, ...rows].join()]
+})
+
 t('Does not re-serialize bytea parameters when retrying on FetchPreparedStatement error', async() => {
   const insert = () => sql`insert into test (data) values (${ Buffer.from('hello') })`
   await sql`create table test (data bytea)`

@@ -538,7 +538,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         query.retried
           ? errored(query.retried)
           : query.prepared && retryRoutines.has(errorResponse.routine)
-            ? retry(query, errorResponse)
+            ? x[5] === 73 // I: not in a transaction block
+              ? retry(query, errorResponse)
+              : forget(query, errorResponse)
             : errored(errorResponse)
       } else {
         query.resolve(results || result)
@@ -822,6 +824,14 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     delete statements[q.signature]
     q.retried = error
     execute(q)
+  }
+
+  // A failed transaction ignores every command until it ends, and a query
+  // pipelined behind this one may already be ending it, so the query is not
+  // retried. Its stale statement is forgotten, to be prepared anew next time.
+  function forget(q, error) {
+    delete statements[q.signature]
+    errored(error)
   }
 
   function NotificationResponse(x) {
