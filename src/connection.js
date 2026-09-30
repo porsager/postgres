@@ -19,6 +19,7 @@ const Sync = b().S().end()
     , Flush = b().H().end()
     , SSLRequest = b().i32(8).i32(80877103).end(8)
     , ExecuteUnnamed = Buffer.concat([b().E().str(b.N).i32(0).end(), Sync])
+    , Unbuildable = b().Q().str('postgres.js: query could not be built' + b.N).end()
     , DescribeUnnamed = b().D().str('S').str(b.N).end()
     , noop = () => { /* noop */ }
 
@@ -176,8 +177,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         && sent.length < max_pipeline
         && (!q.options.onexecute || q.options.onexecute(connection))
     } catch (error) {
-      sent.length === 0 && write(Sync)
-      errored(error)
+      // q already has its place in the queue of queries awaiting an answer,
+      // but nothing of it was written. Send a query the server is sure to
+      // refuse in its place, so that q gets an answer of its own, every
+      // later answer stays with its query, and a transaction q was part of
+      // is aborted instead of committing without it. q is then rejected with
+      // its own error, as a retried query is (ReadyForQuery).
+      q.retried = error
+      q.describeFirst = false
+      q.cursorFn = null
+      write(Unbuildable)
       return true
     }
   }

@@ -342,6 +342,77 @@ t('Undefined values throws', async() => {
   return ['UNDEFINED_VALUE', error]
 })
 
+t('Undefined value in a pipelined query rejects only that query', async() => {
+  const sql = postgres(options)
+  await sql`select 1`
+  const results = await Promise.all([
+    sql`select pg_sleep(0.1), 1 as x`,
+    sql`select ${ undefined } as x`,
+    sql`select 3 as x`
+  ].map(x => x.then(([x]) => x.x, e => e.code)))
+  const after = (await sql`select 4 as x`)[0].x
+  await sql.end()
+  return ['1,UNDEFINED_VALUE,3,4', [...results, after].join()]
+})
+
+t('Undefined value in a transaction returning an array of queries rejects', async() => {
+  const sql = postgres(options)
+  await sql`create table test (x int)`
+  const error = await sql.begin(sql => [
+    sql`insert into test values (1)`,
+    sql`select ${ undefined } as x`
+  ]).catch(e => e.code)
+  const count = (await sql`select count(*)::int from test`)[0].count
+  await sql`drop table test`
+  await sql.end()
+  return ['UNDEFINED_VALUE,0', [error, count].join()]
+})
+
+t('Undefined value in a pipelined cursor rejects only that query', async() => {
+  const sql = postgres(options)
+  await sql`select 1`
+  const results = await Promise.all([
+    sql`select pg_sleep(0.1), 1 as x`,
+    sql`select ${ undefined } as x`.cursor(() => { /* noop */ }),
+    sql`select 3 as x`
+  ].map(x => x.then(x => x.length ? x[0].x : x.command, e => e.code)))
+  const after = (await sql`select 4 as x`)[0].x
+  await sql.end()
+  return ['1,UNDEFINED_VALUE,3,4', [...results, after].join()]
+})
+
+t('Too many parameters in a pipelined query rejects only that query', async() => {
+  const sql = postgres(options)
+  await sql`select 1`
+  const results = await Promise.all([
+    sql`select pg_sleep(0.1), 1 as x`,
+    sql.unsafe('select 2 as x', [...Array(65535).keys()]),
+    sql`select 3 as x`,
+    sql`select 4 as x`
+  ].map(x => x.then(([x]) => x.x, e => e.code)))
+  const after = (await sql`select 5 as x`)[0].x
+  await sql.end()
+  return ['1,MAX_PARAMETERS_EXCEEDED,3,4,5', [...results, after].join()]
+})
+
+t('Undefined value aborts a pipelined transaction on a reserved connection', async() => {
+  const sql = postgres(options)
+  await sql`create table test (x int)`
+  const reserved = await sql.reserve()
+  const results = await Promise.all([
+    reserved`begin`,
+    reserved`insert into test values (1)`,
+    reserved`select ${ undefined } as x`,
+    reserved`insert into test values (2)`,
+    reserved`commit`
+  ].map(x => x.then(x => x.command, e => e.code)))
+  reserved.release()
+  const count = (await sql`select count(*)::int from test`)[0].count
+  await sql`drop table test`
+  await sql.end()
+  return ['BEGIN,INSERT,UNDEFINED_VALUE,25P02,ROLLBACK,0', [...results, count].join()]
+})
+
 t('Transform undefined', async() => {
   const sql = postgres({ ...options, transform: { undefined: null } })
   return [null, (await sql`select ${ undefined } as x`)[0].x]
