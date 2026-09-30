@@ -1710,6 +1710,120 @@ t('requests works after single connect_timeout', async() => {
   ]
 })
 
+const backendMessage = (type, body) => {
+  const header = Buffer.alloc(5)
+  header.write(type)
+  header.writeInt32BE(body.length + 4, 1)
+  return Buffer.concat([header, body])
+}
+
+const errorResponse = (severity, code) => backendMessage('E', Buffer.from(
+  'S' + severity + '\0V' + severity + '\0C' + code + '\0M' + code + '\0\0'
+))
+
+const authenticated = Buffer.concat([
+  backendMessage('R', Buffer.alloc(4)),
+  backendMessage('Z', Buffer.from('I'))
+])
+
+t('Query runs on a new connection if the backend dies while fetching array types', async() => {
+  let killed = false
+    , unhandled = 0
+
+  const onunhandled = () => unhandled++
+  process.on('unhandledRejection', onunhandled)
+
+  const proxy = net.createServer(client => {
+    const server = net.connect(5432, 'localhost')
+    client.on('data', x => {
+      if (!killed && x.includes('typarray')) {
+        killed = true
+        server.destroy()
+        return client.end(errorResponse('FATAL', '57P01'))
+      }
+      server.write(x)
+    })
+    server.on('data', x => client.writable && client.write(x))
+    client.on('error', () => server.destroy())
+    server.on('error', () => client.destroy())
+    client.on('close', () => server.destroy())
+  })
+
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port })
+  const x = await sql`select 1 as x`.then(([x]) => x.x, e => e.code)
+  await sql.end()
+  proxy.close()
+  process.off('unhandledRejection', onunhandled)
+
+  return ['1,0', [x, unhandled].join(',')]
+})
+
+t('Clean close during startup rejects after connect_timeout instead of reconnecting forever', async() => {
+  let attempts = 0
+
+  const server = net.createServer(socket => (attempts++, socket.end()))
+  await new Promise(r => server.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: server.address().port })
+  const code = await sql`select 1`.catch(e => e.code)
+  await sql.end()
+  server.close()
+
+  return ['CONNECTION_CLOSED,true', [code, attempts < 10].join(',')]
+})
+
+t('Failing every array type fetch rejects with the peer error instead of reconnecting forever', async() => {
+  let attempts = 0
+    , unhandled = 0
+
+  const onunhandled = () => unhandled++
+  process.on('unhandledRejection', onunhandled)
+
+  const server = net.createServer(socket => {
+    attempts++
+    socket.on('error', () => socket.destroy())
+    socket.on('data', x => x.includes('typarray')
+      ? socket.end(errorResponse('FATAL', '08P01'))
+      : socket.write(authenticated)
+    )
+  })
+
+  await new Promise(r => server.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: server.address().port })
+  const code = await sql`select 1`.catch(e => e.code)
+  await sql.end()
+  server.close()
+  process.off('unhandledRejection', onunhandled)
+
+  return ['08P01,true,0', [code, attempts < 10, unhandled].join(',')]
+})
+
+t('Failed array type fetch on a live connection is not an unhandled rejection', async() => {
+  let unhandled = 0
+
+  const onunhandled = () => unhandled++
+  process.on('unhandledRejection', onunhandled)
+
+  const server = net.createServer(socket => {
+    socket.on('error', () => socket.destroy())
+    socket.on('data', x => x.includes('typarray')
+      ? socket.write(Buffer.concat([errorResponse('ERROR', '57014'), backendMessage('Z', Buffer.from('I'))]))
+      : x[0] === 88
+        ? socket.end()
+        : socket.write(authenticated)
+    )
+  })
+
+  await new Promise(r => server.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: server.address().port })
+  await sql`select 1`.catch(() => null)
+  await sql.end()
+  server.close()
+  process.off('unhandledRejection', onunhandled)
+
+  return [0, unhandled]
+})
+
 t('Postgres errors are of type PostgresError', async() =>
   [true, (await sql`bad keyword`.catch(e => e)) instanceof sql.PostgresError]
 )
