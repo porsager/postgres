@@ -145,8 +145,10 @@ function Postgres(a, b) {
   }
 
   async function listen(name, fn, onlisten) {
-    const listener = { fn, onlisten }
+    return listenSubscription(name, { fn, onlisten })
+  }
 
+  async function listenSubscription(name, listener) {
     const sql = listen.sql || (listen.sql = Postgres({
       ...options,
       max: 1,
@@ -156,7 +158,7 @@ function Postgres(a, b) {
       onclose() {
         Object.entries(listen.channels).forEach(([name, { listeners }]) => {
           delete listen.channels[name]
-          Promise.all(listeners.map(l => listen(name, l.fn, l.onlisten).catch(() => { /* noop */ })))
+          Promise.all(listeners.map(l => listenSubscription(name, l).catch(() => { /* noop */ })))
         })
       },
       onnotify(c, x) {
@@ -169,16 +171,14 @@ function Postgres(a, b) {
 
     if (exists) {
       channels[name].listeners.push(listener)
-      const result = await channels[name].result
-      listener.onlisten && listener.onlisten()
-      return { state: result.state, unlisten }
+    } else {
+      channels[name] = { result: sql`listen ${
+        sql.unsafe('"' + name.replace(/"/g, '""') + '"')
+      }`, listeners: [listener] }
     }
-
-    channels[name] = { result: sql`listen ${
-      sql.unsafe('"' + name.replace(/"/g, '""') + '"')
-    }`, listeners: [listener] }
     const result = await channels[name].result
-    listener.onlisten && listener.onlisten()
+    if (name in channels && channels[name].listeners.includes(listener))
+      listener.onlisten && listener.onlisten()
     return { state: result.state, unlisten }
 
     async function unlisten() {
