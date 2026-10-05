@@ -95,6 +95,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     , rows = 0
     , serverSignature = null
     , nextWriteTimer = null
+    , reconnectTimer = null
     , terminated = false
     , incomings = null
     , results = null
@@ -340,6 +341,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (!socket)
       return
 
+    if (terminated)
+      return (socket.removeAllListeners(), socket.destroy(), socket = null)
+
     connectTimer.start()
 
     if (options.socket)
@@ -359,7 +363,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   }
 
   function reconnect() {
-    setTimeout(connect, closedTime ? Math.max(0, closedTime + delay - performance.now()) : 0)
+    reconnectTimer = setTimeout(connect, closedTime ? Math.max(0, closedTime + delay - performance.now()) : 0)
   }
 
   function connected() {
@@ -421,6 +425,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
   function terminate() {
     terminated = true
+    clearTimeout(reconnectTimer)
     if (stream || query || initial || sent.length)
       error(Errors.connection('CONNECTION_DESTROYED', options))
 
@@ -428,7 +433,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (socket) {
       socket.removeListener('data', data)
       socket.removeListener('connect', connected)
-      socket.readyState === 'open' && socket.end(b().X().end())
+      socket.readyState === 'open'
+        ? socket.end(b().X().end())
+        : socket.readyState === 'opening' && socket.destroy()
     }
     ended && (ended(), ending = ended = null)
   }
