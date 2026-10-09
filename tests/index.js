@@ -2523,6 +2523,7 @@ t('Custom socket', {}, async() => {
 })
 
 t('Connection end cancels a pending socket factory', async() => {
+  const net = await import('node:net')
   let release
     , started
     , closes = 0
@@ -2780,4 +2781,19 @@ t('Connection end cancels a pending listen reconnect', async() => {
     await client.end({ timeout: 0 })
     await sql`select pg_terminate_backend(pid) from pg_stat_activity where application_name = ${ application_name }`
   }
+})
+
+t('Connection end cancels the first listen attempt', async() => {
+  // Use native sockets because Deno's net shim has different connection states.
+  const net = await import('node:net')
+  const server = net.createServer(socket => socket.resume())
+  server.listen()
+  const socket = new net.Socket()
+  const closed = new Promise(r => socket.once('close', r))
+  const sql = postgres({ ...options, connect_timeout: 30, socket: () => socket.connect(server.address().port, '127.0.0.1') })
+  const listening = sql.listen('end_connecting', () => {}).catch(x => x.code)
+  await sql.end()
+  await closed
+  server.close()
+  return ['CONNECTION_DESTROYED', await listening]
 })
