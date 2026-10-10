@@ -185,7 +185,7 @@ function Socket() {
 
   function end(data) {
     return data
-      ? tcp.write(data, () => tcp.raw.close())
+      ? tcp.write(data)
       : tcp.raw.close()
   }
 
@@ -206,13 +206,20 @@ function Socket() {
   }
 
   async function readFirst() {
-    const { value } = await tcp.reader.read()
-    tcp.emit('data', Buffer.from(value))
+    try {
+      const { value } = await tcp.reader.read()
+      tcp.emit('data', Buffer.from(value))
+    } catch (err) {
+      error(err)
+    }
   }
 
   function error(err) {
+    if (tcp.readyState === 'closed')
+      return
+
     tcp.emit('error', err)
-    tcp.emit('close')
+    close()
   }
 }
 
