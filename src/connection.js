@@ -567,10 +567,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       initial && !initial.reserve && execute(initial)
       options.shared.retries = retries = 0
       initial = null
-      return
     }
 
-    while (sent.length && (query = sent.shift()) && (query.active = true, query.cancelled))
+    if (sent.length && (query = sent.shift()) && (query.active = true, query.cancelled))
       Connection(options).cancel(query.state, query.cancelled.resolve, query.cancelled.reject)
 
     if (query)

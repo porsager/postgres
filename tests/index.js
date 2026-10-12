@@ -2302,6 +2302,41 @@ t('Cancel queued query', async() => {
   return ['57014', error.code]
 })
 
+t('Cancel piped query with a query piped behind it', async() => {
+  await sql`select 1`
+  const last = sql`select pg_sleep(0.5)`.execute()
+  const query = sql`select pg_sleep(2) as dig`
+  setTimeout(() => query.cancel(), 100)
+  const [error, [{ x }]] = await Promise.all([query.catch(x => x), sql`select 1 as x`])
+  await last
+  return ['57014,1', error.code + ',' + x]
+})
+
+t('Cancel query while its connection is opening', async() => {
+  let open
+  const opened = new Promise(r => open = r)
+  const sql = postgres({
+    ...options,
+    socket: async({ host: [host], port: [port] }) => {
+      await opened
+      return new Promise((resolve, reject) => {
+        const socket = new net.Socket()
+        socket.connect(port, host)
+        socket.on('error', reject)
+        socket.on('connect', () => resolve(socket))
+      })
+    }
+  })
+  const query = sql`select 1 as x`
+  const error = query.catch(x => x)
+  await delay(10)
+  query.cancel()
+  const next = sql`select 2 as x`.execute()
+  open()
+  const [{ x }] = await next
+  return ['57014,2', (await error).code + ',' + x, await sql.end()]
+})
+
 t('Fragments', async() => [
   1,
   (await sql`
