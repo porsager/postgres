@@ -49,7 +49,7 @@ const errorFields = {
   82  : 'routine'            // R
 }
 
-function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop } = {}) {
+function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop, onfull = noop } = {}) {
   const {
     sslnegotiation,
     ssl,
@@ -538,7 +538,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         query.retried
           ? errored(query.retried)
           : query.prepared && retryRoutines.has(errorResponse.routine)
-            ? retry(query, errorResponse)
+            ? !query.cancelled && !sent.length && x[5] === 73 // I
+              ? retry(query, errorResponse)
+              : forget(query, errorResponse)
             : errored(errorResponse)
       } else {
         query.resolve(results || result)
@@ -821,7 +823,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function retry(q, error) {
     delete statements[q.signature]
     q.retried = error
-    execute(q)
+    execute(q) || onfull(connection)
+  }
+
+  function forget(q, error) {
+    delete statements[q.signature]
+    errored(error)
   }
 
   function NotificationResponse(x) {

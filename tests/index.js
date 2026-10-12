@@ -1839,6 +1839,7 @@ t('Does not re-serialize json parameters when retrying on RevalidateCachedQuery 
 })
 
 t('Does not re-serialize json parameters when retrying on FetchPreparedStatement error', async() => {
+  const sql = postgres(options)
   const insert = () => sql`insert into test (config) values (${ sql.json({ warmup: 2100000000 }) })`
   await sql`create table test (config jsonb)`
   await insert()
@@ -1866,6 +1867,7 @@ t('Does not re-serialize boolean parameters when retrying on RevalidateCachedQue
 })
 
 t('Does not re-serialize boolean parameters when retrying on FetchPreparedStatement error', async() => {
+  const sql = postgres(options)
   const insert = () => sql`insert into test (enabled) values (${ true })`
   await sql`create table test (enabled bool)`
   await insert()
@@ -1893,6 +1895,7 @@ t('Does not re-serialize bytea parameters when retrying on RevalidateCachedQuery
 })
 
 t('Does not re-serialize bytea parameters when retrying on FetchPreparedStatement error', async() => {
+  const sql = postgres(options)
   const insert = () => sql`insert into test (data) values (${ Buffer.from('hello') })`
   await sql`create table test (data bytea)`
   await insert()
@@ -1903,6 +1906,124 @@ t('Does not re-serialize bytea parameters when retrying on FetchPreparedStatemen
     (await sql`select data from test`).map(x => x.data.toString()).join(),
     await sql`drop table test`
   ]
+})
+
+t('Fails a stale prepared statement once when a query is piped behind it', async() => {
+  const sql = postgres(options)
+  const piped = () => Promise.all([sql`select 1 as x`, sql`select 2 as x`])
+  await piped()
+  await sql`deallocate all`
+  const error = await piped().catch(e => e)
+  return [
+    '26000,12',
+    error.code + ',' + (await piped()).map(([{ x }]) => x).join('')
+  ]
+})
+
+t('Holds the connection while retrying a prepared statement', async() => {
+  let builds = 0
+    , other
+  const sql = postgres({
+    ...options,
+    debug: (_, x) => x === 'select * from test where id = $1' && ++builds === 3 && (other = get(2).execute())
+  })
+  const read = id => sql`select * from test where id = ${ id }`
+  const get = id => sql`select id, name, null::int as extra from test where id = ${ id }`
+  await sql`create table test (id int, name text)`
+  await sql`insert into test values (1, 'a'), (2, 'b')`
+  await read(1)
+  await get(2)
+  await sql`alter table test add column extra int`
+  const [x] = await read(1)
+  const [y] = await other
+  return [
+    '1a2b',
+    x.id + x.name + y.id + y.name,
+    await sql`drop table test`
+  ]
+})
+
+t('Answers two stale prepared statements piped together', async() => {
+  const sql = postgres(options)
+  const read = id => sql`select * from test where id = ${ id }`
+  await sql`create table test (id int, name text)`
+  await sql`insert into test values (1, 'a'), (2, 'b')`
+  await read(1)
+  await sql`alter table test add column extra int`
+  const [error, [x]] = await Promise.all([read(1).catch(e => e), read(2)])
+  const [y] = await sql`select 3 as id, 'c' as name`
+  const [z] = await read(1)
+  return [
+    '0A000,2b,3c,1a',
+    [error.code, x.id + x.name, y.id + y.name, z.id + z.name].join(),
+    await sql`drop table test`
+  ]
+})
+
+t('Does not retry a stale prepared statement inside a transaction begun behind it', async() => {
+  const sql = postgres(options)
+  const insert = x => sql`insert into test (name) values (${ x }) returning *`
+  await sql`create table test (id serial primary key, name text)`
+  await insert('a')
+  await sql`alter table test add column extra int`
+  const [error] = await Promise.all([
+    insert('b').catch(e => e),
+    sql.begin(async sql => {
+      await sql`select 1`
+      throw new Error('rollback')
+    }).catch(() => null)
+  ])
+  return [
+    '0A000,a',
+    error.code + ',' + (await sql`select name from test order by id`).map(x => x.name).join(),
+    await sql`drop table test`
+  ]
+})
+
+t('Does not give a stale prepared statement the answer of a statement piped behind it', async() => {
+  const sql = postgres(options)
+  const select = () => sql`select * from test order by id`
+  const get = id => sql`select name from test where id = ${ id }`
+  await sql`create table test (id int, name text)`
+  await sql`insert into test values (1, 'a'), (2, 'b')`
+  await select()
+  await sql`alter table test add column extra int`
+  const [error, [x]] = await Promise.all([select().catch(e => e), get(2)])
+  const [y] = await get(2)
+  return [
+    '0A000,b,b',
+    [error.code, x.name, y.name].join(),
+    await sql`drop table test`
+  ]
+})
+
+t('Does not reorder writes on a reserved connection when retrying a stale prepared statement', async() => {
+  const sql = postgres(options)
+  const reserved = await sql.reserve()
+  await reserved`create table test (id int primary key, name text)`
+  await reserved`insert into test values (1, 'a')`
+  await reserved`delete from test`
+  await reserved`deallocate all`
+  const [error] = await Promise.all([
+    reserved`insert into test values (1, 'a')`.catch(e => e),
+    reserved`update test set name = 'b' where id = 1`
+  ])
+  reserved.release()
+  return [
+    '26000,',
+    error.code + ',' + (await sql`select name from test`).map(x => x.name).join(),
+    await sql`drop table test`
+  ]
+})
+
+t('Does not retry a cancelled stale prepared statement', async() => {
+  const sql = postgres(options)
+  await sql`select 1 as x`
+  await sql`deallocate all`
+  sql`select pg_sleep(0.5)`.execute()
+  const query = sql`select 1 as x`.execute()
+  setTimeout(() => query.cancel(), 100)
+  return ['26000', (await query.catch(e => e)).code]
 })
 
 t('Properly throws routine error on not prepared statements', async() => {
