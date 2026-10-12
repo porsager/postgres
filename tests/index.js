@@ -2302,6 +2302,14 @@ t('Cancel queued query', async() => {
   return ['57014', error.code]
 })
 
+t('Error mid-result does not offset rows of next query', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  await sql`select 1 / (g - 3) from generate_series(1, 5) g`.catch(x => x)
+  const result = await sql`select 1 as x`
+  await sql.end()
+  return [1, result.length]
+})
+
 t('Fragments', async() => [
   1,
   (await sql`

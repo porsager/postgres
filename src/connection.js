@@ -549,6 +549,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
 
     query = results = errorResponse = null
     result = new Result()
+    rows = 0
     connectTimer.cancel()
 
     if (initial) {
