@@ -63,7 +63,7 @@ function Postgres(a, b) {
       , full = Queue()
       , queues = { connecting, reserved, closed, ended, open, busy, full }
 
-  const connections = [...Array(options.max)].map(() => Connection(options, queues, { onopen, onend, onclose }))
+  const connections = [...Array(options.max)].map(() => Connection(options, queues, { onopen, onend, onclose, onfull }))
 
   const sql = Sql(handler)
 
@@ -405,6 +405,10 @@ function Postgres(a, b) {
 
   function onend(c) {
     move(c, ended)
+  }
+
+  function onfull(c) {
+    move(c, full)
   }
 
   function onopen(c) {
