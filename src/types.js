@@ -302,17 +302,23 @@ function arrayParserLoop(s, x, parser, typarray) {
       xs.push(arrayParserLoop(s, x, parser, typarray))
     } else if (s.char === '}') {
       s.quoted = false
-      s.last < s.i && xs.push(parser ? parser(x.slice(s.last, s.i)) : x.slice(s.last, s.i))
+      s.last < s.i && xs.push(arrayElement(x.slice(s.last, s.i), parser))
       s.last = s.i + 1
       break
     } else if (s.char === delimiter && s.p !== '}' && s.p !== '"') {
-      xs.push(parser ? parser(x.slice(s.last, s.i)) : x.slice(s.last, s.i))
+      xs.push(arrayElement(x.slice(s.last, s.i), parser))
       s.last = s.i + 1
     }
     s.p = s.char
   }
-  s.last < s.i && xs.push(parser ? parser(x.slice(s.last, s.i + 1)) : x.slice(s.last, s.i + 1))
+  s.last < s.i && xs.push(arrayElement(x.slice(s.last, s.i + 1), parser))
   return xs
+}
+
+// A NULL element is written as the bare token NULL, while a string reading NULL
+// is always quoted, so only unquoted elements can be NULLs.
+function arrayElement(str, parser) {
+  return str === 'NULL' ? null : parser ? parser(str) : str
 }
 
 export const toCamel = x => {

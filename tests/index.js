@@ -6,6 +6,7 @@ import fs from 'fs'
 import crypto from 'crypto'
 
 import postgres from '../src/index.js'
+import { arrayParser } from '../src/types.js'
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
 const rel = x => new URL(x, import.meta.url)
@@ -153,6 +154,121 @@ t('Nested array n3', async() =>
 t('Escape in arrays', async() =>
   ['Hello "you",c:\\windows', (await sql`select ${ sql.array(['Hello "you"', 'c:\\windows']) } as x`)[0].x.join(',')]
 )
+
+const show = x => Array.isArray(x)
+  ? '[' + x.map(x => show(x)) + ']'
+  : x === null ? 'null' : x instanceof Date ? 'date:' + x.getTime() : typeof x + ':' + x
+
+t('Null in text array', async() => [
+  '[string:a,null,string:b]',
+  show((await sql`select array['a', null, 'b']::text[] as x`)[0].x)
+])
+
+t('Null in arrays of other types', async() => {
+  const x = (await sql`
+    select
+      array[1, null]::int2[] as int2,
+      array[null, 2]::int4[] as int4,
+      array[1, null]::bigint[] as bigint,
+      array[1.5, null]::numeric[] as numeric,
+      array[true, null, false]::bool[] as bool,
+      array['1970-01-01 00:00:00+00'::timestamptz, null] as timestamptz
+  `)[0]
+
+  return [
+    '[number:1,null],[null,number:2],[string:1,null],[string:1.5,null],[boolean:true,null,boolean:false],[date:0,null]',
+    [x.int2, x.int4, x.bigint, x.numeric, x.bool, x.timestamptz].map(show).join()
+  ]
+})
+
+t('Null in json array', async() => [
+  '[object:[object Object],null]',
+  show((await sql`select array['{"a":1}'::json, null] as x`)[0].x)
+])
+
+t('Null in array_agg', async() => [
+  '[string:a,null,string:b]',
+  show((await sql`select array_agg(y) as x from (values ('a'), (null), ('b')) as v(y)`)[0].x)
+])
+
+t('Null in nested arrays', async() => {
+  const x = (await sql`
+    select
+      array[[1, null], [null, 4]]::int[] as ints,
+      array[[['a', null]], [[null, 'd e']]]::text[] as strings
+  `)[0]
+
+  return [
+    '[[number:1,null],[null,number:4]],[[[string:a,null]],[[null,string:d e]]]',
+    [x.ints, x.strings].map(show).join()
+  ]
+})
+
+t('Null in array of only nulls', async() => [
+  '[null,null]',
+  show((await sql`select array[null, null]::text[] as x`)[0].x)
+])
+
+t('String NULL in array is not null', async() => [
+  '[string:NULL,null,string:null,string:Null]',
+  show((await sql`select array['NULL', null, 'null', 'Null']::text[] as x`)[0].x)
+])
+
+t('String NULL in nested array is not null', async() => [
+  '[[string:NULL,null],[null,string:NULL]]',
+  show((await sql`select array[['NULL', null], [null, 'NULL']]::text[] as x`)[0].x)
+])
+
+t('String NULL in array round trips', async() => [
+  '[string:NULL,null,string:a]',
+  show((await sql`select ${ sql.array(['NULL', null, 'a']) }::text[] as x`)[0].x)
+])
+
+t('Null in array does not reach custom type parser', async() => {
+  const parsed = []
+  const sql = postgres({
+    ...options,
+    types: {
+      text: { to: 25, from: [25], serialize: x => x, parse: x => (parsed.push(x), x.toUpperCase()) }
+    }
+  })
+
+  const x = (await sql`select array['a', null, 'NULL']::text[] as x`)[0].x
+  await sql.end()
+  return ['[string:A,null,string:NULL]/a,NULL', show(x) + '/' + parsed.join()]
+})
+
+// The connection strips the leading { before handing the value to the array parser
+t('Array parser returns null for unquoted NULL', async() => [
+  '[number:1,null,number:3]',
+  show(arrayParser('1,NULL,3}', Number))
+])
+
+t('Array parser returns null for NULL without a parser', async() => [
+  '[null,string:a,null]',
+  show(arrayParser('NULL,a,NULL}'))
+])
+
+t('Array parser keeps quoted NULL as a string', async() => [
+  '[string:NULL,null,string:a b,null,string:NULL]',
+  show(arrayParser('"NULL",NULL,"a b",NULL,"NULL"}'))
+])
+
+t('Array parser returns null in nested arrays', async() => [
+  '[[number:1,null],[null,number:4]]',
+  show(arrayParser('{1,NULL},{NULL,4}}', Number))
+])
+
+t('Array parser returns null for NULL in a box array', async() => [
+  '[string:(1,2),(3,4),null]',
+  show(arrayParser('(1,2),(3,4);NULL}', undefined, 1020))
+])
+
+t('Array parser does not call the parser for NULL', async() => {
+  const parsed = []
+  arrayParser('a,NULL,"NULL"}', x => parsed.push(x))
+  return ['a,NULL', parsed.join()]
+})
 
 t('Escapes', async() => {
   return ['hej"hej', Object.keys((await sql`select 1 as ${ sql('hej"hej') }`)[0])[0]]
