@@ -2686,6 +2686,16 @@ t('reserve connection', async() => {
   ]
 })
 
+t('end resolves when a reserved connection is released after end was called', async() => {
+  const sql = postgres(options)
+  const reserved = await sql.reserve()
+  const ended = sql.end()
+  await delay(10)
+  reserved.release()
+  await ended
+  return [true, true]
+})
+
 t('arrays in reserved connection', async() => {
   const reserved = await sql.reserve()
   const [{ x }] = await reserved`select array[1, 2, 3] as x`
