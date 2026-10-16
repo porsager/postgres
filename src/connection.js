@@ -438,6 +438,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     remaining = 0
     incomings = null
     clearImmediate(nextWriteTimer)
+    chunk = nextWriteTimer = null
     socket.removeListener('data', data)
     socket.removeListener('connect', connected)
     idleTimer.cancel()

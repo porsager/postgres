@@ -2522,6 +2522,37 @@ t('Custom socket', {}, async() => {
   ]
 })
 
+t('Reconnects after a close with a write still buffered', { timeout: 5 }, async() => {
+  const sockets = []
+  const sql = postgres({
+    ...options,
+    connect_timeout: 1,
+    socket: () => new Promise((resolve, reject) => {
+      const socket = new net.Socket()
+      sockets.push(socket)
+      socket.connect(5432)
+      socket.on('error', reject)
+      socket.on('connect', () => resolve(socket))
+    })
+  })
+
+  await sql`select 1`
+
+  // Issue a query so its bytes are buffered for the pending write immediate,
+  // then close the socket before that immediate runs.
+  const pending = sql`select 1`.execute().catch(e => e.code)
+  for (let i = 0; i < 10; i++) await 1
+  const socket = sockets[0]
+  socket.emit('close', false)
+  socket.destroy()
+
+  const closed = await pending
+  const x = await sql`select 1 as x`.then(([{ x }]) => x, e => e.code)
+  await sql.end()
+
+  return ['CONNECTION_CLOSED,1', closed + ',' + x]
+})
+
 t('Ensure drain only dequeues if ready', async() => {
   const sql = postgres(options)
 
