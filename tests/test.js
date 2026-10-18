@@ -1,87 +1,94 @@
-/* eslint no-console: 0 */
-
 import util from 'util'
 
 let done = 0
 let only = false
 let ignored = 0
-let failed = false
+let skipped = 0
+let current = null
 let promise = Promise.resolve()
 const tests = {}
-    , ignore = {}
+    , filter = (process.argv[2] || '').toLowerCase()
 
 export const nt = () => ignored++
 export const ot = (...rest) => (only = true, test(true, ...rest))
 export const t = (...rest) => test(false, ...rest)
 t.timeout = 5
+t.before = null
+t.ready = Promise.resolve()
+
+process.on('unhandledRejection', stray)
+process.on('uncaughtException', stray)
 
 async function test(o, name, options, fn) {
   typeof options !== 'object' && (fn = options, options = {})
-  const line = new Error().stack.split('\n')[3].match(':([0-9]+):')[1]
+  const at = new Error().stack.split('\n').map(x => x.match('/([^/]+\\.js):([0-9]+):')).find(x => x && x[1] !== 'test.js')
+      , line = at ? at[1] + ':' + at[2] : '?'
 
   await 1
 
   if (only && !o)
     return
 
-  tests[line] = { fn, line, name }
-  promise = promise.then(() => Promise.race([
-    new Promise((resolve, reject) =>
-      fn.timer = setTimeout(() => reject('Timed out'), (options.timeout || t.timeout) * 1000)
-    ),
-    failed
-      ? (ignored++, ignore)
-      : fn()
-  ]))
-    .then(async x => {
-      clearTimeout(fn.timer)
-      if (x === ignore)
-        return
+  if (filter && !name.toLowerCase().includes(filter))
+    return skipped++
 
-      if (!Array.isArray(x))
+  const x = tests[line + ' ' + name] = { fn, line, name }
+  promise = promise.then(async() => {
+    current = x
+    return Promise.race([
+      new Promise((resolve, reject) =>
+        x.timer = setTimeout(() => reject('Timed out'), (options.timeout || t.timeout) * 1000)
+      ),
+      new Promise((resolve, reject) => (
+        x.stray = reject,
+        Promise.resolve().then(t.before).then(fn).then(resolve, reject)
+      ))
+    ])
+  })
+    .then(async result => {
+      if (!Array.isArray(result))
         throw new Error('Test should return result array')
 
-      const [expected, got] = await Promise.all(x)
-      if (expected !== got) {
-        failed = true
+      const [expected, got] = await Promise.all(result)
+      if (expected !== got)
         throw new Error(util.inspect(expected) + ' != ' + util.inspect(got))
-      }
 
-      tests[line].succeeded = true
+      x.succeeded = true
       process.stdout.write('✅')
     })
     .catch(err => {
-      tests[line].failed = failed = true
-      tests[line].error = err instanceof Error ? err : new Error(util.inspect(err))
+      x.failed = true
+      x.error = err instanceof Error ? err : new Error(util.inspect(err))
+      process.stdout.write('⛔️')
     })
     .then(() => {
-      ++done === Object.keys(tests).length && exit()
+      clearTimeout(x.timer)
+      current = null
+      ++done === Object.keys(tests).length && t.ready.then(() => done === Object.keys(tests).length && exit())
     })
+}
+
+function stray(err) {
+  current && !current.succeeded && !current.failed
+    ? current.stray(err)
+    : console.error('\n⚠️', 'Stray error outside a test', '\n', util.inspect(err))
 }
 
 function exit() {
-  let success = true
-  Object.values(tests).every((x) => {
-    if (x.succeeded)
-      return true
+  const failures = Object.values(tests).filter(x => !x.succeeded)
 
-    success = false
-    x.cleanup
-      ? console.error('⛔️', x.name + ' at line', x.line, 'cleanup failed', '\n', util.inspect(x.cleanup))
-      : console.error('⛔️', x.name + ' at line', x.line, x.failed
-        ? 'failed'
-        : 'never finished', x.error ? '\n' + util.inspect(x.error) : ''
-      )
-  })
+  console.log('')
+  failures.forEach(x =>
+    console.error('⛔️', x.name, 'at', x.line, x.failed ? 'failed' : 'never finished', x.error ? '\n' + util.inspect(x.error) : '')
+  )
 
-  only
+  only || skipped
     ? console.error('⚠️', 'Not all tests were run')
     : ignored
-      ? console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's', '\n'))
-      : success
-        ? console.log('🎉')
-        : console.error('⚠️', 'Not good')
+      ? console.error('⚠️', ignored, 'ignored test' + (ignored === 1 ? '' : 's'))
+      : failures.length
+        ? console.error('⚠️', failures.length, 'of', done, 'failed')
+        : console.log('🎉')
 
-  !process.exitCode && (!success || only || ignored) && (process.exitCode = 1)
+  !process.exitCode && (failures.length || only || ignored) && (process.exitCode = 1)
 }
-

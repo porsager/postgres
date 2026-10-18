@@ -1,6 +1,6 @@
 import { spawnSync } from 'child_process'
 
-exec('dropdb', ['postgres_js_test'])
+exec('dropdb', ['--force', 'postgres_js_test'])
 
 exec('psql', ['-c', 'alter system set ssl=on'])
 exec('psql', ['-c', 'drop user postgres_js_test'])
@@ -24,11 +24,3 @@ export function exec(cmd, args) {
     throw stderr
 }
 
-async function execAsync(cmd, args) { // eslint-disable-line
-  let stderr = ''
-  const cp = await spawn(cmd, args, { stdio: 'pipe', encoding: 'utf8' }) // eslint-disable-line
-  cp.stderr.on('data', x => stderr += x)
-  await new Promise(x => cp.on('exit', x))
-  if (stderr && !stderr.includes('already exists') && !stderr.includes('does not exist'))
-    throw new Error(stderr)
-}

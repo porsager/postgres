@@ -1,14 +1,23 @@
 {
   "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "lib": [
-      "ES2015"
+      "ES2022"
     ],
     "types": [
       "node"
     ],
-    "esModuleInterop": true,
     "strict": true,
-    "noImplicitAny": true,
-    "exactOptionalPropertyTypes": true
-  }
+    "noEmit": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": false,
+    "skipLibCheck": false
+  },
+  "files": [
+    "index.d.ts",
+    "test.ts",
+    "issues.ts"
+  ]
 }

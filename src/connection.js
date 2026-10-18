@@ -1,1062 +1,1226 @@
-import net from 'net'
-import tls from 'tls'
-import crypto from 'crypto'
 import Stream from 'stream'
-import { performance } from 'perf_hooks'
-
-import { stringify, handleValue, arrayParser, arraySerializer } from './types.js'
-import { Errors } from './errors.js'
+import * as p from './protocol.js'
+import { Errors, queryError } from './errors.js'
 import Result from './result.js'
-import Queue from './queue.js'
-import { Query, CLOSE } from './query.js'
-import b from './bytes.js'
+import { CLOSE } from './query.js'
+import { now, channels, listened } from './diagnostics.js'
 
-export default Connection
+export const slow = 100
+export const notable = 5
 
-let uid = 1
+const text = p.text
+    , noop = () => {}
+    , ending = /^\s*(commit|end|abort|rollback(?!\s+to\b)|prepare\s+transaction)\b/i
+    , limit = 1000
+    , refused = 'postgres.js: query could not be built'
+    , skip = Symbol('skip')
+    , unknown = 100
+    , states = new WeakMap()
+    , after = 16
 
-const Sync = b().S().end()
-    , Flush = b().H().end()
-    , SSLRequest = b().i32(8).i32(80877103).end(8)
-    , ExecuteUnnamed = Buffer.concat([b().E().str(b.N).i32(0).end(), Sync])
-    , DescribeUnnamed = b().D().str('S').str(b.N).end()
-    , noop = () => { /* noop */ }
+let ids = 1
+  , compiles = true
 
-const retryRoutines = new Set([
-  'FetchPreparedStatement',
-  'RevalidateCachedQuery',
-  'transformAssignedExpr'
-])
+export function Connection(ready, options, events) {
+  const { socket } = ready
+      , timers = options.timers
+      , defer = timers.nextTick || process.nextTick
+      , { transform } = options
+      , sent = []
+      , pending = []
+      , running = new Set()
+      , open = new Set()
+      , prepared = new Map()
+      , out = p.Writer()
+      , frames = p.Frames(frame, socket.shared, error => (connection.fatal = error, socket.destroy()))
 
-const errorFields = {
-  83  : 'severity_local',    // S
-  86  : 'severity',          // V
-  67  : 'code',              // C
-  77  : 'message',           // M
-  68  : 'detail',            // D
-  72  : 'hint',              // H
-  80  : 'position',          // P
-  112 : 'internal_position', // p
-  113 : 'internal_query',    // q
-  87  : 'where',             // W
-  115 : 'schema_name',       // s
-  116 : 'table_name',        // t
-  99  : 'column_name',       // c
-  100 : 'data type_name',    // d
-  110 : 'constraint_name',   // n
-  70  : 'file',              // F
-  76  : 'line',              // L
-  82  : 'routine'            // R
-}
-
-function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop } = {}) {
-  const {
-    sslnegotiation,
-    ssl,
-    max,
-    user,
-    host,
-    port,
-    database,
-    parsers,
-    transform,
-    onnotice,
-    onnotify,
-    onparameter,
-    max_pipeline,
-    keep_alive,
-    backoff,
-    target_session_attrs
-  } = options
-
-  const sent = Queue()
-      , id = uid++
-      , backend = { pid: null, secret: null }
-      , idleTimer = timer(end, options.idle_timeout)
-      , lifeTimer = timer(end, options.max_lifetime)
-      , connectTimer = timer(connectTimedOut, options.connect_timeout)
-
-  let socket = null
-    , cancelMessage
-    , errorResponse = null
-    , result = new Result()
-    , incoming = Buffer.alloc(0)
-    , needsTypes = options.fetch_types
-    , backendParameters = {}
-    , statements = {}
-    , statementId = Math.random().toString(36).slice(2)
-    , statementCount = 1
-    , closedTime = 0
-    , remaining = 0
-    , hostIndex = 0
-    , retries = 0
-    , length = 0
-    , delay = 0
-    , rows = 0
-    , serverSignature = null
-    , nextWriteTimer = null
-    , terminated = false
-    , incomings = null
-    , results = null
-    , initial = null
-    , ending = null
-    , stream = null
-    , chunk = null
-    , ended = null
-    , nonce = null
-    , query = null
-    , final = null
+  let blocker = null
+    , rolling = false
+    , fence = null
+    , drained = null
+    , status = ready.status
+    , flushing = false
+    , closed = null
+    , closing = null
+    , portals = 0
+    , traced = 0
+    , epoch = 0
+    , headSince = 0
+    , notables = 0
 
   const connection = {
-    queue: queues.closed,
-    idleTimer,
-    connect(query) {
-      initial = query
-      reconnect()
-    },
-    terminate,
-    execute,
+    id: ids++,
+    host: ready.host,
+    port: ready.port,
+    backend: ready.backend,
+    parameters: ready.parameters,
+    prepared,
+    lease: null,
+    get status() { return status },
+    get inflight() { return sent.length + pending.length },
+    get exclusive() { return !!blocker && exclusive(blocker) },
+    get copying() { return !!blocker && blocker.streaming && blocker.open },
+    get closed() { return closed },
+    get closing() { return !!closing },
+    send,
+    simple,
+    describe,
+    local,
     cancel,
-    end,
-    count: 0,
-    id
+    close,
+    destroy,
+    ref: () => socket.ref(),
+    unref: () => socket.unref(),
+    backlog,
+    heavy,
+    get notable() { return notables > 0 }
   }
 
-  queues.closed && queues.closed.push(connection)
+  socket.ondata = x => frames.push(x)
+  socket.ondrain = ondrain
+  socket.onclose = onclose
+  ready.rest && ready.rest.length && frames.push(ready.rest)
+  socket.resume()
 
   return connection
 
-  async function createSocket() {
-    let x
-    try {
-      x = options.socket
-        ? (await Promise.resolve(options.socket(options)))
-        : new net.Socket()
-    } catch (e) {
-      error(e)
-      return
-    }
-    x.on('error', error)
-    x.on('close', closed)
-    x.on('drain', drain)
-    return x
+  function ondrain() {
+    const x = drained
+    drained = null
+    x && x()
   }
 
-  async function cancel({ pid, secret }, resolve, reject) {
-    try {
-      cancelMessage = b().i32(16).i32(80877102).i32(pid).i32(secret).end(16)
-      await connect()
-      socket.once('error', reject)
-      socket.once('close', resolve)
-    } catch (error) {
-      reject(error)
-    }
-  }
+  function schedule(now) {
+    if (now || out.length >= 65536)
+      return flush()
 
-  function execute(q) {
-    if (terminated)
-      return queryError(q, Errors.connection('CONNECTION_DESTROYED', options))
-
-    if (stream)
-      return queryError(q, Errors.generic('COPY_IN_PROGRESS', 'You cannot execute queries during copy'))
-
-    if (q.cancelled)
-      return
-
-    try {
-      q.state = backend
-      query
-        ? sent.push(q)
-        : (query = q, query.active = true)
-
-      build(q)
-      return write(toBuffer(q))
-        && !q.describeFirst
-        && !q.cursorFn
-        && sent.length < max_pipeline
-        && (!q.options.onexecute || q.options.onexecute(connection))
-    } catch (error) {
-      sent.length === 0 && write(Sync)
-      errored(error)
-      return true
-    }
-  }
-
-  function toBuffer(q) {
-    if (q.parameters.length >= 65534)
-      throw Errors.generic('MAX_PARAMETERS_EXCEEDED', 'Max number of parameters (65534) exceeded')
-
-    return q.options.simple
-      ? b().Q().str(q.statement.string + b.N).end()
-      : q.describeFirst
-        ? Buffer.concat([describe(q), Flush])
-        : q.prepare
-          ? q.prepared
-            ? prepared(q)
-            : Buffer.concat([describe(q), prepared(q)])
-          : unnamed(q)
-  }
-
-  function describe(q) {
-    return Buffer.concat([
-      Parse(q.statement.string, q.parameters, q.statement.types, q.statement.name),
-      Describe('S', q.statement.name)
-    ])
-  }
-
-  function prepared(q) {
-    return Buffer.concat([
-      Bind(q.parameters, q.statement.types, q.statement.name, q.cursorName),
-      q.cursorFn
-        ? Execute('', q.cursorRows)
-        : ExecuteUnnamed
-    ])
-  }
-
-  function unnamed(q) {
-    return Buffer.concat([
-      Parse(q.statement.string, q.parameters, q.statement.types),
-      DescribeUnnamed,
-      prepared(q)
-    ])
-  }
-
-  function build(q) {
-    const parameters = []
-        , types = []
-
-    const string = stringify(q, q.strings[0], q.args[0], parameters, types, options)
-
-    !q.tagged && q.args.forEach(x => handleValue(x, parameters, types, options))
-
-    q.prepare = options.prepare && ('prepare' in q.options ? q.options.prepare : true)
-    q.string = string
-    q.signature = q.prepare && types + string
-    q.onlyDescribe && (delete statements[q.signature])
-    q.parameters = q.parameters || parameters
-    q.prepared = q.prepare && q.signature in statements
-    q.describeFirst = q.onlyDescribe || (parameters.length && !q.prepared)
-    q.statement = q.prepared
-      ? statements[q.signature]
-      : { string, types, name: q.prepare ? statementId + statementCount++ : '' }
-
-    typeof options.debug === 'function' && options.debug(id, string, parameters, types)
-  }
-
-  function write(x, fn) {
-    chunk = chunk ? Buffer.concat([chunk, x]) : Buffer.from(x)
-    if (fn || chunk.length >= 1024)
-      return nextWrite(fn)
-    nextWriteTimer === null && (nextWriteTimer = setImmediate(nextWrite))
+    flushing || (flushing = true, defer(flush))
     return true
   }
 
-  function nextWrite(fn) {
-    const x = socket.write(chunk, fn)
-    nextWriteTimer !== null && clearImmediate(nextWriteTimer)
-    chunk = nextWriteTimer = null
-    return x
+  function flush() {
+    flushing = false
+    if (closed)
+      return (out.take(), true)
+
+    return out.length ? socket.write(out.take()) : true
   }
 
-  function connectTimedOut() {
-    errored(Errors.connection('CONNECT_TIMEOUT', options, socket))
-    socket.destroy()
+  function holds(x) {
+    return x.describing
+      || (!!x.error && !x.done)
+      || (x.flushing && !x.synced)
+      || (x.streaming && x.open)
+      || (x.alone && !x.done)
   }
 
-  async function secure() {
-    if (sslnegotiation !== 'direct') {
-      write(SSLRequest)
-      const canSSL = await new Promise(r => socket.once('data', x => r(x[0] === 83))) // S
-
-      if (!canSSL && ssl === 'prefer')
-        return connected()
-    }
-
-    const options = {
-      socket,
-      servername: net.isIP(socket.host) ? undefined : socket.host
-    }
-
-    if (sslnegotiation === 'direct')
-      options.ALPNProtocols = ['postgresql']
-
-    if (ssl === 'require' || ssl === 'allow' || ssl === 'prefer')
-      options.rejectUnauthorized = false
-    else if (typeof ssl === 'object')
-      Object.assign(options, ssl)
-
-    socket.removeAllListeners()
-    socket = tls.connect(options)
-    socket.on('secureConnect', connected)
-    socket.on('error', error)
-    socket.on('close', closed)
-    socket.on('drain', drain)
+  function exclusive(x) {
+    return x.flushing || x.streaming || x.alone
   }
 
-  /* c8 ignore next 3 */
-  function drain() {
-    !query && onopen(connection)
+  function refresh() {
+    blocker && !holds(blocker) && (blocker = null)
+    release()
   }
 
-  function data(x) {
-    if (incomings) {
-      incomings.push(x)
-      remaining -= x.length
-      if (remaining > 0)
-        return
-    }
+  function queue(x) {
+    if (closed)
+      return settleError(x, closed)
 
-    incoming = incomings
-      ? Buffer.concat(incomings, length - remaining)
-      : incoming.length === 0
-        ? x
-        : Buffer.concat([incoming, x], incoming.length + x.length)
+    if (blocker && blocker.streaming && blocker.open)
+      return settleError(x, Errors.generic('COPY_IN_PROGRESS', 'You cannot execute queries during copy'))
 
-    while (incoming.length > 4) {
-      length = incoming.readUInt32BE(1)
-      if (length >= incoming.length) {
-        remaining = length - incoming.length
-        incomings = [incoming]
-        break
-      }
+    x.query && (x.query.state = connection.backend)
+    if (fence)
+      pending.splice(pending.indexOf(fence), 0, x)
+    else if (x.ends && open.size)
+      pending.push(fence = x)
+    else if (blocker || pending.length)
+      pending.push(x)
+    else
+      return (write(x), schedule())
 
-      try {
-        handle(incoming.subarray(0, length + 1))
-      } catch (e) {
-        query && (query.cursorFn || query.describeFirst) && write(Sync)
-        errored(e)
-      }
-      incoming = incoming.subarray(length + 1)
-      remaining = 0
-      incomings = null
-    }
+    release()
   }
 
-  async function connect() {
-    terminated = false
-    backendParameters = {}
-    socket || (socket = await createSocket())
+  function release() {
+    while (!blocker && pending.length && pending[0] !== fence)
+      write(pending.shift())
 
-    if (!socket)
-      return
-
-    connectTimer.start()
-
-    if (options.socket)
-      return ssl ? secure() : connected()
-
-    socket.on('connect', ssl ? secure : connected)
-
-    if (options.path)
-      return socket.connect(options.path)
-
-    socket.ssl = ssl
-    socket.connect(port[hostIndex], host[hostIndex])
-    socket.host = host[hostIndex]
-    socket.port = port[hostIndex]
-
-    hostIndex = (hostIndex + 1) % port.length
+    schedule()
   }
 
-  function reconnect() {
-    setTimeout(connect, closedTime ? Math.max(0, closedTime + delay - performance.now()) : 0)
-  }
+  function write(x) {
+    if (x.kind === 'local' && sent.length === 0)
+      return queueMicrotask(() => settle(x))
 
-  function connected() {
+    const mark = out.length
+    let result
     try {
-      statements = {}
-      needsTypes = options.fetch_types
-      statementId = Math.random().toString(36).slice(2)
-      statementCount = 1
-      lifeTimer.start()
-      socket.on('data', data)
-      keep_alive && socket.setKeepAlive && socket.setKeepAlive(true, 1000 * keep_alive)
-      const s = StartupMessage()
-      write(s)
-    } catch (err) {
-      error(err)
+      result = x.write(x)
+    } catch (error) {
+      x.own = error
+      result = skip
+    }
+    if (result === skip) {
+      out.truncate(mark)
+      x.fresh = null
+      x.parses = []
+      x.portal = ''
+      x.describing = x.synced = x.flushing = x.open = false
+      if (!x.own || x.kind === 'step' || !connection.lease) {
+        x.kind = 'local'
+        x.cost >= notable && notables--
+        x.cost = undefined
+        return sent.length === 0 ? queueMicrotask(() => settle(x)) : sent.push(x)
+      }
+
+      x.kind = 'simple'
+      x.text = refused
+      x.results = []
+      x.entry = null
+      sync(x, true)
+    }
+    x.fresh && register(x.fresh)
+    x.portal && x.kind === 'query' && open.add(x)
+    x.query && (x.query.active = sent.length === 0)
+    x.ends && epoch++
+    x.epoch = epoch
+    options.scheduler && sent.length === 0 && (headSince = timers.now())
+    sent.push(x)
+    holds(x) && (blocker = x)
+    x.trace && wrote(x)
+  }
+
+  function sync(x, refuse) {
+    if (x.synced)
+      return
+
+    x.synced = true
+    refuse ? p.query(out, refused) : p.sync(out)
+    schedule()
+  }
+
+  function register(entry) {
+    const current = prepared.get(entry.name)
+    current && prepared.delete(entry.name)
+    prepared.set(entry.name, entry)
+    entry.owner.entry = entry
+    entry.owner.fresh = null
+    if (prepared.size <= limit)
+      return
+
+    for (const [name, x] of prepared) {
+      if (x.state !== 'parsing') {
+        prepared.delete(name)
+        p.close(out, 'S', name)
+        return
+      }
     }
   }
 
-  function error(err) {
-    if (connection.queue === queues.connecting && options.host[retries + 1])
+  function drop(entry) {
+    prepared.get(entry.name) === entry && prepared.delete(entry.name)
+  }
+
+  function send(query) {
+    const { statement } = query.wire
+        , x = Exchange('query', query, connection.lease, extended)
+
+    x.statement = statement
+    x.ends = statement.ends === undefined ? (statement.ends = ending.test(statement.text)) : statement.ends
+    options.scheduler && cost(x)
+    queue(x)
+  }
+
+  function cost(x) {
+    const { query } = x
+    query.cost && !query.cursorFn && !query.streaming && (x.cost = query.cost.est === undefined ? unknown : query.cost.est)
+    x.cost >= notable && notables++
+  }
+
+  function timed(x) {
+    const t = timers.now()
+
+    if (x.cost !== undefined) {
+      x.cost >= notable && notables--
+      const sample = t - headSince
+          , c = x.query.cost
+      c.est = c.est === undefined || sample > c.est ? sample : c.est + (sample - c.est) * 0.1
+      events.ontimed && events.ontimed(sample, t)
+    }
+
+    headSince = t
+  }
+
+  function backlog(t) {
+    let w = 0
+    for (let i = 0; i < sent.length; i++) {
+      const e = sent[i].cost || 0
+      if (i === 0) {
+        const elapsed = t - headSince
+        w += elapsed < e ? e - elapsed : elapsed
+      } else {
+        w += e
+      }
+    }
+
+    for (let i = 0; i < pending.length; i++)
+      w += pending[i].cost || 0
+
+    return w
+  }
+
+  function heavy() {
+    for (let i = 0; i < sent.length; i++) {
+      if (sent[i].cost >= slow)
+        return true
+    }
+
+    for (let i = 0; i < pending.length; i++) {
+      if (pending[i].cost >= slow)
+        return true
+    }
+
+    return false
+  }
+
+  function extended(x) {
+    const { query } = x
+        , { built } = query.wire
+        , statement = x.statement
+        , name = statement.name
+        , current = name ? prepared.get(name) : null
+
+    if (query.cursorFn) {
+      x.rows = query.cursorRows
+      x.portal = transaction() ? 'c' + portals++ : ''
+      x.flushing = !x.portal
+    }
+
+    x.streaming = x.open = !!query.streaming
+
+    if (current && current.state === 'parsing' && current.oids === null)
+      throw Errors.generic('STATEMENT_PENDING', 'A statement was used before its description arrived')
+
+    if (current && current !== x.previous && usable(current, statement)) {
+      x.entry = current
+      x.columns = current.columns
+      x.values = serialize(current.oids, built, current)
+      return run(x, name)
+    }
+
+    if (x.retried) {
+      x.verify = true
+      p.parse(out, '', statement.text, built.oids)
+      p.describe(out, 'S', '')
+      p.flush(out)
+      x.describing = true
       return
+    }
 
-    errored(err)
-    while (sent.length)
-      queryError(sent.shift(), err)
+    const typed = !inferred(built)
+    name && (x.fresh = Entry(name, x, typed ? built.oids : null))
+    current && p.close(out, 'S', name)
+    parse(x, name, statement.text, built.oids)
+    p.describe(out, 'S', name)
+
+    if (!typed) {
+      p.flush(out)
+      x.describing = true
+      return
+    }
+
+    x.learn = true
+    x.values = serialize(built.oids, built, x.fresh || {})
+    run(x, name)
   }
 
-  function errored(err) {
-    stream && (stream.destroy(err), stream = null)
-    query && queryError(query, err)
-    initial && (queryError(initial, err), initial = null)
+  function parse(x, name, text, oids) {
+    p.parse(out, name, text, oids)
+    x.parses.push(name)
   }
 
-  function queryError(query, err) {
-    if (query.reserve)
-      return query.reject(err)
+  function run(x, name) {
+    const mark = out.length
+    try {
+      p.run(out, x.portal, name, x.values, x.rows, x.flushing)
+    } catch (error) {
+      out.truncate(mark)
+      throw error
+    }
+    x.flushing || (x.synced = true)
+    debug(x.statement.text, x.values, x.entry ? x.entry.oids : x.params || x.query.wire.built.oids)
+  }
 
-    if (!err || typeof err !== 'object')
-      err = new Error(err)
+  function usable(entry, statement) {
+    return entry.oids !== null && (entry.state === 'parsing' || (entry.state === 'ready' && entry.version === statement.version))
+  }
 
-    'query' in err || 'parameters' in err || Object.defineProperties(err, {
-      stack: { value: err.stack + query.origin.replace(/.*\n/, '\n'), enumerable: options.debug },
-      query: { value: query.string, enumerable: options.debug },
-      parameters: { value: query.parameters, enumerable: options.debug },
-      args: { value: query.args, enumerable: options.debug },
-      types: { value: query.statement && query.statement.types, enumerable: options.debug }
+  function learned(entry, statement) {
+    const shape = entry.oids.join() + ':' + entry.columns.map(x => x.type).join()
+    if (statement.shape !== shape) {
+      statement.shape === undefined || statement.version++
+      statement.shape = shape
+    }
+    entry.version = statement.version
+  }
+
+  function inferred(built) {
+    for (let i = 0; i < built.oids.length; i++) {
+      if (!built.oids[i])
+        return true
+    }
+    return false
+  }
+
+  function serialize(oids, built, cache) {
+    const serializers = cache.serializers || (cache.serializers = oids.map(events.serializer))
+        , values = built.values
+        , out = new Array(values.length)
+
+    for (let i = 0; i < values.length; i++) {
+      out[i] = values[i] === null ? null : serializers[i](values[i])
+      out[i] === null || out[i] === undefined || typeof out[i] === 'string' || out[i] instanceof Uint8Array || Buffer.byteLength(out[i])
+    }
+
+    return out
+  }
+
+  function transaction() {
+    return !!connection.lease && connection.lease.kind === 'transaction'
+  }
+
+  function described(x) {
+    x.describing = false
+    const { built } = x.query.wire
+        , name = x.statement.name
+        , params = x.params || []
+        , columns = x.columns || []
+
+    try {
+      if (x.verify) {
+        const previous = x.previous
+        if (previous && same(previous, params, columns)) {
+          if (x.original) {
+            x.own = x.original
+            return sync(x)
+          }
+        } else if (previous) {
+          stale(previous)
+          x.statement.version++
+        }
+        x.values = serialize(params, built, {})
+        return run(x, '')
+      }
+      const entry = x.entry
+      entry && (entry.oids = params, entry.columns = columns, learned(entry, x.statement))
+      x.values = serialize(params, built, entry || {})
+      run(x, name)
+    } catch (error) {
+      x.own = error
+      sync(x, !!connection.lease)
+    }
+  }
+
+  function same(entry, params, columns) {
+    const a = entry.oids || []
+        , b = entry.columns
+
+    return !!b
+      && a.length === params.length && params.every((x, i) => x === a[i])
+      && b.length === columns.length && columns.every((x, i) => x.type === b[i].type)
+  }
+
+  function describe(statement, oids) {
+    return new Promise((resolve, reject) => {
+      const x = Exchange('describe', null, connection.lease, x => {
+        p.parse(out, '', statement.text, oids)
+        p.describe(out, 'S', '')
+        sync(x)
+      })
+      x.resolve = resolve
+      x.reject = reject
+      queue(x)
     })
-    query.reject(err)
   }
 
-  function end() {
-    return ending || (
-      !connection.reserved && onend(connection),
-      !connection.reserved && !initial && !query && sent.length === 0
-        ? (terminate(), new Promise(r => socket && socket.readyState !== 'closed' ? socket.once('close', r) : r()))
-        : ending = new Promise(r => ended = r)
-    )
+  function simple(query, sql) {
+    const x = Exchange('simple', query, connection.lease, x => {
+      debug(sql, [], [])
+      p.query(out, sql)
+      x.synced = true
+    })
+    x.text = sql
+    x.results = []
+    x.ends = ending.test(sql)
+    x.streaming = x.open = !!query.streaming
+    options.scheduler && cost(x)
+    queue(x)
+  }
+
+  function local(query, error) {
+    queue(Exchange('query', query, connection.lease, () => { throw error }))
+  }
+
+  function cancel(query) {
+    if (running.has(query) || (sent[0] && sent[0].query === query && sent[0].awaiting))
+      return (query.aborted = Errors.generic('57014', 'canceling statement due to user request'), Promise.resolve())
+    const i = pending.findIndex(x => x.query === query)
+
+    if (i !== -1) {
+      const [x] = pending.splice(i, 1)
+      x === fence && (fence = null)
+      x.cost >= notable && notables--
+      settleError(x, Errors.generic('57014', 'canceling statement due to user request'))
+      release()
+      return Promise.resolve()
+    }
+
+    const x = sent.find(x => x.query === query)
+    if (!x)
+      return Promise.resolve()
+
+    return x === sent[0] && query.active
+      ? ready.cancel()
+      : new Promise((resolve, reject) => x.cancel = { resolve, reject })
+  }
+
+  function close() {
+    closing || (closing = new Promise(r => {
+      connection.onended = r
+      idle() && terminate()
+    }))
+    return closing
+  }
+
+  function idle() {
+    return sent.length === 0 && pending.length === 0
   }
 
   function terminate() {
-    terminated = true
-    if (stream || query || initial || sent.length)
-      error(Errors.connection('CONNECTION_DESTROYED', options))
+    if (closed)
+      return connection.onended && connection.onended()
 
-    clearImmediate(nextWriteTimer)
-    if (socket) {
-      socket.removeListener('data', data)
-      socket.removeListener('connect', connected)
-      socket.readyState === 'open' && socket.end(b().X().end())
-    }
-    ended && (ended(), ending = ended = null)
+    flush()
+    socket.end(p.Terminate())
   }
 
-  async function closed(hadError) {
-    incoming = Buffer.alloc(0)
-    remaining = 0
-    incomings = null
-    clearImmediate(nextWriteTimer)
-    socket.removeListener('data', data)
-    socket.removeListener('connect', connected)
-    idleTimer.cancel()
-    lifeTimer.cancel()
-    connectTimer.cancel()
-
-    socket.removeAllListeners()
-    socket = null
-
-    if (initial)
-      return reconnect()
-
-    !hadError && (query || sent.length) && error(Errors.connection('CONNECTION_CLOSED', options, socket))
-    closedTime = performance.now()
-    hadError && options.shared.retries++
-    delay = (typeof backoff === 'function' ? backoff(options.shared.retries) : backoff) * 1000
-    onclose(connection, Errors.connection('CONNECTION_CLOSED', options, socket))
+  function destroy(error) {
+    closing || (closing = Promise.resolve())
+    socket.destroy(error)
   }
 
-  /* Handlers */
-  function handle(xs, x = xs[0]) {
-    (
-      x === 68 ? DataRow :                   // D
-      x === 100 ? CopyData :                 // d
-      x === 65 ? NotificationResponse :      // A
-      x === 83 ? ParameterStatus :           // S
-      x === 90 ? ReadyForQuery :             // Z
-      x === 67 ? CommandComplete :           // C
-      x === 50 ? BindComplete :              // 2
-      x === 49 ? ParseComplete :             // 1
-      x === 116 ? ParameterDescription :     // t
-      x === 84 ? RowDescription :            // T
-      x === 82 ? Authentication :            // R
-      x === 110 ? NoData :                   // n
-      x === 75 ? BackendKeyData :            // K
-      x === 69 ? ErrorResponse :             // E
-      x === 115 ? PortalSuspended :          // s
-      x === 51 ? CloseComplete :             // 3
-      x === 71 ? CopyInResponse :            // G
-      x === 78 ? NoticeResponse :            // N
-      x === 72 ? CopyOutResponse :           // H
-      x === 99 ? CopyDone :                  // c
-      x === 73 ? EmptyQueryResponse :        // I
-      x === 86 ? FunctionCallResponse :      // V
-      x === 118 ? NegotiateProtocolVersion : // v
-      x === 87 ? CopyBothResponse :          // W
-      /* c8 ignore next */
-      UnknownMessage
-    )(xs)
-  }
-
-  function DataRow(x) {
-    let index = 7
-    let length
-    let column
-    let value
-
-    const row = query.isRaw ? new Array(query.statement.columns.length) : {}
-    for (let i = 0; i < query.statement.columns.length; i++) {
-      column = query.statement.columns[i]
-      length = x.readInt32BE(index)
-      index += 4
-
-      value = length === -1
-        ? null
-        : query.isRaw === true
-          ? x.subarray(index, index += length)
-          : column.parser === undefined
-            ? x.toString('utf8', index, index += length)
-            : column.parser.array === true
-              ? column.parser(x.toString('utf8', index + 1, index += length))
-              : column.parser(x.toString('utf8', index, index += length))
-
-      query.isRaw
-        ? (row[i] = query.isRaw === true
-          ? value
-          : transform.value.from ? transform.value.from(value, column) : value)
-        : (row[column.name] = transform.value.from ? transform.value.from(value, column) : value)
-    }
-
-    query.forEachFn
-      ? query.forEachFn(transform.row.from ? transform.row.from(row) : row, result)
-      : (result[rows++] = transform.row.from ? transform.row.from(row) : row)
-  }
-
-  function ParameterStatus(x) {
-    const [k, v] = x.toString('utf8', 5, x.length - 1).split(b.N)
-    backendParameters[k] = v
-    if (options.parameters[k] !== v) {
-      options.parameters[k] = v
-      onparameter && onparameter(k, v)
-    }
-  }
-
-  function ReadyForQuery(x) {
-    if (query) {
-      if (errorResponse) {
-        query.retried
-          ? errored(query.retried)
-          : query.prepared && retryRoutines.has(errorResponse.routine)
-            ? retry(query, errorResponse)
-            : errored(errorResponse)
-      } else {
-        query.resolve(results || result)
-      }
-    } else if (errorResponse) {
-      errored(errorResponse)
-    }
-
-    query = results = errorResponse = null
-    result = new Result()
-    connectTimer.cancel()
-
-    if (initial) {
-      if (target_session_attrs) {
-        if (!backendParameters.in_hot_standby || !backendParameters.default_transaction_read_only)
-          return fetchState()
-        else if (tryNext(target_session_attrs, backendParameters))
-          return terminate()
-      }
-
-      if (needsTypes) {
-        initial.reserve && (initial = null)
-        return fetchArrayTypes()
-      }
-
-      initial && !initial.reserve && execute(initial)
-      options.shared.retries = retries = 0
-      initial = null
+  function onclose(error) {
+    if (closed)
       return
-    }
 
-    while (sent.length && (query = sent.shift()) && (query.active = true, query.cancelled))
-      Connection(options).cancel(query.state, query.cancelled.resolve, query.cancelled.reject)
-
-    if (query)
-      return // Consider opening if able and sent.length < 50
-
-    connection.reserved
-      ? !connection.reserved.release && x[5] === 73 // I
-        ? ending
-          ? terminate()
-          : (connection.reserved = null, onopen(connection))
-        : connection.reserved()
-      : ending
-        ? terminate()
-        : onopen(connection)
+    out.take()
+    blocker = null
+    fence = null
+    notables = 0
+    closed = Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
+    closed.cause = connection.fatal || error || undefined
+    const head = sent[0]
+    sent.splice(0).forEach(x => {
+      x.stream && x.stream.destroy(closed)
+      x.own ? settle(x)
+        : x === head && x.error && x.error.severity === 'FATAL' ? settleError(x, x.error)
+        : settleError(x, closed)
+    })
+    pending.splice(0).forEach(x => x.own ? settle(x) : settleError(x, closed))
+    running.forEach(query => query.settled || query.reject(decorate(query, closed)))
+    running.clear()
+    open.clear()
+    connection.onended && connection.onended()
+    events.onclose(connection, closed)
   }
 
-  function CommandComplete(x) {
-    rows = 0
+  function decorate(query, error) {
+    return queryError(error, query, options.debug)
+  }
 
-    for (let i = x.length - 1; i > 0; i--) {
-      if (x[i] === 32 && x[i + 1] < 58 && result.count === null)
-        result.count = +x.toString('utf8', i + 1, x.length - 1)
-      if (x[i - 1] >= 65) {
-        result.command = x.toString('utf8', 5, i)
-        result.state = backend
-        break
-      }
+  function settleError(x, error) {
+    x.kind === 'describe'
+      ? x.reject(error)
+      : x.query && !x.query.settled && x.query.reject(decorate(x.query, error))
+  }
+
+  function debug(text, values, oids) {
+    typeof options.debug === 'function' && options.debug(connection.id, text, values, oids)
+  }
+
+  function wrote(x) {
+    const trace = x.trace
+    traced++
+    trace.query = x.text || x.statement.text
+    trace.statement = x.statement ? x.statement.name : ''
+    trace.parameters = options.debug ? x.query.parameters : undefined
+    trace.connection = connection.id
+    trace.host = connection.host
+    trace.port = connection.port
+    trace.sent = now()
+  }
+
+  function first() {
+    const x = sent[0]
+    x && x.trace && x.trace.firstByte === null && (x.trace.firstByte = now())
+  }
+
+  function frame(type, x, start, end) {
+    traced && first()
+    try {
+      type === 68 ? DataRow(x, start) :
+      type === 100 ? CopyData(x, start, end) :
+      type === 90 ? ReadyForQuery(x, start) :
+      type === 67 ? CommandComplete(x, start, end) :
+      type === 50 ? BindComplete() :
+      type === 49 ? ParseComplete() :
+      type === 51 ? null :
+      type === 116 ? ParameterDescription(x, start) :
+      type === 84 ? RowDescription(x, start) :
+      type === 110 ? NoData() :
+      type === 69 ? ErrorResponse(x, start, end) :
+      type === 115 ? PortalSuspended() :
+      type === 73 ? EmptyQueryResponse() :
+      type === 65 ? NotificationResponse(x, start) :
+      type === 78 ? NoticeResponse(x, start, end) :
+      type === 83 ? ParameterStatus(x, start) :
+      type === 71 ? CopyInResponse() :
+      type === 72 ? CopyOutResponse() :
+      type === 87 ? CopyBothResponse() :
+      type === 99 ? CopyDone() :
+      type === 86 ? unsupported('FunctionCallResponse') :
+      type === 118 ? unsupported('NegotiateProtocolVersion') :
+      null
+    } catch (error) {
+      const x = sent[0]
+      x ? fail(x, error) : destroy(error)
     }
+    blocker && !holds(blocker) && (blocker = null, release())
+    out.length && schedule()
+  }
 
-    final && (final(), final = null)
+  function fail(x, error) {
+    x.error = x.error || error
+    x.describing = false
+    x.open = false
+    sync(x)
+  }
 
-    if (result.command === 'BEGIN' && max !== 1 && !connection.reserved)
-      return errored(Errors.generic('UNSAFE_TRANSACTION', 'Only use sql.begin, sql.reserved or max: 1'))
-
-    if (query.options.simple)
-      return BindComplete()
-
-    if (query.cursorFn) {
-      result.count && query.cursorFn(result)
-      write(Sync)
-    }
+  function unsupported(x) {
+    sent[0] && fail(sent[0], Errors.notSupported(x))
   }
 
   function ParseComplete() {
-    query.parsing = false
+    const x = sent[0]
+        , name = x.parses.shift()
+
+    name && x.entry && x.entry.name === name && x.entry.owner === x && x.entry.state === 'parsing' && (x.entry.state = 'ready')
   }
 
   function BindComplete() {
-    !result.statement && (result.statement = query.statement)
-    result.columns = query.statement.columns
-  }
-
-  function ParameterDescription(x) {
-    const length = x.readUInt16BE(5)
-
-    for (let i = 0; i < length; ++i)
-      !query.statement.types[i] && (query.statement.types[i] = x.readUInt32BE(7 + i * 4))
-
-    query.prepare && (statements[query.signature] = query.statement)
-    query.describeFirst && !query.onlyDescribe && (write(prepared(query)), query.describeFirst = false)
-  }
-
-  function RowDescription(x) {
-    if (result.command) {
-      results = results || [result]
-      results.push(result = new Result())
-      result.count = null
-      query.statement.columns = null
+    const x = sent[0]
+    x.bound = true
+    if (!x.columns && x.entry) {
+      x.columns = x.entry.columns
+      x.result.columns = x.columns
     }
-
-    const length = x.readUInt16BE(5)
-    let index = 7
-    let start
-
-    query.statement.columns = Array(length)
-
-    for (let i = 0; i < length; ++i) {
-      start = index
-      while (x[index++] !== 0);
-      const table = x.readUInt32BE(index)
-      const number = x.readUInt16BE(index + 4)
-      const type = x.readUInt32BE(index + 6)
-      query.statement.columns[i] = {
-        name: transform.column.from
-          ? transform.column.from(x.toString('utf8', start, index - 1))
-          : x.toString('utf8', start, index - 1),
-        parser: parsers[type],
-        table,
-        number,
-        type
-      }
-      index += 18
-    }
-
-    result.statement = query.statement
-    if (query.onlyDescribe)
-      return (query.resolve(query.statement), write(Sync))
   }
 
-  async function Authentication(x, type = x.readUInt32BE(5)) {
-    (
-      type === 3 ? AuthenticationCleartextPassword :
-      type === 5 ? AuthenticationMD5Password :
-      type === 10 ? SASL :
-      type === 11 ? SASLContinue :
-      type === 12 ? SASLFinal :
-      type !== 0 ? UnknownAuth :
-      noop
-    )(x, type)
+  function ParameterDescription(x, start) {
+    sent[0].params = p.parameterDescription(x, start)
   }
 
-  /* c8 ignore next 5 */
-  async function AuthenticationCleartextPassword() {
-    const payload = await Pass()
-    write(
-      b().p().str(payload).z(1).end()
-    )
-  }
-
-  async function AuthenticationMD5Password(x) {
-    const payload = 'md5' + (
-      await md5(
-        Buffer.concat([
-          Buffer.from(await md5((await Pass()) + user)),
-          x.subarray(9)
-        ])
-      )
-    )
-    write(
-      b().p().str(payload).z(1).end()
-    )
-  }
-
-  async function SASL() {
-    nonce = (await crypto.randomBytes(18)).toString('base64')
-    b().p().str('SCRAM-SHA-256' + b.N)
-    const i = b.i
-    write(b.inc(4).str('n,,n=*,r=' + nonce).i32(b.i - i - 4, i).end())
-  }
-
-  async function SASLContinue(x) {
-    const res = x.toString('utf8', 9).split(',').reduce((acc, x) => (acc[x[0]] = x.slice(2), acc), {})
-
-    const saltedPassword = await crypto.pbkdf2Sync(
-      await Pass(),
-      Buffer.from(res.s, 'base64'),
-      parseInt(res.i), 32,
-      'sha256'
-    )
-
-    const clientKey = await hmac(saltedPassword, 'Client Key')
-
-    const auth = 'n=*,r=' + nonce + ','
-               + 'r=' + res.r + ',s=' + res.s + ',i=' + res.i
-               + ',c=biws,r=' + res.r
-
-    serverSignature = (await hmac(await hmac(saltedPassword, 'Server Key'), auth)).toString('base64')
-
-    const payload = 'c=biws,r=' + res.r + ',p=' + xor(
-      clientKey, Buffer.from(await hmac(await sha256(clientKey), auth))
-    ).toString('base64')
-
-    write(
-      b().p().str(payload).end()
-    )
-  }
-
-  function SASLFinal(x) {
-    if (x.toString('utf8', 9).split(b.N, 1)[0].slice(2) === serverSignature)
-      return
-    /* c8 ignore next 5 */
-    errored(Errors.generic('SASL_SIGNATURE_MISMATCH', 'The server did not return the correct signature'))
-    socket.destroy()
-  }
-
-  function Pass() {
-    return Promise.resolve(typeof options.pass === 'function'
-      ? options.pass()
-      : options.pass
-    )
+  function RowDescription(x, start) {
+    received(sent[0], p.rowDescription(x, start, 0, column))
   }
 
   function NoData() {
-    result.statement = query.statement
-    result.statement.columns = []
-    if (query.onlyDescribe)
-      return (query.resolve(query.statement), write(Sync))
+    received(sent[0], [])
   }
 
-  function BackendKeyData(x) {
-    backend.pid = x.readUInt32BE(5)
-    backend.secret = x.readUInt32BE(9)
-  }
-
-  async function fetchArrayTypes() {
-    needsTypes = false
-    const types = await new Query([`
-      select b.oid, b.typarray
-      from pg_catalog.pg_type a
-      left join pg_catalog.pg_type b on b.oid = a.typelem
-      where a.typcategory = 'A'
-      group by b.oid, b.typarray
-      order by b.oid
-    `], [], execute)
-    types.forEach(({ oid, typarray }) => addArrayType(oid, typarray))
-  }
-
-  function addArrayType(oid, typarray) {
-    if (!!options.parsers[typarray] && !!options.serializers[typarray]) return
-    const parser = options.parsers[oid]
-    options.shared.typeArrayMap[oid] = typarray
-    options.parsers[typarray] = (xs) => arrayParser(xs, parser, typarray)
-    options.parsers[typarray].array = true
-    options.serializers[typarray] = (xs) => arraySerializer(xs, options.serializers[oid], options, typarray)
-  }
-
-  function tryNext(x, xs) {
-    return (
-      (x === 'read-write' && xs.default_transaction_read_only === 'on') ||
-      (x === 'read-only' && xs.default_transaction_read_only === 'off') ||
-      (x === 'primary' && xs.in_hot_standby === 'on') ||
-      (x === 'standby' && xs.in_hot_standby === 'off') ||
-      (x === 'prefer-standby' && xs.in_hot_standby === 'off' && options.host[retries])
-    )
-  }
-
-  function fetchState() {
-    const query = new Query([`
-      show transaction_read_only;
-      select pg_catalog.pg_is_in_recovery()
-    `], [], execute, null, { simple: true })
-    query.resolve = ([[a], [b]]) => {
-      backendParameters.default_transaction_read_only = a.transaction_read_only
-      backendParameters.in_hot_standby = b.pg_is_in_recovery ? 'on' : 'off'
+  function received(x, columns) {
+    if (x.kind === 'simple' && x.result.command !== null) {
+      x.results.push(x.result)
+      x.result = new Result()
     }
-    query.execute()
+    x.columns = columns
+    x.result.columns = columns
+    if (x.learn) {
+      x.learn = false
+      x.entry && x.entry.owner === x && (x.entry.columns = columns, learned(x.entry, x.statement))
+    }
+    x.describing && described(x)
   }
 
-  function ErrorResponse(x) {
-    if (query) {
-      (query.cursorFn || query.describeFirst) && write(Sync)
-      errorResponse = Errors.postgres(parseError(x))
+  function column(name, table, number, type) {
+    const parser = events.parser(type)
+    return {
+      name: transform.column.from ? transform.column.from(name) : name,
+      parser: parser.identity ? null : parser,
+      decode: events.decoder(type, parser),
+      table,
+      number,
+      type
+    }
+  }
+
+  function DataRow(x, start) {
+    const item = sent[0]
+        , { query, columns } = item
+        , raw = query.isRaw
+        , from = raw !== true ? transform.value.from : null
+        , shape = item.shaped === columns ? item.reader : (item.shaped = columns, item.reader = Rows(columns))
+        , fast = raw !== true && read(shape, !!raw, text, from)
+        , n = columns.length
+        , result = item.result
+
+    let row
+    if (fast) {
+      row = fast(x, start + 7)
     } else {
-      errored(Errors.postgres(parseError(x)))
+      row = raw ? new Array(n) : {}
+      let i = start + 7
+      for (let j = 0; j < n; j++) {
+        const length = (x[i] << 24) | (x[i + 1] << 16) | (x[i + 2] << 8) | x[i + 3]
+            , column = columns[j]
+        i += 4
+        let value = null
+        if (length !== -1) {
+          value = raw === true
+            ? Buffer.from(x.subarray(i, i + length))
+            : column.decode
+              ? column.decode(x, i, i + length)
+              : column.parser
+                ? column.parser(text(x, i, i + length))
+                : text(x, i, i + length)
+          i += length
+        }
+        from && (value = from(value, column))
+        raw ? row[j] = value : column.name === '__proto__' ? own(row, column.name, value) : row[column.name] = value
+      }
+    }
+
+    const out = transform.row.from ? transform.row.from(row) : row
+    query.forEachFn
+      ? query.forEachFn(out, result)
+      : result[result.length] = out
+  }
+
+  function CommandComplete(x, start, end) {
+    const item = sent[0]
+        , { command, count } = p.commandComplete(x, start, end)
+        , result = item.result
+
+    result.command = command
+    result.count = count
+    result.state = connection.backend
+    result.statement = item
+    item.query && (item.query.source = item)
+    result.columns = result.columns || item.columns
+
+    item.final && (item.stream && Object.assign(item.stream, { count, command }), item.final(), item.final = null)
+
+    if (item.kind === 'simple') {
+      item.results.push(item.result)
+      item.result = new Result()
+      return
+    }
+
+    if (item.rows) {
+      item.finished = true
+      item.flushing && sync(item)
+      result.count && (item.last = new Promise(r => r(item.query.cursorFn(result)))).catch(noop)
     }
   }
 
-  function retry(q, error) {
-    delete statements[q.signature]
-    q.retried = error
-    execute(q)
+  function unsafe(item) {
+    const error = () => Errors.generic('UNSAFE_TRANSACTION', 'Only use sql.begin, sql.reserved or max: 1')
+    rolling = true
+    item.own = error()
+    sent.forEach(x => x.kind !== 'local' && (x.own = error()))
+    pending.unshift(Exchange('internal', null, null, x => (p.query(out, 'rollback'), x.synced = true)))
   }
 
-  function NotificationResponse(x) {
-    if (!onnotify)
-      return
-
-    let index = 9
-    while (x[index++] !== 0);
-    onnotify(
-      x.toString('utf8', 9, index - 1),
-      x.toString('utf8', index, x.length - 1)
-    )
+  function EmptyQueryResponse() {
+    const item = sent[0]
+    item.kind === 'simple' && (item.results.push(item.result), item.result = new Result())
   }
 
   async function PortalSuspended() {
+    const item = sent[0]
+    if (!item.flushing)
+      return (item.suspended = true)
+
     try {
-      const x = await Promise.resolve(query.cursorFn(result))
-      rows = 0
-      x === CLOSE
-        ? write(Close(query.portal))
-        : (result = new Result(), write(Execute('', query.cursorRows)))
-    } catch (err) {
-      write(Sync)
-      query.reject(err)
+      item.awaiting = true
+      const next = await item.query.cursorFn(item.result)
+      item.awaiting = false
+      item.result = new Result()
+      if (closed || item.synced || sent[0] !== item)
+        return
+      if (item.query.aborted)
+        throw item.query.aborted
+      next === CLOSE
+        ? (p.close(out, 'P', ''), sync(item))
+        : (p.execute(out, '', item.rows), p.flush(out), schedule())
+    } catch (error) {
+      item.awaiting = false
+      if (closed || item.synced || sent[0] !== item)
+        return
+      fail(item, error)
+    }
+
+    refresh()
+  }
+
+  function ErrorResponse(x, start, end) {
+    const item = sent[0]
+        , error = Errors.postgres(p.error(x, start, end))
+
+    if (!item)
+      return (connection.fatal = error)
+
+    item.stream && item.stream.destroy(error)
+    item.final && (item.final(error), item.final = null)
+    fail(item, error)
+  }
+
+  function ReadyForQuery(x, start) {
+    status = p.readyForQuery(x, start)
+    frames.own(false)
+    const item = sent.shift()
+    options.scheduler && timed(item)
+    item.done = true
+    item.open = false
+    item.trace && traced--
+    item.kind === 'internal' && (rolling = false)
+    status !== 'I' && !rolling && !item.lease && !connection.lease && options.max !== 1 && unsafe(item)
+    blocker === item && (blocker = null)
+    settle(item)
+    while (sent.length && sent[0].kind === 'local')
+      settle(sent.shift())
+    release()
+
+    const next = sent[0]
+    if (next && next.query) {
+      next.query.active = true
+      next.cancel && ready.cancel().then(next.cancel.resolve, next.cancel.reject)
+    }
+
+    closing && idle() && terminate()
+    events.onready(connection)
+  }
+
+  function settle(x) {
+    if (x.kind === 'internal')
+      return
+
+    if (x.kind === 'describe') {
+      return x.error
+        ? x.reject(x.error)
+        : x.resolve({ params: x.params || [], columns: x.columns })
+    }
+
+    const { query } = x
+        , cursor = x.origin || (x.portal ? x : null)
+    cursor && (x.own || x.error || !x.suspended) && unfence(cursor)
+
+    if (x.own)
+      return query.reject(decorate(query, x.own))
+
+    if (x.error)
+      return failed(x)
+
+    if (x.suspended)
+      return suspended(x)
+
+    x.last
+      ? x.last.then(() => query.settled || finish(x), error => query.settled || query.reject(decorate(query, error)))
+      : query.settled || finish(x)
+  }
+
+  function unfence(cursor) {
+    if (!open.delete(cursor) || open.size || !fence)
+      return
+    fence = null
+    release()
+  }
+
+  function failed(x) {
+    const entry = x.kind === 'query' ? x.entry : null
+    const parsing = x.fresh || (entry && entry.owner === x && entry.state === 'parsing')
+
+    if (x.error.code === '42P05' && x.kind === 'query' && x.statement.name && parsing) {
+      entry && drop(entry)
+      x.statement.name += '_'
+      return retryable(x) ? again(x, null) : settleError(x, x.error)
+    }
+
+    if (!entry)
+      return settleError(x, x.error)
+
+    if (entry.owner === x && entry.state === 'parsing')
+      return (drop(entry), settleError(x, x.error))
+
+    if (x.error.code === '26000') {
+      drop(entry)
+      return retryable(x) ? again(x, null) : settleError(x, x.error)
+    }
+
+    if (x.bound)
+      return settleError(x, x.error)
+
+    if (retryable(x))
+      return again(x, x.error)
+
+    stale(entry)
+    settleError(x, x.error)
+  }
+
+  function stale(entry) {
+    prepared.get(entry.name) === entry && (entry.state = 'stale')
+  }
+
+  function retryable(x) {
+    return !x.retried
+        && !x.cancel
+        && !x.query.cancelled
+        && !x.query.cursorFn
+        && !x.streaming
+        && x.lease === connection.lease
+        && status === 'I'
+        && !closing
+        && (sent.length === 0 || (!x.lease && options.max !== 1))
+  }
+
+  function again(x, original) {
+    const retry = Exchange('query', x.query, x.lease, extended)
+    retry.statement = x.statement
+    retry.ends = x.ends
+    retry.retried = true
+    retry.original = original
+    retry.previous = x.entry
+    retry.trace = x.trace
+    retry.cost = x.cost
+
+    if (sent.length)
+      return queue(retry)
+
+    pending.unshift(retry)
+    release()
+  }
+
+  function suspended(x) {
+    const cursor = x.origin || x
+        , { query } = x
+
+    running.add(query)
+
+    new Promise(r => r(query.cursorFn(x.result))).then(next => {
+      running.delete(query)
+      if (query.settled)
+        return unfence(cursor)
+      queue(step(cursor, next === CLOSE || !!query.aborted, query.aborted || null))
+    }, error => {
+      running.delete(query)
+      if (query.settled)
+        return unfence(cursor)
+      queue(step(cursor, true, error))
+    })
+  }
+
+  function step(cursor, end, failure) {
+    const x = Exchange('step', cursor.query, cursor.lease, stepped)
+    x.origin = cursor
+    x.statement = cursor.statement
+    x.entry = cursor.entry
+    x.columns = cursor.columns
+    x.portal = cursor.portal
+    x.rows = cursor.rows
+    x.end = end
+    x.failure = failure
+    return x
+  }
+
+  function stepped(x) {
+    const cursor = x.origin
+
+    if (connection.lease !== cursor.lease || cursor.epoch !== epoch) {
+      if (x.failure)
+        throw x.failure
+      if (!x.end)
+        throw outlived()
+      return skip
+    }
+
+    x.own = x.failure
+    x.end ? p.close(out, 'P', x.portal) : p.execute(out, x.portal, x.rows)
+    sync(x)
+  }
+
+  function outlived() {
+    return Errors.generic('UNSAFE_TRANSACTION', 'The cursor outlived its transaction')
+  }
+
+  function finish(x) {
+    const { query } = x
+
+    if (x.kind === 'simple') {
+      x.result.command !== null && x.results.push(x.result)
+      const results = x.results
+      return query.resolve(results.length > 1 ? results : results[0] || x.result)
+    }
+
+    query.resolve(x.result)
+  }
+
+  function NotificationResponse(x, start) {
+    const { pid, channel, payload } = p.notification(x, start)
+    events.onnotify && guard(events.onnotify, channel, payload, pid)
+  }
+
+  function guard(fn, ...xs) {
+    try {
+      fn(...xs)
+    } catch (error) {
+      noop(error)
     }
   }
 
-  function CloseComplete() {
-    result.count && query.cursorFn(result)
-    query.resolve(result)
+  function NoticeResponse(x, start, end) {
+    const notice = p.error(x, start, end)
+    listened(channels.notice) && channels.notice.publish({
+      notice,
+      connection: connection.id,
+      host: connection.host,
+      port: connection.port,
+      database: options.database
+    })
+    options.onnotice
+      ? guard(options.onnotice, notice)
+      : options.onnotice === false || console.log(notice)
+  }
+
+  function ParameterStatus(x, start) {
+    const [k, v] = p.parameterStatus(x, start)
+    connection.parameters[k] = v
+    events.onparameter && guard(events.onparameter, k, v)
+  }
+
+  function writeData(chunk, callback) {
+    p.copyData(out, chunk)
+    flush() ? callback() : (drained = callback)
+  }
+
+  function writable(item) {
+    return {
+      autoDestroy: true,
+      write(chunk, encoding, callback) {
+        writeData(chunk, callback)
+      },
+      destroy(error, callback) {
+        callback(error)
+        item.stream = null
+        if (!item.copied && !closed && !item.error) {
+          p.copyFail(out, (error || 'The COPY stream was destroyed') + '')
+          item.copied = true
+          item.open = false
+          schedule(true)
+          refresh()
+        }
+      },
+      final(callback) {
+        p.copyDone(out)
+        item.copied = true
+        item.open = false
+        item.final = callback
+        schedule(true)
+        refresh()
+      }
+    }
   }
 
   function CopyInResponse() {
-    stream = new Stream.Writable({
-      autoDestroy: true,
-      write(chunk, encoding, callback) {
-        socket.write(b().d().raw(chunk).end(), callback)
-      },
-      destroy(error, callback) {
-        callback(error)
-        socket.write(b().f().str(error + b.N).end())
-        stream = null
-      },
-      final(callback) {
-        socket.write(b().c().end())
-        final = callback
-        stream = null
-      }
-    })
-    query.resolve(stream)
+    const item = sent[0]
+    item.stream = new Stream.Writable(writable(item))
+    item.query.resolve(item.stream)
+  }
+
+  function readable(item) {
+    return () => {
+      item.wanted = true
+
+      if (!frames.paused)
+        return
+
+      frames.resume()
+      frames.paused || socket.resume()
+    }
   }
 
   function CopyOutResponse() {
-    stream = new Stream.Readable({
-      read() { socket.resume() }
-    })
-    query.resolve(stream)
+    const item = sent[0]
+    item.stream = new Stream.Readable({ read: readable(item) })
+    item.open = false
+    frames.own(true)
+    item.query.resolve(item.stream)
   }
 
-  /* c8 ignore next 3 */
   function CopyBothResponse() {
-    stream = new Stream.Duplex({
-      autoDestroy: true,
-      read() { socket.resume() },
-      /* c8 ignore next 11 */
-      write(chunk, encoding, callback) {
-        socket.write(b().d().raw(chunk).end(), callback)
-      },
-      destroy(error, callback) {
-        callback(error)
-        socket.write(b().f().str(error + b.N).end())
-        stream = null
-      },
-      final(callback) {
-        socket.write(b().c().end())
-        final = callback
-      }
-    })
-    query.resolve(stream)
+    const item = sent[0]
+    item.stream = new Stream.Duplex({ ...writable(item), read: readable(item) })
+    frames.own(true)
+    item.query.resolve(item.stream)
   }
 
-  function CopyData(x) {
-    stream && (stream.push(x.subarray(5)) || socket.pause())
+  function CopyData(x, start, end) {
+    const item = sent[0]
+
+    if (!item.stream)
+      return
+
+    item.wanted = false
+    if (!item.stream.push(frames.owns(x) ? x.subarray(start + 5, end) : Buffer.from(x.subarray(start + 5, end))) && !item.wanted) {
+      frames.pause()
+      socket.pause()
+    }
   }
 
   function CopyDone() {
-    stream && stream.push(null)
-    stream = null
+    frames.own(false)
+    const item = sent[0]
+    item.stream && item.stream.push(null)
+    item.stream = null
   }
-
-  function NoticeResponse(x) {
-    onnotice
-      ? onnotice(parseError(x))
-      : console.log(parseError(x)) // eslint-disable-line
-
-  }
-
-  /* c8 ignore next 3 */
-  function EmptyQueryResponse() {
-    /* noop */
-  }
-
-  /* c8 ignore next 3 */
-  function FunctionCallResponse() {
-    errored(Errors.notSupported('FunctionCallResponse'))
-  }
-
-  /* c8 ignore next 3 */
-  function NegotiateProtocolVersion() {
-    errored(Errors.notSupported('NegotiateProtocolVersion'))
-  }
-
-  /* c8 ignore next 3 */
-  function UnknownMessage(x) {
-    console.error('Postgres.js : Unknown Message:', x[0]) // eslint-disable-line
-  }
-
-  /* c8 ignore next 3 */
-  function UnknownAuth(x, type) {
-    console.error('Postgres.js : Unknown Auth:', type) // eslint-disable-line
-  }
-
-  /* Messages */
-  function Bind(parameters, types, statement = '', portal = '') {
-    let prev
-      , type
-
-    b().B().str(portal + b.N).str(statement + b.N).i16(0).i16(parameters.length)
-
-    parameters.forEach((x, i) => {
-      if (x === null)
-        return b.i32(0xFFFFFFFF)
-
-      type = types[i]
-      x = type in options.serializers
-        ? options.serializers[type](x)
-        : '' + x
-
-      prev = b.i
-      b.inc(4).str(x).i32(b.i - prev - 4, prev)
-    })
-
-    b.i16(0)
-
-    return b.end()
-  }
-
-  function Parse(str, parameters, types, name = '') {
-    b().P().str(name + b.N).str(str + b.N).i16(parameters.length)
-    parameters.forEach((x, i) => b.i32(types[i] || 0))
-    return b.end()
-  }
-
-  function Describe(x, name = '') {
-    return b().D().str(x).str(name + b.N).end()
-  }
-
-  function Execute(portal = '', rows = 0) {
-    return Buffer.concat([
-      b().E().str(portal + b.N).i32(rows).end(),
-      Flush
-    ])
-  }
-
-  function Close(portal = '') {
-    return Buffer.concat([
-      b().C().str('P').str(portal + b.N).end(),
-      b().S().end()
-    ])
-  }
-
-  function StartupMessage() {
-    return cancelMessage || b().inc(4).i16(3).z(2).str(
-      Object.entries(Object.assign({
-        user,
-        database,
-        client_encoding: 'UTF8'
-      },
-        options.connection
-      )).filter(([, v]) => v).map(([k, v]) => k + b.N + v).join(b.N)
-    ).z(2).end(0)
-  }
-
 }
 
-function parseError(x) {
-  const error = {}
-  let start = 5
-  for (let i = 5; i < x.length - 1; i++) {
-    if (x[i] === 0) {
-      error[errorFields[x[start]]] = x.toString('utf8', start + 1, i)
-      start = i + 1
-    }
-  }
-  return error
+function key(name) {
+  const x = JSON.stringify(String(name))
+  return name === '__proto__' ? '[' + x + ']' : x
 }
 
-function md5(x) {
-  return crypto.createHash('md5').update(x).digest('hex')
+export function own(row, name, value) {
+  Object.defineProperty(row, name, { value, writable: true, enumerable: true, configurable: true })
 }
 
-function hmac(key, x) {
-  return crypto.createHmac('sha256', key).update(x).digest()
-}
-
-function sha256(x) {
-  return crypto.createHash('sha256').update(x).digest()
-}
-
-function xor(a, b) {
-  const length = Math.max(a.length, b.length)
-  const buffer = Buffer.allocUnsafe(length)
-  for (let i = 0; i < length; i++)
-    buffer[i] = a[i] ^ b[i]
-  return buffer
-}
-
-function timer(fn, seconds) {
-  seconds = typeof seconds === 'function' ? seconds() : seconds
-  if (!seconds)
-    return { cancel: noop, start: noop }
-
-  let timer
+function Exchange(kind, query, lease, write) {
   return {
-    cancel() {
-      timer && (clearTimeout(timer), timer = null)
-    },
-    start() {
-      timer && clearTimeout(timer)
-      timer = setTimeout(done, seconds * 1000, arguments)
-    }
+    kind,
+    query,
+    lease,
+    write,
+    trace: query && query.trace || null,
+    statement: null,
+    text: '',
+    entry: null,
+    fresh: null,
+    previous: null,
+    parses: [],
+    values: null,
+    params: null,
+    columns: null,
+    shaped: null,
+    reader: null,
+    result: new Result(),
+    results: null,
+    origin: null,
+    portal: '',
+    rows: 0,
+    end: false,
+    failure: null,
+    flushing: false,
+    streaming: false,
+    open: false,
+    alone: !!(query && query.alone),
+    describing: false,
+    learn: false,
+    verify: false,
+    synced: false,
+    bound: false,
+    suspended: false,
+    finished: false,
+    done: false,
+    ends: false,
+    epoch: 0,
+    retried: false,
+    original: null,
+    error: null,
+    own: null,
+    cancel: null,
+    stream: null,
+    copied: false,
+    wanted: false,
+    final: null,
+    resolve: null,
+    reject: null,
+    cost: undefined
   }
+}
 
-  function done(args) {
-    fn.apply(null, args)
-    timer = null
+function Entry(name, owner, oids) {
+  return { name, owner, oids, columns: null, serializers: null, state: 'parsing', version: -1 }
+}
+
+function Rows(columns) {
+  let state = states.get(columns)
+  if (state === undefined) {
+    state = {
+      columns,
+      seen: 0,
+      object: null,
+      array: null,
+      compilable: compiles && columns.length <= 512 && !columns.some(x => String(x.name) === '__proto__')
+    }
+    states.set(columns, state)
   }
+  return state
+}
+
+function read(state, array, text, from) {
+  const key = array ? 'array' : 'object'
+
+  if (state[key] !== null)
+    return state[key]
+
+  if (!state.compilable || ++state.seen < after)
+    return null
+
+  try {
+    return state[key] = compile(state.columns, array, text, from)
+  } catch (_) {
+    compiles = state.compilable = false
+    return null
+  }
+}
+
+function compile(columns, array, text, from) {
+  const locals = []
+      , body = ['let l = 0']
+      , at = 'x, i, i + l'
+
+  columns.forEach((c, j) => {
+    c.decode
+      ? locals.push('d' + j + ' = c[' + j + '].decode')
+      : c.parser && locals.push('p' + j + ' = c[' + j + '].parser')
+    const value = c.decode ? 'd' + j + '(' + at + ')' : c.parser ? 'p' + j + '(text(' + at + '))' : 'text(' + at + ')'
+    body.push(
+      'l = (x[i] << 24) | (x[i + 1] << 16) | (x[i + 2] << 8) | x[i + 3]',
+      'i += 4',
+      'let v' + j + ' = null',
+      'l !== -1 && (v' + j + ' = ' + value + ', i += l)',
+      from ? 'v' + j + ' = from(v' + j + ', c[' + j + '])' : ''
+    )
+  })
+
+  body.push(array
+    ? 'return [' + columns.map((c, j) => 'v' + j).join(',') + ']'
+    : 'return {' + columns.map((c, j) => key(c.name) + ':v' + j).join(',') + '}'
+  )
+
+  return new Function('c', 'text', 'from',
+    (locals.length ? 'const ' + locals.join(', ') + '\n' : '') +
+    'return function row(x, i) {\n' + body.filter(Boolean).join('\n') + '\n}'
+  )(columns, text, from)
 }

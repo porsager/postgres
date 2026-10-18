@@ -1,0 +1,12 @@
+name = "postgres-js-cf-test"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# wrangler dev connects this binding straight to localConnectionString (or to the
+# CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE variable), without Hyperdrive.
+# The scheduled hyperdrive workflow deploys with the id of a real Hyperdrive instead.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "00000000000000000000000000000000"
+localConnectionString = "postgres://postgres_js_test_scram:postgres_js_test_scram@localhost:5432/postgres_js_test"
