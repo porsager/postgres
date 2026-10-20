@@ -185,7 +185,7 @@ function Socket() {
 
   function end(data) {
     return data
-      ? tcp.write(data)
+      ? tcp.write(data, () => tcp.writer.close())
       : tcp.raw.close()
   }
 
@@ -200,6 +200,7 @@ function Socket() {
         , value
       while (({ done, value } = await tcp.reader.read(), !done))
         tcp.emit('data', Buffer.from(value))
+      close()
     } catch (err) {
       error(err)
     }
