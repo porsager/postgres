@@ -2,27 +2,27 @@ export default Queue
 
 function Queue(initial = []) {
   let xs = initial.slice()
-  let index = 0
+  let offset = 0
 
   return {
     get length() {
-      return xs.length - index
+      return xs.length - offset
     },
     remove: (x) => {
-      const index = xs.indexOf(x)
+      const index = xs.indexOf(x, offset)
       return index === -1
         ? null
         : (xs.splice(index, 1), x)
     },
     push: (x) => (xs.push(x), x),
     shift: () => {
-      const out = xs[index++]
+      const out = xs[offset++]
 
-      if (index === xs.length) {
-        index = 0
+      if (offset === xs.length) {
+        offset = 0
         xs = []
       } else {
-        xs[index - 1] = undefined
+        xs[offset - 1] = undefined
       }
 
       return out
