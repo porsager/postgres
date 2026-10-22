@@ -2274,6 +2274,37 @@ t('Execute', async() => {
   return [result, 'select 1']
 })
 
+const revokeArrayTypes = () => exec('psql', ['-d', options.db, '-c', 'revoke select on pg_catalog.pg_type from public'])
+const grantArrayTypes = () => exec('psql', ['-d', options.db, '-c', 'grant select on pg_catalog.pg_type to public'])
+
+t('Failed array types fetch rejects the query and refetches on a new connection', async() => {
+  const sql = postgres(options)
+  await revokeArrayTypes()
+  const code = await sql`select 1`.catch(e => e.code)
+  await grantArrayTypes()
+  const [{ x }] = await sql`select '{1,2}'::int[] as x`
+  return ['42501,true', code + ',' + Array.isArray(x), await sql.end()]
+})
+
+t('Failed array types fetch rejects queued queries', async() => {
+  const sql = postgres(options)
+  await revokeArrayTypes()
+  const codes = await Promise.all([
+    sql`select 1`.catch(e => e.code),
+    sql`select 1`.catch(e => e.code)
+  ])
+  await grantArrayTypes()
+  return ['42501,42501', codes.join(), await sql.end()]
+})
+
+t('Failed array types fetch rejects a waiting reserve', async() => {
+  const sql = postgres(options)
+  await revokeArrayTypes()
+  const code = await sql.reserve().catch(e => e.code)
+  await grantArrayTypes()
+  return ['42501', code, await sql.end()]
+})
+
 t('Cancel running query', async() => {
   const query = sql`select pg_sleep(2)`
   setTimeout(() => query.cancel(), 500)
