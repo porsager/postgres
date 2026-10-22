@@ -560,8 +560,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       }
 
       if (needsTypes) {
-        initial.reserve && (initial = null)
-        return fetchArrayTypes()
+        const reserve = initial.reserve ? initial : null
+        reserve && (initial = null)
+        return fetchArrayTypes(reserve)
       }
 
       initial && !initial.reserve && execute(initial)
@@ -569,6 +570,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       initial = null
       return
     }
+
+    // Array types fetch failed, so this connection would return arrays as
+    // strings. Close it instead of opening it; the next connection refetches.
+    if (needsTypes)
+      return terminate()
 
     while (sent.length && (query = sent.shift()) && (query.active = true, query.cancelled))
       Connection(options).cancel(query.state, query.cancelled.resolve, query.cancelled.reject)
@@ -765,9 +771,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     backend.secret = x.readUInt32BE(9)
   }
 
-  async function fetchArrayTypes() {
+  async function fetchArrayTypes(reserve) {
     needsTypes = false
-    const types = await new Query([`
+    const query = new Query([`
       select b.oid, b.typarray
       from pg_catalog.pg_type a
       left join pg_catalog.pg_type b on b.oid = a.typelem
@@ -775,6 +781,19 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       group by b.oid, b.typarray
       order by b.oid
     `], [], execute)
+    // Flag the failure synchronously so ReadyForQuery closes the connection
+    // before onopen() can reuse it, and fail a waiting reserve(), which is no
+    // longer `initial`. errored() fails any other waiting query.
+    const reject = query.reject
+    query.reject = err => {
+      needsTypes = true
+      reserve && reserve.reject(err)
+      reject(err)
+    }
+    // ReadyForQuery drops this promise, so a failed fetch must not reject it.
+    const types = await query.catch(() => null)
+    if (types === null)
+      return
     types.forEach(({ oid, typarray }) => addArrayType(oid, typarray))
   }
 
