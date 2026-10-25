@@ -129,6 +129,8 @@ export const tls = {
   }
 }
 
+const maxSocketWriteSize = 16384
+
 function Socket() {
   const tcp = Object.assign(new EventEmitter(), {
     readyState: 'open',
@@ -178,8 +180,12 @@ function Socket() {
     tcp.emit('close')
   }
 
+  // Workers drop plaintext sockets on a single write above 64 KiB, so large queries are split
   function write(data, cb) {
-    tcp.writer.write(data).then(cb, error)
+    const writes = []
+    for (let i = 0; i < data.length; i += maxSocketWriteSize)
+      writes.push(tcp.writer.write(data.subarray(i, i + maxSocketWriteSize)))
+    Promise.all(writes).then(cb, error)
     return true
   }
 
