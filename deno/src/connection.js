@@ -354,6 +354,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       return socket.connect(options.path)
 
     socket.ssl = ssl
+    // Direct TLS (`sslnegotiation: 'direct'`): a socket that must be secure from its first byte, for the Cloudflare Workers shim (cf/polyfills.js) to open it so.
+    socket.direct = ssl && sslnegotiation === 'direct'
     socket.connect(port[hostIndex], host[hostIndex])
     socket.host = host[hostIndex]
     socket.port = port[hostIndex]
@@ -959,7 +961,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
         return b.i32(0xFFFFFFFF)
 
       type = types[i]
-      parameters[i] = x = type in options.serializers
+      x = type in options.serializers
         ? options.serializers[type](x)
         : '' + x
 

@@ -110,6 +110,13 @@ export { setImmediate, clearImmediate }
 
 export const tls = {
   connect({ socket: tcp, servername }) {
+    // A socket opened secure from its first byte (direct TLS): there is nothing to upgrade, only to say it is connected.
+    if (tcp.direct) {
+      tcp.readyState = 'open'
+      tcp.read()
+      queueMicrotask(() => tcp.emit('secureConnect'))
+      return tcp
+    }
     tcp.writer.releaseLock()
     tcp.reader.releaseLock()
     tcp.readyState = 'upgrading'
@@ -148,7 +155,7 @@ function Socket() {
     try {
       tcp.readyState = 'opening'
       const { connect } = await import('cloudflare:sockets')
-      tcp.raw = connect(host + ':' + port, tcp.ssl ? { secureTransport: 'starttls' } : {})
+      tcp.raw = connect(host + ':' + port, tcp.ssl ? { secureTransport: tcp.direct ? 'on' : 'starttls' } : {})
       tcp.raw.closed.then(
         () => {
           tcp.readyState !== 'upgrade'
@@ -160,7 +167,7 @@ function Socket() {
       tcp.writer = tcp.raw.writable.getWriter()
       tcp.reader = tcp.raw.readable.getReader()
 
-      tcp.ssl ? readFirst() : read()
+      tcp.ssl && !tcp.direct ? readFirst() : tcp.direct ? null : read()
       tcp.writer.ready.then(() => {
         tcp.readyState = 'open'
         tcp.emit('connect')
