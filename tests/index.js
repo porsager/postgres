@@ -1650,6 +1650,142 @@ t('Query and parameters are enumerable if debug is set', async() => {
   ]
 })
 
+t('Cancelled connect timeout cannot interrupt a ready query', async() => {
+  const timeout = captureTimer(61)
+  let sent
+  const started = new Promise(r => sent = r)
+      , client = postgres({
+        ...options,
+        connect_timeout: 61,
+        idle_timeout: 0,
+        max_lifetime: 0,
+        debug: (_, query) => query.includes('pg_sleep') && sent()
+      })
+
+  try {
+    await client`select 1`
+    const pending = client`select pg_sleep(0.05), 42::int as x`.execute()
+    await started
+    timeout.callbacks[0]() // Deliver an already-cancelled callback deliberately.
+    return [42, (await pending)[0].x]
+  } finally {
+    timeout.restore()
+    await client.end({ timeout: 0 })
+  }
+})
+
+t('Cancelled connect timeout is inert after close', async() => {
+  const timeout = captureTimer(61)
+      , client = postgres({ ...options, connect_timeout: 61, idle_timeout: 0, max_lifetime: 0 })
+
+  try {
+    await client`select 1`
+    await client.end()
+    timeout.callbacks[0]()
+    return [1, timeout.callbacks.length]
+  } finally {
+    timeout.restore()
+    await client.end({ timeout: 0 })
+  }
+})
+
+t('Old connect timeout cannot interrupt a restarted connection', async() => {
+  let fireOld = false
+    , closed
+
+  const disconnected = new Promise(r => closed = r)
+      , timeout = captureTimer(61, callbacks => {
+        fireOld && callbacks.length === 2 && queueMicrotask(callbacks[0])
+      })
+      , client = postgres({ ...options, connect_timeout: 61, idle_timeout: 0, max_lifetime: 0, onclose: () => closed() })
+
+  try {
+    const [{ pid }] = await client`select pg_backend_pid() as pid`
+    await sql`select pg_terminate_backend(${ pid })`
+    await disconnected
+    fireOld = true
+    return ['42,2', [(await client`select 42::int as x`)[0].x, timeout.callbacks.length].join()]
+  } finally {
+    timeout.restore()
+    await client.end({ timeout: 0 })
+  }
+})
+
+t('Connect timeout still closes a stalled protocol cancellation connection', async() => {
+  const native = await import('node:net')
+  let packet = Buffer.alloc(0)
+    , count = 0
+    , cancelClosed
+    , querySent
+
+  const sockets = new Set()
+      , server = native.createServer(socket => {
+        sockets.add(socket)
+        socket.on('data', data => packet = Buffer.concat([packet, data]))
+        socket.on('close', () => sockets.delete(socket))
+      })
+
+  await new Promise(r => server.listen(0, '127.0.0.1', r))
+  const closed = new Promise(r => cancelClosed = r)
+      , sent = new Promise(r => querySent = r)
+      , owned = new Set()
+      , client = postgres({
+        ...options,
+        connect_timeout: 0.1,
+        idle_timeout: 0,
+        max_lifetime: 0,
+        debug: (_, query) => query.includes('pg_sleep') && querySent(),
+        socket: ({ port, host }) => new Promise((resolve, reject) => {
+          const cancellation = count++ > 0
+              , socket = native.connect(cancellation ? server.address().port : port[0], host[0])
+          owned.add(socket)
+          socket.once('error', reject)
+          socket.once('connect', () => resolve(socket))
+          cancellation && socket.once('close', () => cancelClosed(true))
+        })
+      })
+
+  try {
+    const query = client`select pg_sleep(0.2)`.execute()
+        , pending = query.then(x => x, x => x)
+    await sent
+    query.cancel()
+    const ended = await Promise.race([closed, delay(1000).then(() => false)])
+    await pending
+    return ['true,16,80877102', [ended, packet.length, packet.readInt32BE(4)].join()]
+  } finally {
+    await client.end({ timeout: 0 })
+    owned.forEach(socket => socket.destroy())
+    sockets.forEach(socket => socket.destroy())
+    server.close()
+  }
+})
+
+function captureTimer(seconds, onstart = () => 0) {
+  const set = globalThis.setTimeout
+      , callbacks = []
+      , handles = []
+
+  globalThis.setTimeout = (fn, ms, ...args) => {
+    const match = fn.name === 'done' && ms === seconds * 1000
+        , handle = set(fn, ms, ...args)
+    if (match) {
+      handles.push(handle)
+      callbacks.push(() => fn(...args))
+      onstart(callbacks)
+    }
+    return handle
+  }
+
+  return {
+    callbacks,
+    restore() {
+      globalThis.setTimeout = set
+      handles.forEach(clearTimeout)
+    }
+  }
+}
+
 t('connect_timeout', { timeout: 20 }, async() => {
   const connect_timeout = 0.2
   const server = net.createServer()

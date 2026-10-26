@@ -1044,19 +1044,23 @@ function timer(fn, seconds) {
   if (!seconds)
     return { cancel: noop, start: noop }
 
-  let timer
+  let timer = null
+    , generation = 0
   return {
     cancel() {
-      timer && (clearTimeout(timer), timer = null)
+      generation++
+      timer !== null && (clearTimeout(timer), timer = null)
     },
     start() {
-      timer && clearTimeout(timer)
-      timer = setTimeout(done, seconds * 1000, arguments)
+      timer !== null && clearTimeout(timer)
+      timer = setTimeout(done, seconds * 1000, arguments, ++generation)
     }
   }
 
-  function done(args) {
-    fn.apply(null, args)
+  function done(args, current) {
+    if (timer === null || current !== generation)
+      return
     timer = null
+    fn.apply(null, args)
   }
 }
