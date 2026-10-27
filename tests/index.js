@@ -1600,6 +1600,24 @@ t('Async stack trace', async() => {
   ]
 })
 
+t('Origin stack is formatted when a query is created', async() => {
+  const prepareStackTrace = Error.prepareStackTrace
+  let formatted = 0
+  Error.prepareStackTrace = (error, stack) => (formatted++, error + stack.map(x => '\n    at ' + x).join(''))
+  let supported
+    , query
+  try {
+    new Error().stack
+    supported = formatted === 1
+    formatted = 0
+    query = sql`select 1 as x`
+  } finally {
+    Error.prepareStackTrace = prepareStackTrace
+  }
+  await query
+  return supported ? [1, formatted] : [true, true]
+})
+
 t('Debug has long async stack trace', async() => {
   const sql = postgres({ ...options, debug: true })
 
