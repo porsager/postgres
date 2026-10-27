@@ -167,7 +167,11 @@ function cachedError(xs) {
 
   const x = Error.stackTraceLimit
   Error.stackTraceLimit = 4
-  originCache.set(xs, new Error())
+  const error = new Error()
   Error.stackTraceLimit = x
-  return originCache.get(xs)
+  // Format the stack right away. Until .stack is read V8 keeps the call sites, and
+  // through them the caller's closure, alive for as long as this cache lives (#1274).
+  try { error.stack } catch (e) { /* a throwing Error.prepareStackTrace leaves it as before */ }
+  originCache.set(xs, error)
+  return error
 }
