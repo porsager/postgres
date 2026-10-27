@@ -37,6 +37,9 @@ export class Query extends Promise {
   }
 
   get origin() {
+    if (!this.tagged && !this.handler.debug)
+      return ''
+
     return (this.handler.debug
       ? this[originError].stack
       : this.tagged && originStackCache.has(this.strings)
