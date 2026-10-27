@@ -1956,6 +1956,23 @@ t('Catches query format errors', async() => [
   await sql.unsafe({ toString: () => { throw new Error('wat') } }).catch((e) => e.message)
 ])
 
+t('Failing queries without a template add nothing to the origin cache', async() => {
+  const set = Map.prototype.set
+  const text = 'select definitely_invalid_column'
+  let added = 0
+  Map.prototype.set = function(key, value) { // eslint-disable-line no-extend-native
+    Array.isArray(key) && key[0] === text && added++
+    return set.call(this, key, value)
+  }
+  try {
+    for (let i = 0; i < 3; i++)
+      await sql.unsafe(text).catch(() => { /* noop */ })
+  } finally {
+    Map.prototype.set = set // eslint-disable-line no-extend-native
+  }
+  return [0, added]
+})
+
 t('Multiple hosts', {
   timeout: 1
 }, async() => {
