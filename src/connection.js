@@ -309,7 +309,7 @@ export function Connection(ready, options, events) {
 
     x.streaming = x.open = !!query.streaming
 
-    if (current && current.state === 'parsing' && current.oids === null && !current.owner.error) {
+    if (current && current.state === 'parsing' && current.oids === null && current.owner && !current.owner.error) {
       if (!current.owner.loose)
         throw Errors.generic('STATEMENT_PENDING', 'A statement was used before its description arrived')
 
@@ -899,6 +899,7 @@ export function Connection(ready, options, events) {
     status !== 'I' && !rolling && !item.lease && !connection.lease && options.max !== 1 && unsafe(item)
     blocker === item && (blocker = null)
     settle(item)
+    item.entry && item.entry.owner === item && (item.entry.owner = null)
     while (sent.length && sent[0].kind === 'local')
       settle(sent.shift())
     release()

@@ -134,6 +134,7 @@ The open issues and pull requests were triaged into 33 correctness bugs, each wi
 - A query on its way to a free connection goes straight to it, without the waiting queue.
 - A connection that becomes ready while others are still opening no longer takes the queries meant for those; 50 connections opened at once each run one of 50 queries.
 - Queries hold no more per-query state than they need, so almost nothing outlives a scavenge.
+- A cached prepared statement no longer keeps the query that prepared it, with its values and rows: 5,000 statements over 10 connections take about 3 MB of heap instead of 12, and the most the caches can hold is about 8 MB instead of 28.
 - One growing buffer per connection, encoded in place and written once at the end of the tick.
 - Plain and direct TLS connections read into one buffer per connection (`onread`) instead of a buffer per chunk, on Node, Bun and Deno.
 - Rows, column descriptions and command tags are decoded by hand.

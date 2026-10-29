@@ -617,3 +617,32 @@ t('The same new query failing to parse with a number and then a string rejects b
   const codes = await Promise.all([query(1), query('one'), query(2)])
   return ['42703,42703,42703,1', codes.concat((await sql`select 1 as x`)[0].x).join(), await sql.end()]
 })
+
+t('A cached prepared statement does not keep the rows of the query that prepared it', async() => {
+  const v8 = await import('v8')
+      , vm = await import('vm')
+  let gc
+  try {
+    v8.setFlagsFromString('--expose-gc')
+    gc = vm.runInNewContext('gc')
+  } catch (e) {
+    return [true, true]
+  }
+
+  const sql = postgres({ ...options, max: 1 })
+  const refs = []
+  await first(sql, refs)
+
+  for (let i = 0; i < 5; i++) {
+    await delay(10)
+    gc()
+  }
+
+  const [{ n }] = await sql`select count(*)::int as n from pg_prepared_statements where statement like 'select repeat%'`
+  return [true + ' 1', (refs[0].deref() === undefined) + ' ' + n, await sql.end()]
+})
+
+async function first(sql, refs) {
+  const rows = await sql`select repeat('x', ${ 1e6 }) as x`
+  refs.push(new WeakRef(rows))
+}
