@@ -639,7 +639,7 @@ t('A cached prepared statement does not keep the rows of the query that prepared
   }
 
   const [{ n }] = await sql`select count(*)::int as n from pg_prepared_statements where statement like 'select repeat%'`
-  return [true + ' 1', (refs[0].deref() === undefined) + ' ' + n, await sql.end()]
+  return [true + ' ' + (options.prepare === false ? 0 : 1), (refs[0].deref() === undefined) + ' ' + n, await sql.end()]
 })
 
 async function first(sql, refs) {

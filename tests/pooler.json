@@ -91,6 +91,7 @@
     "listen.js: Original listen handles unsubscribe after a reconnect",
     "listen.js: Unlisten while reconnecting keeps only the other listener",
     "listen.js: A listener that throws keeps its connection and gets the next notification",
-    "prepared.js: A connection that prepares a statement for the first time writes values for the parameter types it has now"
+    "prepared.js: A connection that prepares a statement for the first time writes values for the parameter types it has now",
+    "prepared.js: The same new query failing to parse with a number and then a string rejects both"
   ]
 }
