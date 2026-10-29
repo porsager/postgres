@@ -53,6 +53,7 @@ The README has an [upgrade guide](./README.md#upgrading-from-v3), with a query t
 
 ### New
 
+- **`sql.batch([queries])`** sends queries in one round trip with a single Sync: outside a transaction they commit or roll back together, and the batch rejects with the failing query's position in `error.index`.
 - **Scheduling across connections:** when every connection is busy, a query is pipelined on the connection where it should be done soonest, from how long each statement took before and how long what is in flight has run, and slow queries are kept together once the rest of the pool is needed for quick ones. In simulations of mixed workloads, the p99 of quick queries fell 2 to 100 times; on PostgreSQL, a 1 ms lookup no longer waits behind a report on a busy pool (p99.9 from 792 ms to 5 ms). `scheduler: false` pipelines on the busy connection with the fewest queries in flight instead; v3 went round-robin over the busy connections. With `max: 1` it is off, as there is only one connection.
 - **`queue_timeout`:** seconds a query, transaction or reserve may wait for a connection before it rejects with `QUEUE_TIMEOUT`, unsent (#1036, #824).
 - **`.signal(abortSignal)`** on a query: aborting rejects it if it is still waiting, or cancels it if it is running.

@@ -186,3 +186,13 @@ dc.subscribe('postgres:pool', message => (message as PoolEvent).stats.waiting)
 queries
 transactions
 rest
+
+async function batched() {
+  const [a, b] = await sql.batch([sql<{ id: number }[]>`select 1 as id`, sql<{ name: string }[]>`select 'a' as name`])
+  a[0].id satisfies number
+  b[0].name satisfies string
+  const none: [] = await sql.batch([])
+  none
+  await sql.batch([sql`select 1`]).catch((e: postgres.PostgresError) => e.index satisfies number | undefined)
+}
+batched

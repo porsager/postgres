@@ -82,6 +82,10 @@ declare namespace postgres {
     line: string
     routine: string
 
+    /** In `sql.batch`, the position of the query that failed */
+    index?: number | undefined
+    /** In `sql.batch`, set on the queries that were skipped or rolled back because another failed */
+    skipped?: boolean | undefined
     detail?: string | undefined
     hint?: string | undefined
     internal_position?: string | undefined
@@ -806,6 +810,9 @@ declare namespace postgres {
       options?: UnsafeQueryOptions
     ): PendingQuery<T>
     unsafe<T extends any[] = (Row & Iterable<Row>)[]>(query: string, options: UnsafeQueryOptions): PendingQuery<T>
+
+    /** Several queries in one round trip with one Sync, in one implicit transaction outside `sql.begin`; resolves with their results in order */
+    batch<T extends readonly PendingQuery<any>[] | []>(queries: T): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }>
 
     notify(channel: string, payload: string): PendingRequest
 

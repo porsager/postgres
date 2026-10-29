@@ -197,7 +197,10 @@ export function Types(options = {}) {
 
   const bases = {}
 
-  return { parser, decoder, known, binary, serializer, load, infer, resolve, named: named.length > 0, plain: !custom.some(x => x.serialize), parsers, serializers }
+  return {
+    parser, decoder, known, unknown, binary, serializer, load, infer, resolve,
+    named: named.length > 0, plain: !custom.some(x => x.serialize), parsers, serializers
+  }
 
   function binary(oid) {
     if (own.has(oid))
@@ -210,6 +213,15 @@ export function Types(options = {}) {
     return element !== undefined && !own.has(element) && (element !== 20 || !(20 in parsers))
       ? readers[element]
       : null
+  }
+
+  function unknown(oids) {
+    for (let i = 0; i < oids.length; i++) {
+      const oid = oids[i]
+      if (oid >= 16384 && !(oid in parsers) && !(oid in serializers) && !(oid in elements) && !(oid in bases))
+        return true
+    }
+    return false
   }
 
   function known(oid) {

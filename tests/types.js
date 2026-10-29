@@ -586,3 +586,16 @@ t('Timestamps read the same in time zones with odd offsets', async() => {
   const results = [await read('UTC'), await read('Asia/Kolkata'), await read('America/St_Johns'), await read('Europe/Amsterdam')]
   return [results[0].repeat(4), results.join(''), await sql.end()]
 })
+
+t('A pool reads array types and domains only once a query meets a type it does not know', async() => {
+  await sql`create type test_mood as enum ('ok', 'sad')`
+  const texts = []
+      , fresh = postgres({ ...options, max: 1, debug: (id, text) => texts.push(text) })
+      , fetches = () => texts.filter(x => x.includes('pg_catalog.pg_type')).length
+  await fresh`select 1 as x`
+  await fresh`select now() as x, array[1]::int[] as y`
+  const before = fetches()
+  const [{ m }] = await fresh`select '{ok,sad}'::test_mood[] as m`
+  const [{ n }] = await fresh`select '{sad}'::test_mood[] as n`
+  return ['0 ok,sad 1 sad', [before, m.join(), fetches(), n.join()].join(' '), await fresh.end(), await sql`drop type test_mood`]
+})

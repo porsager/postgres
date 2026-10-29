@@ -2,7 +2,7 @@ import Stream from 'stream'
 import * as p from './protocol.js'
 import { Errors, queryError } from './errors.js'
 import Result from './result.js'
-import { CLOSE } from './query.js'
+import { CLOSE, Query } from './query.js'
 import { now, channels, listened } from './diagnostics.js'
 
 export const slow = 100
@@ -36,6 +36,7 @@ export function Connection(ready, options, events) {
       , frames = p.Frames(frame, socket.shared, error => (connection.fatal = error, socket.destroy()))
 
   let blocker = null
+    , stash = null
     , rolling = false
     , fence = null
     , drained = null
@@ -64,12 +65,14 @@ export function Connection(ready, options, events) {
     get closed() { return closed },
     get closing() { return !!closing },
     send,
+    batch,
     simple,
     describe,
     local,
     cancel,
     close,
     destroy,
+    go,
     ref: () => socket.ref(),
     unref: () => socket.unref(),
     backlog,
@@ -168,6 +171,7 @@ export function Connection(ready, options, events) {
       out.truncate(mark)
       x.loose = false
       blocker = sent.find(y => y.gate && holds(y)) || null
+      blocker && blocker.nosync && !blocker.flushed && (blocker.flushed = true, p.flush(out), schedule())
       return pending.unshift(x)
     }
 
@@ -177,18 +181,23 @@ export function Connection(ready, options, events) {
       x.parses = []
       x.portal = ''
       x.describing = x.synced = x.flushing = x.open = false
-      if (!x.own || x.kind === 'step' || !connection.lease) {
+      if (x.batch) {
+        x.entry = null
+        p.parse(out, '', refused)
+        x.parses = ['']
+        abort(x)
+      } else if (!x.own || x.kind === 'step' || !connection.lease) {
         x.kind = 'local'
         x.cost >= notable && notables--
         x.cost = undefined
         return sent.length === 0 ? queueMicrotask(() => settle(x)) : sent.push(x)
+      } else {
+        x.kind = 'simple'
+        x.text = refused
+        x.results = []
+        x.entry = null
+        sync(x, true)
       }
-
-      x.kind = 'simple'
-      x.text = refused
-      x.results = []
-      x.entry = null
-      sync(x, true)
     }
     x.fresh && register(x.fresh)
     x.portal && x.kind === 'query' && open.add(x)
@@ -240,6 +249,120 @@ export function Connection(ready, options, events) {
     x.ends = statement.ends === undefined ? (statement.ends = ending.test(statement.text)) : statement.ends
     options.scheduler && cost(x)
     queue(x)
+  }
+
+  function batch(query, parts) {
+    const b = {
+      query, parts, results: new Array(parts.length), settled: new Array(parts.length).fill(false),
+      left: parts.length, error: null, index: -1, aborted: null
+    }
+
+    parts.forEach((part, i) => {
+      part.resolve = result => batched(b, i, null, result)
+      part.reject = error => batched(b, i, error)
+      if (b.aborted)
+        return batched(b, i, skipped(b.aborted, i))
+
+      const x = Exchange('query', part, connection.lease, extended)
+      x.statement = part.wire.statement
+      x.ends = x.statement.ends === undefined ? (x.statement.ends = ending.test(x.statement.text)) : x.statement.ends
+      x.batch = b
+      x.nosync = i < parts.length - 1
+      options.scheduler && cost(x)
+      queue(x)
+    })
+  }
+
+  function batched(b, i, error, result) {
+    if (b.settled[i])
+      return
+
+    b.settled[i] = true
+    b.left--
+    error
+      ? (b.error === null || (i < b.index && !error.skipped)) && (b.error = error, b.index = i)
+      : b.results[i] = result
+
+    if (b.left)
+      return
+
+    const { query, parts, results } = b
+    if (b.error) {
+      b.error.index = b.index
+      parts.forEach((part, j) => {
+        Query.prototype.reject.call(part, j === b.index ? b.error : skipped(b.error, b.index))
+        part.catch(noop)
+      })
+      return query.reject(b.error)
+    }
+
+    parts.forEach((part, j) => Query.prototype.resolve.call(part, results[j]))
+    query.resolve(results)
+  }
+
+  function skipped(error, index) {
+    const x = copy(error)
+    x.index = index
+    x.skipped = true
+    return x
+  }
+
+  function part(x) {
+    sent.shift()
+    options.scheduler && timed(x)
+    x.done = true
+    x.open = false
+    x.trace && traced--
+    blocker === x && (blocker = null)
+    settle(x)
+    const next = sent[0]
+    if (next && next.query) {
+      next.query.active = true
+      next.cancel && ready.cancel().then(next.cancel.resolve, next.cancel.reject)
+    }
+    release()
+  }
+
+  function abort(x) {
+    if (x.aborted)
+      return
+
+    x.aborted = true
+    const b = x.batch
+        , error = x.own || x.error
+
+    b.aborted = error
+    let synced = !x.nosync && x.synced
+    const at = sent.indexOf(x)
+    for (let i = at === -1 ? sent.length : at + 1; i < sent.length;) {
+      const y = sent[i]
+      if (y.batch === b) {
+        sent.splice(i, 1)
+        synced = synced || (!y.nosync && y.synced)
+        drop(y)
+        blocker === y && (blocker = null)
+      } else {
+        i++
+      }
+    }
+
+    for (let i = 0; i < pending.length;) {
+      const y = pending[i]
+      y.batch === b ? (pending.splice(i, 1), drop(y)) : i++
+    }
+
+    synced || p.sync(out)
+    x.nosync = false
+    x.synced = true
+    schedule()
+
+    function drop(y) {
+      y.entry && y.entry.owner === y && y.entry.state === 'parsing' && (y.entry.state = 'stale')
+      y.done = true
+      y.trace && traced--
+      y.cost >= notable && notables--
+      settleError(y, skipped(error, b.parts.indexOf(y.query)))
+    }
   }
 
   function cost(x) {
@@ -400,7 +523,9 @@ export function Connection(ready, options, events) {
   function run(x, name) {
     const mark = out.length
     try {
-      p.run(out, x.portal, name, x.values, x.rows, x.flushing, x.formats)
+      x.nosync
+        ? (p.bind(out, x.portal, name, x.values, undefined, x.formats || undefined), p.execute(out, x.portal, x.rows))
+        : p.run(out, x.portal, name, x.values, x.rows, x.flushing, x.formats)
     } catch (error) {
       out.truncate(mark)
       throw error
@@ -480,7 +605,7 @@ export function Connection(ready, options, events) {
       run(x, name)
     } catch (error) {
       x.own = error
-      sync(x, !!connection.lease)
+      x.batch ? (p.parse(out, '', refused), x.parses.push(''), abort(x)) : sync(x, !!connection.lease)
     }
   }
 
@@ -526,6 +651,9 @@ export function Connection(ready, options, events) {
   }
 
   function cancel(query) {
+    if (query.parts)
+      return cancelBatch(query)
+
     if (running.has(query) || (sent[0] && sent[0].query === query && sent[0].awaiting))
       return (query.aborted = Errors.generic('57014', 'canceling statement due to user request'), Promise.resolve())
     const i = pending.findIndex(x => x.query === query || x.for === query)
@@ -575,6 +703,19 @@ export function Connection(ready, options, events) {
 
   function answered(x) {
     x.unanswered && (timers.clearTimeout(x.unanswered), x.unanswered = null)
+  }
+
+  function cancelBatch(query) {
+    const x = sent.find(x => x.batch && x.batch.query === query)
+    if (x)
+      return x === sent[0] ? cancelling(x) : new Promise((resolve, reject) => x.cancel = { resolve, reject })
+
+    const first = pending.find(x => x.batch && x.batch.query === query)
+    if (first) {
+      first.own = Errors.generic('57014', 'canceling statement due to user request')
+      first.write = () => { throw first.own }
+    }
+    return Promise.resolve()
   }
 
   function close() {
@@ -664,6 +805,27 @@ export function Connection(ready, options, events) {
   }
 
   function frame(type, x, start, end) {
+    if (!events.typed && stash === null && (type === 84 || type === 116)
+      && events.unknown(type === 84 ? p.rowDescription(x, start, end, oidOf) : p.parameterDescription(x, start))) {
+      stash = { type, x: Buffer.from(x.subarray(start, end)) }
+      frames.pause()
+      return events.need(connection)
+    }
+
+    dispatch(type, x, start, end)
+  }
+
+  function go() {
+    if (!stash)
+      return
+
+    const { type, x } = stash
+    dispatch(type, x, 0, x.length)
+    stash = null
+    frames.resume()
+  }
+
+  function dispatch(type, x, start, end) {
     traced && first()
     try {
       type === 68 ? DataRow(x, start) :
@@ -701,7 +863,7 @@ export function Connection(ready, options, events) {
     x.error = x.error || error
     x.describing = false
     x.open = false
-    sync(x)
+    x.batch ? abort(x) : sync(x)
   }
 
   function unsupported(x) {
@@ -833,6 +995,8 @@ export function Connection(ready, options, events) {
       item.flushing && sync(item)
       result.count && (item.last = new Promise(r => r(item.query.cursorFn(result)))).catch(noop)
     }
+
+    item.nosync && !item.error && part(item)
   }
 
   function unsafe(item) {
@@ -846,6 +1010,7 @@ export function Connection(ready, options, events) {
   function EmptyQueryResponse() {
     const item = sent[0]
     item.kind === 'simple' && (item.results.push(item.result), item.result = new Result())
+    item.nosync && !item.error && part(item)
   }
 
   async function PortalSuspended() {
@@ -987,6 +1152,7 @@ export function Connection(ready, options, events) {
 
   function retryable(x) {
     return !x.retried
+        && !x.batch
         && !x.cancel
         && !x.query.cancelled
         && !x.query.cursorFn
@@ -1198,6 +1364,10 @@ export function Connection(ready, options, events) {
   }
 }
 
+function oidOf(name, table, number, type) {
+  return type
+}
+
 function copy(error) {
   const x = Object.create(Object.getPrototypeOf(error), Object.getOwnPropertyDescriptors(error))
   Object.defineProperty(x, 'stack', { value: error.stack, writable: true, configurable: true })
@@ -1245,6 +1415,10 @@ function Exchange(kind, query, lease, write) {
     alone: !!(query && query.alone),
     describing: false,
     learn: false,
+    batch: null,
+    nosync: false,
+    aborted: false,
+    flushed: false,
     loose: false,
     gate: false,
     later: false,

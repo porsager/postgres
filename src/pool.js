@@ -23,12 +23,17 @@ export function Pool(options, types) {
         onclose,
         onnotify: options.onnotify,
         onparameter,
-        ontimed
+        ontimed,
+        typed: options.fetch_types === false,
+        unknown: oids => !typesLoaded && types.unknown(oids),
+        need
       }
       , work = { fast: 0, slow: 0, at: 0 }
 
   const signal = { aborted: false, sockets: new Set() }
       , replacing = []
+      , eager = types.named || !!options.eager_types
+      , paused = new Set()
 
   let opening = 0
     , ending = null
@@ -43,6 +48,7 @@ export function Pool(options, types) {
     , typesFailed = 0
     , failure = null
     , typesLoading = false
+    , retryTypes = null
 
   const pool = {
     query,
@@ -68,6 +74,9 @@ export function Pool(options, types) {
 
     if (ending && !lease)
       return q.reject(queryError(Errors.connection('CONNECTION_ENDED', options, options.host[0], options.port[0]), q, options.debug))
+
+    if (q.parts)
+      return batch(q, lease)
 
     let built
     try {
@@ -108,6 +117,29 @@ export function Pool(options, types) {
       q.timer = null
       q.settled || (q.timedOut = true, cancel(q))
     }, options.query_timeout * 1000)
+  }
+
+  function batch(q, lease) {
+    const parts = q.parts
+    if (!parts.length)
+      return q.resolve([])
+
+    for (let i = 0; i < parts.length; i++) {
+      try {
+        parts[i].build()
+      } catch (error) {
+        error && typeof error === 'object' && (error.index = i)
+        return unbuilt(q, error, lease)
+      }
+    }
+
+    parts.forEach(x => {
+      const built = x.built
+      x.wire = { statement: statements.get(built, options.prepare && x.options.prepare !== false), built }
+    })
+
+    const run = c => (q.connection = c, c.batch(q, parts), q.onwrite && q.onwrite())
+    place({ q, run, typed: !typesLoaded && parts.some(x => unknown(x.built.oids)) }, lease)
   }
 
   function describeOnly(q, built, lease) {
@@ -235,8 +267,8 @@ export function Pool(options, types) {
     const statement = job.statement
         , any = !statement || !statement.name
 
-    if (!typesLoaded && (job.lease || job.typed))
-      return null
+    if (!typesLoaded && (eager ? job.lease || job.typed : job.typed))
+      return (eager || need(), null)
 
     let best = null
       , soon = false
@@ -392,8 +424,8 @@ export function Pool(options, types) {
     connections.add(c)
     lifetime(c)
     listened(channels.pool) && event('open', c)
-    typesLoaded || (typesLoading ? (c.loading = true) : loadTypes(c))
-    c.loading || c.typing || typesLoading || recovered()
+    typesLoaded || !eager || (typesLoading ? (c.loading = true) : loadTypes(c))
+    c.loading || c.typing || (eager && typesLoading) || recovered()
     drain()
   }
 
@@ -401,6 +433,50 @@ export function Pool(options, types) {
     retries = 0
     failingSince = null
     failure = null
+  }
+
+  function need(c) {
+    c && paused.add(c)
+    if (typesLoaded)
+      return resume()
+
+    if (typesLoading)
+      return
+
+    typesLoading = true
+    const idle = [...connections].find(x => !paused.has(x) && usable(x) && x.inflight === 0)
+    idle
+      ? fetched(types.load(runner(idle)))
+      : (options.open || startup)(options, signal, 0).then(ready => {
+        const c = Connection(ready, options, { ...events, onready: () => {}, onclose: () => {}, onparameter: () => {}, ontimed: () => {}, need: () => {} })
+        fetched(types.load(runner(c)).finally(() => c.close()))
+      }, error => fetched(Promise.reject(error)))
+  }
+
+  function fetched(loading) {
+    loading.then(() => typesLoaded = true, error => error instanceof PostgresError && (typesLoaded = true)).then(() => {
+      typesLoading = false
+      events.typed = typesLoaded
+      typesLoaded
+        ? resume()
+        : paused.size && (retryTypes = setTimeout(() => (retryTypes = null, need()), 1000))
+    })
+  }
+
+  function resume() {
+    const xs = [...paused]
+    paused.clear()
+    xs.forEach(x => x.closed || x.go())
+    drain()
+  }
+
+  function runner(c) {
+    return text => new Promise((resolve, reject) => {
+      const q = new Query([text], [], Object.assign(() => {}, { options }), { simple: true })
+      q.executed = true
+      q.then(resolve, reject)
+      c.simple(q, text)
+    })
   }
 
   function retype() {
@@ -432,6 +508,7 @@ export function Pool(options, types) {
       : error && error.code === 'TYPE_NOT_FOUND' && (typesError = error, typesFailed = now())
     ).then(() => {
       typesLoading = false
+      events.typed = typesLoaded
       c.typing = null
       connections.forEach(x => x.loading = !typesLoaded && !typesError)
       ;(typesLoaded || typesError) && recovered()
@@ -548,6 +625,7 @@ export function Pool(options, types) {
   function onclose(c, error) {
     connections.delete(c)
     ;(c.loading || (c.typing && !c.typing.settled)) && !signal.aborted && attempted(copy(error))
+    paused.delete(c)
     ending || replacing.push((c.index + 1) % (options.path ? 1 : options.host.length))
     replacing.length > options.max && replacing.shift()
     c.retired && c.retired.forEach(r => r())
@@ -689,6 +767,7 @@ export function Pool(options, types) {
     if (connections.size === 0 && (opening === 0 || signal.aborted) && waiting.length === 0) {
       endTimer && clearTimeout(endTimer)
       retryTimer && clearTimeout(retryTimer)
+      retryTypes && clearTimeout(retryTypes)
       const resolve = pool.ended
       pool.ended = null
       resolve()

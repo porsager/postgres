@@ -101,6 +101,7 @@ function Postgres(a, b) {
       types: typed,
       typed,
       unsafe,
+      batch,
       notify,
       array,
       json,
@@ -124,6 +125,25 @@ function Postgres(a, b) {
         ...options,
         simple: 'simple' in options ? options.simple : args.length === 0
       })
+    }
+
+    function batch(queries) {
+      if (!Array.isArray(queries))
+        throw Errors.generic('BATCH_NOT_ARRAY', 'sql.batch takes an array of queries')
+
+      queries.forEach((x, i) => {
+        if (!(x instanceof Query))
+          throw Errors.generic('BATCH_NOT_QUERY', 'Item ' + i + ' of the batch is not a query')
+        if (x.executed)
+          throw Errors.generic('BATCH_EXECUTED', 'Item ' + i + ' of the batch has already run')
+        if (x.cursorFn || x.cursorRows || x.streaming || x.forEachFn || x.onlyDescribe)
+          throw Errors.generic('BATCH_UNSUPPORTED', 'Item ' + i + ' of the batch is a cursor, stream, forEach or describe')
+      })
+
+      const q = new Query([], [], handler, {})
+      q.parts = queries
+      queries.forEach(x => (x.executed = true, x.cancel = () => q.cancel()))
+      return q
     }
 
     async function notify(channel, payload) {
@@ -511,6 +531,7 @@ function parseOptions(a, b) {
     unref_sockets   : !!o.unref_sockets,
     passfile        : passfile(env),
     shared_types    : o.shared_types,
+    eager_types     : o.eager_types,
     transform       : parseTransform(o.transform || { undefined: undefined }),
     parameters      : {},
     shared          : { retries: 0 },

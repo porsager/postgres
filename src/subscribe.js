@@ -35,7 +35,8 @@ export default function Subscribe(postgres, options) {
       state.pid = state.secret = undefined
       ended || restart()
     },
-    no_subscribe: true
+    no_subscribe: true,
+    eager_types: true
   })
 
   const end = sql.end

@@ -12,7 +12,7 @@ const postgres = (await import(modulePath.startsWith('.') ? new URL(modulePath, 
 
 const scenarios = {
   split: { faults: [] },
-  errors: { faults: [], kinds: ['query', 'rows', 'fail', 'syntax', 'begin', 'cursor', 'unsafe'] },
+  errors: { faults: [], kinds: ['query', 'rows', 'fail', 'syntax', 'begin', 'cursor', 'unsafe', 'batch'] },
   close: { faults: ['close', 'reset'] },
   terminate: { faults: ['kill'] },
   stale: { faults: ['stale', 'deallocate'] },
@@ -91,7 +91,7 @@ async function simulate(seed) {
   const settled = []
   let next = 1
 
-  const kinds = scenario.kinds || ['query', 'query', 'rows', 'fail', 'syntax', 'sleep', 'unsafe', 'begin', 'reserve', 'cursor']
+  const kinds = scenario.kinds || ['query', 'query', 'rows', 'fail', 'syntax', 'sleep', 'unsafe', 'begin', 'reserve', 'cursor', 'batch']
   for (let i = 0; i < config.ops; i++)
     clock.timers.setTimeout(() => settled.push(operation(random.pick(kinds))), random.int(0, 3000))
 
@@ -191,6 +191,26 @@ async function simulate(seed) {
       random.chance(0.3) && clock.timers.setTimeout(() => Promise.resolve(q.cancel()).catch(() => {}), random.int(0, 300))
       return q.then(expect(kind, id, scope, 1))
     }
+    if (kind === 'batch') {
+      const parts = [...Array(random.int(1, 4))].map(() => random.pick(['query', 'query', 'rows', 'fail', 'syntax']))
+          , ids = parts.map(() => next++)
+          , bad = parts.findIndex(x => x === 'fail' || x === 'syntax')
+          , queries = parts.map((x, i) =>
+            x === 'rows' ? sql`select ${ ids[i] }::int as id, ${ scope }::int as scope from rows(${ k }::int)`
+            : x === 'fail' ? sql`select ${ ids[i] }::int as id, ${ scope }::int as scope from rows(${ k }::int) fail(${ 0 }::int)`
+            : x === 'syntax' ? sql`selec ${ ids[i] }::int as id, ${ scope }::int as scope`
+            : sql`select ${ ids[i] }::int as id, ${ scope }::int as scope`
+          )
+      return sql.batch(queries).then(
+        results => bad === -1
+          ? results.forEach((x, i) => expect('batch', ids[i], scope, parts[i] === 'rows' ? k : 1)(x))
+          : violations.push('batch ' + id + ' should have failed at ' + bad),
+        e => {
+          if (bad === -1 || e.index !== bad || e.code !== (parts[bad] === 'fail' ? '22012' : '42601'))
+            throw e
+        }
+      )
+    }
     if (kind === 'unsafe')
       return sql.unsafe('select ' + id + ' as id, ' + scope + ' as scope').then(expect(kind, id, scope, 1))
 
@@ -207,7 +227,7 @@ async function simulate(seed) {
   }
 
   function scoped(sql, scope) {
-    const kinds = [...Array(random.int(1, 4))].map(() => random.pick(['query', 'rows', 'fail', 'syntax', 'sleep', 'unsafe', 'cursor']))
+    const kinds = [...Array(random.int(1, 4))].map(() => random.pick(['query', 'rows', 'fail', 'syntax', 'sleep', 'unsafe', 'cursor', 'batch']))
     return random.chance(0.5)
       ? Promise.all(kinds.map(k => query(sql, k, scope)))
       : kinds.reduce((p, k) => p.then(() => query(sql, k, scope)), Promise.resolve())

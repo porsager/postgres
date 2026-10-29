@@ -499,6 +499,10 @@ const backendMessage = (type, body) => {
 
 const errorResponse = (severity, code) => backendMessage('E', Buffer.from('S' + severity + '\0V' + severity + '\0C' + code + '\0M' + code + '\0\0'))
 
+const userTypeColumn = backendMessage('T', Buffer.concat([
+  Buffer.from([0, 1]), Buffer.from('x\0'), Buffer.from([0, 0, 0, 0, 0, 0, 0, 0, 0x40, 0x74, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0])
+]))
+
 const authenticated = Buffer.concat([
   backendMessage('R', Buffer.alloc(4)),
   backendMessage('Z', Buffer.from('I'))
@@ -646,7 +650,9 @@ t('Failed array type fetch on a live connection is not an unhandled rejection', 
       for (let i = 0; i < x.length; i += 1 + x.readInt32BE(i + 1)) {
         const body = x.subarray(i + 5, i + 1 + x.readInt32BE(i + 1))
         x[i] === 88 && socket.end()
-        x[i] === 81 && body.includes('pg_type') && (fetched++, out.push(errorResponse('ERROR', '57014')))
+        x[i] === 81 && (body.includes('pg_type')
+          ? (fetched++, out.push(errorResponse('ERROR', '57014')))
+          : out.push(userTypeColumn, backendMessage('D', Buffer.from([0, 1, 0, 0, 0, 1, 120])), backendMessage('C', Buffer.from('SELECT 1\0'))))
         x[i] === 81 && out.push(backendMessage('Z', Buffer.from('I')))
       }
       out.length && socket.write(Buffer.concat(out))
@@ -655,12 +661,12 @@ t('Failed array type fetch on a live connection is not an unhandled rejection', 
 
   await new Promise(r => server.listen(0, 'localhost', r))
   const sql = postgres({ ...options, host: 'localhost', port: server.address().port })
-  await sql.unsafe('select 1').catch(() => null)
+  const [{ x }] = await sql.unsafe('select x')
   await sql.end()
   server.close()
   process.off('unhandledRejection', onunhandled)
 
-  return ['1 0', fetched + ' ' + unhandled]
+  return ['1 0 x', fetched + ' ' + unhandled + ' ' + x]
 })
 
 t('end() completes after the backend is terminated mid-query', { timeout: 5 }, async() => {
