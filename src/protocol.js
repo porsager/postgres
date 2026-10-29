@@ -205,8 +205,8 @@ export function bind(w, portal, name, values = [], formats = [], resultFormats =
   return w.end()
 }
 
-export function run(w, portal, name, values, rows, flushing) {
-  bind(w, portal, name, values)
+export function run(w, portal, name, values, rows, flushing, formats) {
+  bind(w, portal, name, values, undefined, formats || undefined)
   execute(w, portal, rows)
   return flushing ? flush(w) : sync(w)
 }

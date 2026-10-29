@@ -29,6 +29,61 @@ export const types = {
 
 const dates = { 1082: parseDate, 1114: parseTimestamp, 1184: parseTimestamptz }
 
+const elementsOf = { 1000: 16, 1005: 21, 1007: 23, 1016: 20 }
+
+const readers = {
+  16: binaryArray((x, i) => x[i] === 1),
+  21: binaryArray((x, i) => (x[i] << 24 | x[i + 1] << 16) >> 16),
+  23: binaryArray((x, i) => x[i] << 24 | x[i + 1] << 16 | x[i + 2] << 8 | x[i + 3]),
+  20: binaryArray((x, i) => x.readBigInt64BE(i).toString())
+}
+
+function bytes(x, i, end) {
+  return Buffer.from(x.subarray(i, end))
+}
+
+function binaryArray(read) {
+  return function(x, i) {
+    const dims = int32(x, i)
+    if (dims === 0)
+      return []
+
+    const sizes = new Array(dims)
+    for (let d = 0; d < dims; d++)
+      sizes[d] = int32(x, i + 12 + d * 8)
+
+    let at = i + 12 + dims * 8
+    return level(0)
+
+    function level(d) {
+      const n = sizes[d]
+          , xs = new Array(n)
+
+      if (d < dims - 1) {
+        for (let k = 0; k < n; k++)
+          xs[k] = level(d + 1)
+        return xs
+      }
+
+      for (let k = 0; k < n; k++) {
+        const length = int32(x, at)
+        at += 4
+        if (length === -1) {
+          xs[k] = null
+        } else {
+          xs[k] = read(x, at)
+          at += length
+        }
+      }
+      return xs
+    }
+  }
+}
+
+function int32(x, i) {
+  return x[i] << 24 | x[i + 1] << 16 | x[i + 2] << 8 | x[i + 3]
+}
+
 function integer(x, i, end) {
   const negative = x[i] === 45
   let n = 0
@@ -63,12 +118,27 @@ export function Types(options = {}) {
   const custom = Object.values(options.types || {})
       , named = custom.filter(x => [x.to].concat(x.from || []).some(y => typeof y === 'string'))
       , oids = {}
+      , own = new Set()
 
   register(custom.filter(x => !named.includes(x)))
+  custom.forEach(x => [x.to].concat(x.from || []).forEach(oid => own.add(oid)))
 
   const bases = {}
 
-  return { parser, decoder, known, serializer, load, infer, resolve, named: named.length > 0, plain: !custom.some(x => x.serialize), parsers, serializers }
+  return { parser, decoder, known, binary, serializer, load, infer, resolve, named: named.length > 0, plain: !custom.some(x => x.serialize), parsers, serializers }
+
+  function binary(oid) {
+    if (own.has(oid))
+      return null
+
+    if (oid === 17)
+      return parsers[17] === types.bytea.parse ? bytes : null
+
+    const element = elementsOf[oid]
+    return element !== undefined && !own.has(element) && (element !== 20 || !(20 in parsers))
+      ? readers[element]
+      : null
+  }
 
   function known(oid) {
     return oid in serializers || oid in elements
@@ -151,6 +221,7 @@ export function Types(options = {}) {
         : 'The type ' + missing[0] + ' does not exist')
     }
     register(named.map(x => ({ ...x, to: resolve(x.to), from: [].concat(x.from || []).map(resolve) })))
+    named.forEach(x => [x.to].concat(x.from || []).forEach(y => own.add(resolve(y))))
   }
 
   function fetched(run) {

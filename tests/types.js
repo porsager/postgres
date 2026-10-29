@@ -543,3 +543,31 @@ t('A value typed as a domain on a new pool is written for the domain base type',
   const [{ x }] = await fresh`select ${ fresh.typed('text', oid) } as x`
   return ['"text"', JSON.stringify(x), await fresh.end(), await sql`drop domain test_doc`]
 })
+
+const binaries = sql => sql`select ${ 1 }::int as k, '\\x00ff10'::bytea as b, array[1, -2, null, 2147483647, -2147483648]::int4[] as i4,
+  array[[1, 2], [3, -32768]]::int2[] as i2, array['9223372036854775807', null]::int8[] as i8, array[true, false, null]::bool[] as bo,
+  '{}'::int[] as e, '[0:1]={5,6}'::int[] as lb, null::int[] as n`
+
+t('bytea and integer and boolean arrays read the same before and after the statement is prepared', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const results = [await binaries(sql), await binaries(sql), await binaries(sql)].map(x => JSON.stringify(x))
+  return [results[0] + results[0], results[1] + results[2], await sql.end()]
+})
+
+t('A custom parser for an integer array still gets the text after the statement is prepared', async() => {
+  const sql = postgres({ ...options, max: 1, types: { ints: { to: 1007, from: [1007], serialize: x => x, parse: x => 'text ' + x } } })
+  const query = () => sql`select array[1, 2]::int4[] as x, ${ 1 }::int as k`.then(([x]) => x.x)
+  return ['text {1,2} text {1,2}', await query() + ' ' + await query(), await sql.end()]
+})
+
+t('A custom parser for the elements of an integer array still gets the text after the statement is prepared', async() => {
+  const sql = postgres({ ...options, max: 1, types: { int: { to: 23, from: [23], serialize: x => '' + x, parse: x => 'n' + x } } })
+  const query = () => sql`select array[1, 2]::int4[] as x, ${ 1 }::int8 as k`.then(([x]) => x.x.join())
+  return ['n1,n2 n1,n2', await query() + ' ' + await query(), await sql.end()]
+})
+
+t('raw() gets the text of bytea and arrays after the statement is prepared', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const query = () => sql`select '\\x01'::bytea as b, array[1]::int[] as a, ${ 1 }::int as k`.raw().then(([x]) => x.map(String).join())
+  return ['\\x01,{1},1 \\x01,{1},1', await query() + ' ' + await query(), await sql.end()]
+})

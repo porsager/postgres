@@ -318,8 +318,10 @@ export function Connection(ready, options, events) {
     }
 
     if (current && current !== x.previous && usable(current, statement)) {
+      const b = query.isRaw === true ? null : binaries(current)
       x.entry = current
-      x.columns = current.columns
+      x.columns = b ? b.columns : current.columns
+      x.formats = b ? b.formats : null
       x.values = serialize(current.oids, built, current)
       return run(x, name)
     }
@@ -348,6 +350,24 @@ export function Connection(ready, options, events) {
     x.learn = true
     x.values = typed ? serialize(built.oids, built, x.fresh || {}) : untyped(built)
     run(x, name)
+  }
+
+  function binaries(entry) {
+    if (entry.binaryOf === entry.columns)
+      return entry.binary
+
+    const columns = entry.columns
+        , formats = new Array(columns.length)
+
+    let binary = null
+    for (let i = 0; i < columns.length; i++) {
+      const decode = events.binary(columns[i].type)
+      formats[i] = decode ? 1 : 0
+      decode && ((binary || (binary = columns.slice()))[i] = { ...columns[i], decode })
+    }
+
+    entry.binaryOf = columns
+    return entry.binary = binary && { columns: binary, formats }
   }
 
   function loose(x, built) {
@@ -380,7 +400,7 @@ export function Connection(ready, options, events) {
   function run(x, name) {
     const mark = out.length
     try {
-      p.run(out, x.portal, name, x.values, x.rows, x.flushing)
+      p.run(out, x.portal, name, x.values, x.rows, x.flushing, x.formats)
     } catch (error) {
       out.truncate(mark)
       throw error
@@ -1227,6 +1247,7 @@ function Exchange(kind, query, lease, write) {
     loose: false,
     gate: false,
     later: false,
+    formats: null,
     verify: false,
     synced: false,
     bound: false,
@@ -1254,7 +1275,7 @@ function Exchange(kind, query, lease, write) {
 }
 
 function Entry(name, owner, oids) {
-  return { name, owner, oids, columns: null, serializers: null, state: 'parsing', version: -1 }
+  return { name, owner, oids, columns: null, serializers: null, binary: null, binaryOf: null, state: 'parsing', version: -1 }
 }
 
 function Rows(columns) {

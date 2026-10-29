@@ -16,6 +16,7 @@ export function Pool(options, types) {
       , events = {
         parser: types.parser,
         decoder: types.decoder,
+        binary: types.binary,
         serializer: types.serializer,
         plain: types.plain,
         onready,
