@@ -860,6 +860,38 @@ sql.begin('read write', async sql => {
 })
 ```
 
+## Batches
+
+### `await sql.batch([queries]) -> Result[]`
+
+`sql.batch` sends several queries in one round trip and ends them with a single Sync, so the server answers them all at once. It resolves with their results in order.
+
+```js
+const [, [{ count }]] = await sql.batch([
+  sql`update users set name = ${ name } where id = ${ id }`,
+  sql`select count(*)::int from users`
+])
+```
+
+Outside a transaction the queries are one implicit transaction, as PostgreSQL makes everything before a Sync: they commit together, and if one fails, none of them is committed and the ones after it are not run. The batch rejects with the error of the query that failed, with its position in `error.index`; the other queries in it reject with a copy marked `skipped`. A query that can not be built or written fails the batch the same way, and nothing of it is committed.
+
+```js
+try {
+  await sql.batch([
+    sql`insert into accounts ${ sql(account) }`,
+    sql`insert into audit ${ sql(entry) }`
+  ])
+} catch (error) {
+  error.index // -> 1 if the audit insert failed, and the account insert was rolled back
+}
+```
+
+Inside `sql.begin` a batch is part of the transaction, and a failure aborts the transaction as any failing query does. On a reserved connection it runs on that connection.
+
+The queries are sent without waiting for each other, so none of them can use another's result, and queries from elsewhere that share the connection keep their own Sync, outside the batch. Cursors, streams, `forEach` and `describe` can not be part of a batch.
+
+`Promise.all` pipelines queries as well, but gives each its own Sync, so each commits, or fails, on its own; with a batch the server finishes one transaction instead of one per query.
+
 ## Data Transformation
 
 Postgres.js allows for transformation of the data passed to or returned from a query by using the `transform` option.
