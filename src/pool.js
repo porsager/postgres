@@ -301,7 +301,7 @@ export function Pool(options, types) {
       return
 
     if (failingSince !== null) {
-      if (opening || !waiting.length || retryTimer)
+      if (opening || !waiting.length || retryTimer || [...connections].some(x => x.loading))
         return
       const wait = nextAttempt - now()
       return wait > 0
@@ -352,9 +352,6 @@ export function Pool(options, types) {
 
   function opened(ready) {
     opening--
-    retries = 0
-    failingSince = null
-    failure = null
 
     if (signal.aborted || (ending && waiting.length === 0)) {
       ready.socket.destroy()
@@ -368,7 +365,14 @@ export function Pool(options, types) {
     lifetime(c)
     listened(channels.pool) && event('open', c)
     typesLoaded || typesLoading ? (c.loading = !typesLoaded) : loadTypes(c)
+    c.loading || recovered()
     drain()
+  }
+
+  function recovered() {
+    retries = 0
+    failingSince = null
+    failure = null
   }
 
   function retype() {
@@ -399,6 +403,7 @@ export function Pool(options, types) {
     ).then(() => {
       typesLoading = false
       connections.forEach(x => x.loading = !typesLoaded && !typesError)
+      ;(typesLoaded || typesError) && recovered()
       typesError
         ? waiting.take().forEach(job => reject(job, copy(typesError)))
         : typesLoaded || [...connections].some(x => !x.closed && (loadTypes(x), true))
@@ -411,6 +416,11 @@ export function Pool(options, types) {
     if (signal.aborted)
       return finishing()
 
+    attempted(error)
+    ending ? finishing() : grow()
+  }
+
+  function attempted(error) {
     failingSince === null && (failingSince = now())
     retries++
     nextAttempt = now() + 1000 * (typeof options.backoff === 'function' ? options.backoff(retries) : options.backoff)
@@ -420,7 +430,6 @@ export function Pool(options, types) {
 
     failure = !transient || expired ? { error } : null
     stuck() && opening === 0 && (failure || ending) && waiting.take().forEach((job, i) => reject(job, i ? copy(error) : error))
-    ending ? finishing() : grow()
   }
 
   function reject(job, error) {
@@ -507,6 +516,7 @@ export function Pool(options, types) {
 
   function onclose(c, error) {
     connections.delete(c)
+    c.loading && !signal.aborted && attempted(error)
     ending || replacing.push((c.index + 1) % (options.path ? 1 : options.host.length))
     replacing.length > options.max && replacing.shift()
     c.retired && c.retired.forEach(r => r())
