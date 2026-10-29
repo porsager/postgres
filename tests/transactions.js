@@ -1,3 +1,4 @@
+import net from 'net'
 import { t } from './test.js'
 import { postgres, sql, options, delay, idle_timeout } from './setup.js'
 
@@ -894,4 +895,45 @@ t('A savepoint or nested begin rejects when the connection is lost while its cal
     await sql.end()
   }
   return ['57P01 57P01,57P01 57P01', outcomes.join()]
+})
+
+async function writes(fn) {
+  let count = 0
+  const server = net.createServer(client => {
+    const upstream = net.connect(options.port || 5432, options.host || 'localhost')
+    client.on('data', x => (count++, upstream.write(x)))
+    upstream.on('data', x => client.write(x))
+    client.on('close', () => upstream.destroy())
+    upstream.on('close', () => client.destroy())
+    client.on('error', () => upstream.destroy())
+    upstream.on('error', () => client.destroy())
+  })
+  await new Promise(r => server.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: server.address().port, max: 1 })
+  await sql`select ${ 1 }::int as x`
+  try {
+    count = 0
+    const result = await fn(sql)
+    return count + ' ' + result
+  } finally {
+    await sql.end()
+    server.close()
+  }
+}
+
+t('begin sends BEGIN together with the first statement', async() => [
+  '2 1',
+  await writes(sql => sql.begin(sql => sql`select ${ 1 }::int as x`).then(([x]) => x.x))
+])
+
+t('begin with a transaction mode waits for BEGIN before the first statement', async() => [
+  '3 1',
+  await writes(sql => sql.begin('read write', sql => sql`select ${ 1 }::int as x`).then(([x]) => x.x))
+])
+
+t('begin with a mode the server refuses runs none of the statements', async() => {
+  await sql`create table test (x int)`
+  const error = await sql.begin('isolation level nonsense', sql => sql`insert into test values (1)`).catch(e => e.code)
+  const [{ n }] = await sql`select count(*)::int as n from test`
+  return ['42601 0', error + ' ' + n, await sql`drop table test`]
 })

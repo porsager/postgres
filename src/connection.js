@@ -14,6 +14,7 @@ const text = p.text
     , limit = 1000
     , refused = 'postgres.js: query could not be built'
     , skip = Symbol('skip')
+    , held = Symbol('held')
     , unknown = 100
     , states = new WeakMap()
     , after = 16
@@ -108,6 +109,7 @@ export function Connection(ready, options, events) {
 
   function holds(x) {
     return x.describing
+      || (x.gate && x.params === null && !x.error)
       || (!!x.error && !x.done)
       || (x.flushing && !x.synced)
       || (x.streaming && x.open)
@@ -162,6 +164,13 @@ export function Connection(ready, options, events) {
       x.own = error
       result = skip
     }
+    if (result === held) {
+      out.truncate(mark)
+      x.loose = false
+      blocker = sent.find(y => y.gate && holds(y)) || null
+      return pending.unshift(x)
+    }
+
     if (result === skip) {
       out.truncate(mark)
       x.fresh = null
@@ -300,8 +309,13 @@ export function Connection(ready, options, events) {
 
     x.streaming = x.open = !!query.streaming
 
-    if (current && current.state === 'parsing' && current.oids === null)
-      throw Errors.generic('STATEMENT_PENDING', 'A statement was used before its description arrived')
+    if (current && current.state === 'parsing' && current.oids === null && !current.owner.error) {
+      if (!current.owner.loose)
+        throw Errors.generic('STATEMENT_PENDING', 'A statement was used before its description arrived')
+
+      current.owner.gate = true
+      return held
+    }
 
     if (current && current !== x.previous && usable(current, statement)) {
       x.entry = current
@@ -325,15 +339,37 @@ export function Connection(ready, options, events) {
     parse(x, name, statement.text, built.oids)
     p.describe(out, 'S', name)
 
-    if (!typed) {
+    if (!typed && !loose(x, built)) {
       p.flush(out)
       x.describing = true
       return
     }
 
     x.learn = true
-    x.values = serialize(built.oids, built, x.fresh || {})
+    x.values = typed ? serialize(built.oids, built, x.fresh || {}) : untyped(built)
     run(x, name)
+  }
+
+  function loose(x, built) {
+    if (!events.plain || x.query.cursorFn || x.streaming)
+      return false
+
+    const { oids, values } = built
+    for (let i = 0; i < oids.length; i++) {
+      if (!oids[i] && values[i] !== null && !(typeof values[i] === 'number' && isFinite(values[i])))
+        return false
+    }
+    return x.loose = true
+  }
+
+  function untyped(built) {
+    const { oids, values } = built
+        , out = new Array(values.length)
+
+    for (let i = 0; i < values.length; i++)
+      out[i] = values[i] === null ? null : oids[i] ? events.serializer(oids[i])(values[i]) : '' + values[i]
+
+    return out
   }
 
   function parse(x, name, text, oids) {
@@ -350,7 +386,12 @@ export function Connection(ready, options, events) {
       throw error
     }
     x.flushing || (x.synced = true)
-    debug(x.statement.text, x.values, x.entry ? x.entry.oids : x.params || x.query.wire.built.oids)
+    const oids = x.entry ? x.entry.oids : x.params || (x.loose ? null : x.query.wire.built.oids)
+    oids ? debug(x.statement.text, x.values, oids) : (x.later = true)
+  }
+
+  function logged(item, oids) {
+    item.later && oids && (item.later = false, debug(item.statement.text, item.values, oids))
   }
 
   function usable(entry, statement) {
@@ -550,7 +591,8 @@ export function Connection(ready, options, events) {
     fence = null
     notables = 0
     const head = sent[0]
-        , fatal = connection.fatal || head && head.error && head.error.severity === 'FATAL' && head.error
+        , failed = head && head.error && head.error.severity === 'FATAL' ? head.error : null
+        , fatal = connection.fatal || failed
     connection.uncertain = !!(fatal && head && head.ends)
     closed = Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
     closed.cause = fatal || error || undefined
@@ -558,7 +600,7 @@ export function Connection(ready, options, events) {
     sent.splice(0).forEach(x => {
       x.stream && x.stream.destroy(closed)
       x.own ? settle(x)
-        : x === head && x.error && x.error.severity === 'FATAL' ? settleError(x, x.error)
+        : failed ? settleError(x, x === head ? failed : copy(failed))
         : settleError(x, closed)
     })
     pending.splice(0).forEach(x => x.own ? settle(x) : settleError(x, closed))
@@ -663,7 +705,10 @@ export function Connection(ready, options, events) {
   }
 
   function ParameterDescription(x, start) {
-    sent[0].params = p.parameterDescription(x, start)
+    const item = sent[0]
+    item.params = p.parameterDescription(x, start)
+    item.loose && item.entry && item.entry.owner === item && item.entry.oids === null && (item.entry.oids = item.params)
+    logged(item, item.params)
   }
 
   function RowDescription(x, start) {
@@ -1132,6 +1177,13 @@ export function Connection(ready, options, events) {
   }
 }
 
+function copy(error) {
+  const x = Object.create(Object.getPrototypeOf(error), Object.getOwnPropertyDescriptors(error))
+  Object.defineProperty(x, 'stack', { value: error.stack, writable: true, configurable: true })
+  ;['query', 'parameters', 'args', 'types'].forEach(k => delete x[k])
+  return x
+}
+
 function key(name) {
   const x = JSON.stringify(String(name))
   return name === '__proto__' ? '[' + x + ']' : x
@@ -1172,6 +1224,9 @@ function Exchange(kind, query, lease, write) {
     alone: !!(query && query.alone),
     describing: false,
     learn: false,
+    loose: false,
+    gate: false,
+    later: false,
     verify: false,
     synced: false,
     bound: false,

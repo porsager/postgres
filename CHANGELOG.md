@@ -18,6 +18,10 @@
 ### Performance
 
 - **An `ssl` object with a `ca` builds its TLS context once** (#1280). The connections made with it share one context instead of each parsing the whole `ca` list again, so with a provider's CA bundle a new connection takes about half the time and CPU, and a burst of them no longer blocks the event loop. Replacing one of the object's values, as with a renewed `cert`, builds a new context for the connections after it.
+- A new statement whose untyped values are all numbers or `null` is prepared, described and run in one round trip, as one whose parameter types are all known is, since those values are written the same for any type the server picks; one with other values only the server can type is still described first, once per connection.
+- A new connection sends its query for array types and domains together with its first queries instead of before them, one round trip less per connection. Leases and values typed as a type the pool hasn't read yet still wait for it.
+- `sql.begin` without a transaction mode sends `BEGIN` together with the first statement; with a mode, which the server can refuse, it still waits for `BEGIN` first.
+- A query failed by a `FATAL` error gives that error to the queries pipelined behind it as well, instead of `CONNECTION_CLOSED`.
 
 ## v4.0.0
 

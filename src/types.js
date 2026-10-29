@@ -68,7 +68,11 @@ export function Types(options = {}) {
 
   const bases = {}
 
-  return { parser, decoder, serializer, load, infer, resolve, named: named.length > 0, parsers, serializers }
+  return { parser, decoder, known, serializer, load, infer, resolve, named: named.length > 0, plain: !custom.some(x => x.serialize), parsers, serializers }
+
+  function known(oid) {
+    return oid in serializers || oid in elements
+  }
 
   function resolve(type) {
     return typeof type === 'string' ? oids[type] || 0 : type

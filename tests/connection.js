@@ -636,18 +636,26 @@ t('Failed array type fetch on a live connection is not an unhandled rejection', 
   process.on('unhandledRejection', onunhandled)
 
   const server = net.createServer(socket => {
+    let started = false
     socket.on('error', () => socket.destroy())
-    socket.on('data', x => x.includes('pg_type')
-      ? (fetched++, socket.write(Buffer.concat([errorResponse('ERROR', '57014'), backendMessage('Z', Buffer.from('I'))])))
-      : x[0] === 88
-        ? socket.end()
-        : socket.write(authenticated)
-    )
+    socket.on('data', x => {
+      if (!started)
+        return (started = true, socket.write(authenticated))
+
+      const out = []
+      for (let i = 0; i < x.length; i += 1 + x.readInt32BE(i + 1)) {
+        const body = x.subarray(i + 5, i + 1 + x.readInt32BE(i + 1))
+        x[i] === 88 && socket.end()
+        x[i] === 81 && body.includes('pg_type') && (fetched++, out.push(errorResponse('ERROR', '57014')))
+        x[i] === 81 && out.push(backendMessage('Z', Buffer.from('I')))
+      }
+      out.length && socket.write(Buffer.concat(out))
+    })
   })
 
   await new Promise(r => server.listen(0, 'localhost', r))
   const sql = postgres({ ...options, host: 'localhost', port: server.address().port })
-  await sql`select 1`.catch(() => null)
+  await sql.unsafe('select 1').catch(() => null)
   await sql.end()
   server.close()
   process.off('unhandledRejection', onunhandled)

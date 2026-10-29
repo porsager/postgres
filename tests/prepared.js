@@ -1,3 +1,4 @@
+import net from 'net'
 import { t } from './test.js'
 import { postgres, sql, options, delay } from './setup.js'
 
@@ -561,4 +562,58 @@ t('Statements past the connection and pool limits are closed and prepared again 
   const [{ n }] = await sql`select count(*)::int as n from pg_prepared_statements`
       , [{ x }] = await run(0)
   return ['true 1', (n <= 1001) + ' ' + x, await sql.end()]
+})
+
+async function counted(fn) {
+  let writes = 0
+  const server = net.createServer(client => {
+    const upstream = net.connect(options.port || 5432, options.host || 'localhost')
+    client.on('data', x => (writes++, upstream.write(x)))
+    upstream.on('data', x => client.write(x))
+    client.on('close', () => upstream.destroy())
+    upstream.on('close', () => client.destroy())
+    client.on('error', () => upstream.destroy())
+    upstream.on('error', () => client.destroy())
+  })
+  await new Promise(r => server.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: server.address().port, max: 1 })
+  await sql`select 1`
+  try {
+    writes = 0
+    const result = await fn(sql)
+    return [writes, result]
+  } finally {
+    await sql.end()
+    server.close()
+  }
+}
+
+t('A new query with only numbers and nulls as untyped values is sent in one write', async() => {
+  const [writes, rows] = await counted(sql => sql`select ${ 1 }::int + ${ 2.5 }::float8 as x, ${ null }::text as y`)
+  return ['1 3.5 null', writes + ' ' + rows[0].x + ' ' + rows[0].y]
+})
+
+t('A new query with a string value still learns the parameter types before writing values', async() => {
+  const [writes, rows] = await counted(sql => sql`select ${ '{"a":1}' }::jsonb as x, ${ 1 }::jsonb as y`)
+  return ['2 string 1', writes + ' ' + typeof rows[0].x + ' ' + rows[0].y]
+})
+
+t('Numbers sent before the parameter types are known are written as the types would write them', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const [{ a, b, c, d }] = await sql`select ${ 1 }::jsonb as a, ${ 0 }::bool as b, ${ -1.5e-7 }::numeric as c, ${ 7 }::int8 as d`
+  return ['1,false,-0.00000015,7', [a, b, c, d].join(), await sql.end()]
+})
+
+t('The same new query with a number and then a string on one connection gives each its own value', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const query = x => sql`select ${ x }::jsonb as x`
+  const [[a], [b], [c]] = await Promise.all([query(1), query('one'), query(2)])
+  return ['1 "one" 2', [a.x, JSON.stringify(b.x), c.x].join(' '), await sql.end()]
+})
+
+t('The same new query failing to parse with a number and then a string rejects both', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const query = x => sql`select ${ x }::jsonb + nope as x`.catch(e => e.code)
+  const codes = await Promise.all([query(1), query('one'), query(2)])
+  return ['42703,42703,42703,1', codes.concat((await sql`select 1 as x`)[0].x).join(), await sql.end()]
 })

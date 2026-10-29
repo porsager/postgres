@@ -17,6 +17,7 @@ export function Pool(options, types) {
         parser: types.parser,
         decoder: types.decoder,
         serializer: types.serializer,
+        plain: types.plain,
         onready,
         onclose,
         onnotify: options.onnotify,
@@ -90,7 +91,15 @@ export function Pool(options, types) {
     q.alone = free && alone(statement.live ? statement : statements.known(built.text))
     q.wire = { statement, built }
     options.scheduler && (q.cost = statement.cost)
-    place({ q, statement, exclusive: !!q.cursorFn || !!q.streaming || q.alone }, lease)
+    place({ q, statement, typed: !typesLoaded && unknown(built.oids), exclusive: !!q.cursorFn || !!q.streaming || q.alone }, lease)
+  }
+
+  function unknown(oids) {
+    for (let i = 0; i < oids.length; i++) {
+      if (oids[i] && !types.known(oids[i]))
+        return true
+    }
+    return false
   }
 
   function deadline(q) {
@@ -213,6 +222,10 @@ export function Pool(options, types) {
     return true
   }
 
+  function quiet(c) {
+    return c.inflight === 0 || (!!c.typing && !c.typing.settled && c.inflight === 1)
+  }
+
   function usable(c) {
     return !c.closed && !c.closing && !c.lease && !c.releasing && !c.retiring && !c.exclusive && !c.loading
   }
@@ -221,24 +234,29 @@ export function Pool(options, types) {
     const statement = job.statement
         , any = !statement || !statement.name
 
+    if (!typesLoaded && (job.lease || job.typed))
+      return null
+
     let best = null
+      , soon = false
 
     for (const c of connections) {
+      c.loading && !c.closed && (soon = true)
       const free = usable(c)
-      if (free && c.inflight === 0) {
+      if (free && quiet(c)) {
         if (any || c.prepared.has(statement.name))
           return c
-        best = best && best.inflight === 0 ? best : c
+        best = best && quiet(best) ? best : c
       } else if (free && !job.lease && !job.exclusive
         && c.inflight < options.max_pipeline && (!best || c.inflight < best.inflight)) {
         best = c
       }
     }
 
-    if (best && best.inflight === 0)
+    if (best && quiet(best))
       return best
 
-    if (connections.size + opening < options.max && !failingSince)
+    if (soon || (connections.size + opening < options.max && !failingSince))
       return null
 
     best && options.scheduler && job.q && needed(job) && (best = scheduled(job) || best)
@@ -373,8 +391,8 @@ export function Pool(options, types) {
     connections.add(c)
     lifetime(c)
     listened(channels.pool) && event('open', c)
-    typesLoaded || typesLoading ? (c.loading = !typesLoaded) : loadTypes(c)
-    c.loading || recovered()
+    typesLoaded || (types.named && typesLoading ? (c.loading = true) : loadTypes(c))
+    c.loading || c.typing || typesLoading || recovered()
     drain()
   }
 
@@ -400,22 +418,25 @@ export function Pool(options, types) {
   function loadTypes(c) {
     hold(c)
     typesLoading = true
-    c.loading = true
+    c.loading = types.named
+    c.typing = null
     types.load(text => new Promise((resolve, reject) => {
       const q = new Query([text], [], Object.assign(() => {}, { options }), { simple: true })
       q.executed = true
       q.then(resolve, reject)
+      types.named || (c.typing = q)
       c.simple(q, text)
     })).then(() => typesLoaded = true, error => error instanceof PostgresError
       ? typesLoaded = true
       : error && error.code === 'TYPE_NOT_FOUND' && (typesError = error, typesFailed = now())
     ).then(() => {
       typesLoading = false
+      c.typing = null
       connections.forEach(x => x.loading = !typesLoaded && !typesError)
       ;(typesLoaded || typesError) && recovered()
       typesError
         ? waiting.take().forEach(job => reject(job, copy(typesError)))
-        : typesLoaded || [...connections].some(x => !x.closed && (loadTypes(x), true))
+        : typesLoaded || [...connections].some(x => !x.closed && !x.typing && (loadTypes(x), true))
       drain()
     })
   }
@@ -525,7 +546,7 @@ export function Pool(options, types) {
 
   function onclose(c, error) {
     connections.delete(c)
-    c.loading && !signal.aborted && attempted(copy(error))
+    ;(c.loading || (c.typing && !c.typing.settled)) && !signal.aborted && attempted(copy(error))
     ending || replacing.push((c.index + 1) % (options.path ? 1 : options.host.length))
     replacing.length > options.max && replacing.shift()
     c.retired && c.retired.forEach(r => r())

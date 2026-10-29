@@ -535,3 +535,11 @@ t('Custom types by name need fetch_types', async() => {
   }
   return ['TYPE_NOT_FOUND', code]
 })
+
+t('A value typed as a domain on a new pool is written for the domain base type', async() => {
+  await sql`create domain test_doc as jsonb`
+  const [{ oid }] = await sql`select 'test_doc'::regtype::oid::int as oid`
+  const fresh = postgres({ ...options, max: 2 })
+  const [{ x }] = await fresh`select ${ fresh.typed('text', oid) } as x`
+  return ['"text"', JSON.stringify(x), await fresh.end(), await sql`drop domain test_doc`]
+})

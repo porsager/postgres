@@ -195,6 +195,7 @@ function Postgres(a, b) {
 
     let savepoints = 0
       , prepare = null
+      , opening = null
 
     context && Object.assign(context, {
       connection: lease.connection.id,
@@ -203,7 +204,8 @@ function Postgres(a, b) {
     })
 
     try {
-      await control(lease, 'begin ' + mode.replace(/[^a-z ]/ig, ''))
+      const began = control(lease, 'begin ' + mode.replace(/[^a-z ]/ig, ''))
+      normal(mode) ? await began : (opening = began).catch(() => {})
       const done = scope(fn)
       done.catch(() => {})
       return await Promise.race([done, lease.closed])
@@ -248,6 +250,9 @@ function Postgres(a, b) {
         if (lease.connection.closed)
           throw lease.error || lease.connection.closed
       } catch (error) {
+        const refused = !name && opening && await opening.then(() => null, e => e)
+        if (refused)
+          throw refused
         context && !name && (context.outcome = 'rollback')
         stopped()
           ? rolled && await rolled.catch(() => {})
@@ -266,6 +271,7 @@ function Postgres(a, b) {
       }
 
       if (!name) {
+        opening && await opening
         const done = await control(lease, prepare ? 'prepare transaction \'' + prepare.replace(/'/g, '\'\'') + '\'' : 'commit')
         context && (context.outcome = prepare ? 'prepare' : done.command === 'COMMIT' ? 'commit' : 'rollback')
 
