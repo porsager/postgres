@@ -5,6 +5,8 @@ const noop = () => {}
     , agent = globalThis.navigator && globalThis.navigator.userAgent || ''
     , workers = agent.startsWith('Cloudflare-Workers')
     , onreadSafe = !agent || agent.startsWith('Node.js') || agent.startsWith('Bun') || agent.startsWith('Deno')
+    , node = !agent || agent.startsWith('Node.js')
+    , contexts = new WeakMap()
 
 export async function Socket(options, host, port, track = noop) {
   const raw = options.socket
@@ -17,7 +19,21 @@ export async function Socket(options, host, port, track = noop) {
 export function secureOptions(ssl) {
   return ssl === 'require' || ssl === 'allow' || ssl === 'prefer'
     ? workers ? {} : { rejectUnauthorized: false }
-    : typeof ssl === 'object' ? ssl : {}
+    : typeof ssl === 'object' ? context(ssl) : {}
+}
+
+function context(ssl) {
+  if (!node || ssl.secureContext)
+    return ssl
+
+  const values = { ...ssl }
+  let last = contexts.get(ssl)
+  last && same(values, last.values) || contexts.set(ssl, last = { values, secureContext: tls.createSecureContext(values) })
+  return { ...values, secureContext: last.secureContext }
+}
+
+function same(a, b) {
+  return [...Object.keys(a), ...Object.keys(b)].every(k => a[k] === b[k])
 }
 
 export const secured = options => !!options.ssl && options.ssl !== 'disable'
