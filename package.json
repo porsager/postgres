@@ -1,6 +1,6 @@
 {
   "name": "postgres",
-  "version": "4.0.0-dev",
+  "version": "4.0.0",
   "description": "Fastest full featured PostgreSQL client for Node.js, Bun and Cloudflare Workers",
   "type": "module",
   "main": "src/index.js",
