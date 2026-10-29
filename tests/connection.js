@@ -1,4 +1,5 @@
 import net from 'net'
+import tls from 'tls'
 import crypto from 'crypto'
 import { t } from './test.js'
 import { postgres, sql, options, login, login_md5, login_scram, delay, idle_timeout, exec } from './setup.js'
@@ -100,6 +101,25 @@ t('Reconnect using SSL', async() => {
   await delay(200)
 
   return [1, (await sql`select 1 as x`)[0].x]
+})
+
+t('An ssl object builds one TLS context for its connections, and a new one when a value in it changes', async() => {
+  const create = tls.createSecureContext
+      , ssl = { rejectUnauthorized: false }
+      , sql = postgres({ ...options, ssl, max: 4 })
+  let built = 0
+  tls.createSecureContext = (...xs) => (built++, create(...xs))
+  try {
+    const reserved = [await sql.reserve(), await sql.reserve(), await sql.reserve()]
+        , first = built
+    ssl.ca = tls.rootCertificates
+    reserved.push(await sql.reserve())
+    reserved.forEach(x => x.release())
+    return ['1 2', first + ' ' + built]
+  } finally {
+    tls.createSecureContext = create
+    await sql.end()
+  }
 })
 
 t('Login without password', async() => {

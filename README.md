@@ -1255,6 +1255,8 @@ const sql =
 
 For more information regarding `ssl` with `postgres`, check out the [Node.js documentation for tls](https://nodejs.org/api/tls.html#tlsconnectoptions-callback).
 
+On Node.js the options in an `ssl` object are made into one TLS context, which every connection made with that object shares, so a long `ca` list is parsed once rather than for each connection. Replacing one of its values, as with a renewed `cert`, makes a new context for the connections opened after that, and a `secureContext` given in the object is used as it is.
+
 The modes follow libpq's `sslmode`: `require`, `prefer` and `allow` encrypt without checking the certificate, and `verify-full` (or `sslrootcert=system` in the url) checks it against the system's certificate authorities. `prefer` and `allow` fall back to an unencrypted connection when the server has no TLS. Cloudflare Workers always check the certificate.
 
 #### Direct TLS
