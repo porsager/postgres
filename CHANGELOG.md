@@ -1,6 +1,6 @@
 # Changelog
 
-## v4.0.0 - unreleased
+## v4.0.0
 
 v4 rewrites everything below the public API: the pool, the connection, the protocol, startup and the socket layer. Queries, helpers, transactions, cursors, COPY, listen, subscribe, large objects and the options work as in 3.4.9, apart from the changes below.
 

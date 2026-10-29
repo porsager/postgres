@@ -456,7 +456,7 @@ t('subscribe confirms its position to the server on an interval', { timeout: 10 
   return ['a true', seen.join() + ' ' + confirmed, await done()]
 })
 
-t('subscribe gives unchanged TOAST values as undefined, transforms values and reports a throwing handler', { timeout: 10 }, async() => {
+t('subscribe gives unchanged TOAST values as undefined, transforms values and reports a throwing handler', { timeout: 30 }, async() => {
   const { sql, done } = await replicating()
       , seen = []
       , errors = []

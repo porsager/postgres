@@ -1,11 +1,10 @@
 <img align="left" width="440" height="180" alt="Fastest full PostgreSQL nodejs client" src="https://raw.githubusercontent.com/porsager/postgres/master/postgresjs.svg?sanitize=true">
 
-- [🚀 Fastest full-featured PostgreSQL client](https://github.com/porsager/postgres-benchmarks#results) for Node.js, Bun and Cloudflare Workers
+- 🚀 Fastest full-featured PostgreSQL client
 - 🏷 ES6 Tagged Template Strings at the core
 - 🏄‍♀️ Simple surface API
 - 🖊️ Dynamic query support
-- 💬 Chat and help on [Gitter](https://gitter.im/porsager/postgres)
-- 🐦 Follow on [Twitter](https://twitter.com/rporsager)
+- 🐦 Follow on [X](https://x.com/rporsager)
 
 <br>
 
@@ -416,10 +415,10 @@ const order = {
   created_at: 'desc'
 }
 await sql`
-  select 
-    * 
-  from ticket 
-  where account = ${ id }  
+  select
+    *
+  from ticket
+  where account = ${ id }
   order by ${
     Object.entries(order).flatMap(([column, order], i) =>
       [i ? sql`,` : sql``, sql`${ sql(column) } ${ order === 'desc' ? sql`desc` : sql`asc` }`]
