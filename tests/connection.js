@@ -1202,6 +1202,42 @@ t('A query that waits less than queue_timeout runs', { timeout: 10 }, async() =>
   return [1, (await query)[0].x, await sql.end()]
 })
 
+t('answer_timeout rejects the query of a connection whose server stops answering, and the next query runs', { timeout: 10 }, async() => {
+  const clients = []
+  const proxy = net.createServer(client => {
+    const server = net.connect(options.port || 5432, 'localhost')
+    clients.push(client)
+    client.on('data', x => client.silent || server.write(x))
+    server.on('data', x => client.silent || client.write(x))
+    client.on('error', () => server.destroy())
+    server.on('error', () => client.destroy())
+    client.on('close', () => server.destroy())
+    server.on('close', () => client.destroy())
+  })
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, max: 1, answer_timeout: 0.2 })
+  await sql`select 1`
+  clients.forEach(x => x.silent = true)
+  const start = Date.now()
+  const code = await sql`select 1`.then(() => 'ran', e => e.code)
+  const waited = Date.now() - start
+  const [{ x }] = await sql`select 1 as x`
+  await sql.end()
+  proxy.close()
+  return ['ANSWER_TIMEOUT true 1', code + ' ' + (waited >= 150 && waited < 1000) + ' ' + x]
+})
+
+t('answer_timeout times a silent query, but not a reserved connection or a cursor while its callback runs', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1, answer_timeout: 0.2 })
+  const silent = await sql`select pg_sleep(0.5)`.then(() => 'ran', e => e.code)
+  const reserved = await sql.reserve()
+  const held = await reserved`select pg_sleep(0.5)`.then(() => 'ran', e => e.code)
+  reserved.release()
+  let rows = 0
+  const cursor = await sql`select generate_series(1, 2) as x`.cursor(() => (rows++, delay(500))).then(() => rows, e => e.code)
+  return ['ANSWER_TIMEOUT ran 2', [silent, held, cursor].join(' '), await sql.end()]
+})
+
 t('An AbortSignal removes a waiting query and cancels a running one', { timeout: 10 }, async() => {
   const sql = postgres({ ...options, max: 1 })
   const reserved = await sql.reserve()

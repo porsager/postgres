@@ -645,6 +645,8 @@ await sql`select * from report()`.signal(AbortSignal.timeout(5000))
 
 A query waits for a connection when every connection is reserved, in a transaction or has `max_pipeline` queries in flight. `queue_timeout` (in seconds) rejects it with `QUEUE_TIMEOUT` if it waits longer, without ever sending it, and the same goes for `sql.begin` and `sql.reserve`. Once a query is sent, PostgreSQL's own `statement_timeout` is the limit.
 
+If the server stops answering while its connection stays up, as when it stalls or something in between keeps the connection and drops the traffic, the query waits forever: keep-alive probes are still answered, and the `statement_timeout` error never arrives. `answer_timeout` (in seconds) closes a connection that has waited that long for an answer without receiving anything, and rejects its queries with `ANSWER_TIMEOUT`. Every message received starts the wait again, so a query that keeps sending rows or notices runs as long as it takes, but one that runs longer than that without sending anything is cut off too; set it above `statement_timeout`. A reserved connection is not timed, nor is a connection while the server is waiting on the client: during a cursor's callback, a `copy ... from stdin` being written, or a stream whose reader has paused it.
+
 ### Execute
 
 #### ```await sql``.execute()```
@@ -1179,6 +1181,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   max_lifetime         : null,          // Max lifetime in seconds (more info below)
   idle_timeout         : 0,             // Idle connection timeout in seconds
   connect_timeout      : 30,            // Connect timeout in seconds
+  answer_timeout       : null,          // Seconds the server may send nothing while a query waits, null for no limit
   queue_timeout        : 0,             // Seconds a query may wait for a connection, 0 for no limit
   keep_alive           : 60,            // TCP keep-alive in seconds, 0 or null for none
   backoff              : fn,            // Seconds to wait before reconnecting, given the attempt
@@ -1830,6 +1833,11 @@ An insert or update helper was given an empty object or an empty list of columns
 > write CONNECT_TIMEOUT host:port
 
 This error is thrown if the startup phase of the connection (tcp, protocol negotiation, and auth) took more than the default 30 seconds or what was specified using `connect_timeout` or `PGCONNECT_TIMEOUT`.
+
+##### ANSWER_TIMEOUT
+> write ANSWER_TIMEOUT host:port
+
+The connection waited longer than `answer_timeout` for an answer without receiving anything from the server, so it was closed and its queries rejected. A query that was sent may still have run.
 
 ##### COPY_IN_PROGRESS
 > You cannot execute queries during copy

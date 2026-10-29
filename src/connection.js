@@ -47,6 +47,8 @@ export function Connection(ready, options, events) {
     , epoch = 0
     , headSince = 0
     , notables = 0
+    , answerTimer = null
+    , silent = null
 
   const connection = {
     id: ids++,
@@ -76,7 +78,7 @@ export function Connection(ready, options, events) {
     get notable() { return notables > 0 }
   }
 
-  socket.ondata = x => frames.push(x)
+  socket.ondata = x => (frames.push(x), owing())
   socket.ondrain = ondrain
   socket.onclose = onclose
   ready.rest && ready.rest.length && frames.push(ready.rest)
@@ -88,6 +90,22 @@ export function Connection(ready, options, events) {
     const x = drained
     drained = null
     x && x()
+  }
+
+  // Not timed: a reserved connection, which its holder may keep busy as long as it likes, and a server waiting on
+  // the client, for a cursor's callback, a COPY upload or a reader that has paused the stream.
+  function owing() {
+    answerTimer && (timers.clearTimeout(answerTimer), answerTimer = null)
+    const x = sent[0]
+    options.answer_timeout && x && !closed && !frames.paused && !x.awaiting && !(x.stream && x.stream.writable)
+      && !(connection.lease && connection.lease.kind === 'reserve')
+      && (answerTimer = timers.setTimeout(answerTimedOut, options.answer_timeout * 1000))
+  }
+
+  function answerTimedOut() {
+    answerTimer = null
+    silent = Errors.connection('ANSWER_TIMEOUT', options, ready.host, ready.port)
+    socket.destroy()
   }
 
   function schedule(now) {
@@ -103,6 +121,7 @@ export function Connection(ready, options, events) {
     if (closed)
       return (out.take(), true)
 
+    answerTimer || owing()
     return out.length ? socket.write(out.take()) : true
   }
 
@@ -519,7 +538,8 @@ export function Connection(ready, options, events) {
     blocker = null
     fence = null
     notables = 0
-    closed = Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
+    answerTimer && (timers.clearTimeout(answerTimer), answerTimer = null)
+    closed = silent || Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
     closed.cause = connection.fatal || error || undefined
     const head = sent[0]
     sent.splice(0).forEach(x => {
@@ -1056,7 +1076,7 @@ export function Connection(ready, options, events) {
         return
 
       frames.resume()
-      frames.paused || socket.resume()
+      frames.paused || (socket.resume(), owing())
     }
   }
 

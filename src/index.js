@@ -424,7 +424,7 @@ function parseOptions(a, b) {
   'timeout' in o && (console.log('The timeout option is deprecated, use idle_timeout instead'), o.idle_timeout = o.timeout)
   query.sslrootcert === 'system' && (query.ssl = 'verify-full')
 
-  const ints = ['idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive', 'min', 'queue_timeout']
+  const ints = ['idle_timeout', 'connect_timeout', 'answer_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive', 'min', 'queue_timeout']
   const defaults = {
     max             : globalThis.Cloudflare ? 3 : 10,
     min             : 0,
@@ -433,6 +433,7 @@ function parseOptions(a, b) {
     channel_binding : 'prefer',
     idle_timeout    : null,
     connect_timeout : 30,
+    answer_timeout  : null,
     queue_timeout   : 0,
     max_lifetime    : max_lifetime,
     max_pipeline    : 100,
