@@ -129,8 +129,10 @@ The open issues and pull requests were triaged into 33 correctness bugs, each wi
 
 - A statement whose parameter types are all known is prepared, described and run in one round trip; one with parameters only the server can type is described first, once per connection, as in v3.
 - `int2`, `int4`, `oid` and `bool` columns are decoded straight from the bytes when they use the built-in parsers; a custom parser still gets the text.
+- `timestamptz`, and `timestamp` and `date` read as UTC, are decoded straight from the bytes when they use the built-in parsers, with the text parser for anything else (BC, `infinity`, years before 1000); about 20% more rows per second for rows with timestamps.
 - `bytea` and arrays of `int2`, `int4`, `int8` and `bool` are fetched in binary once a prepared statement's columns are known on the connection, when they use the built-in parsers: the values are the same as from the text, about 4.5 times faster to read for `bytea` and 3 times for an `int4[]`. A custom parser for the type or its elements, and `raw()`, still get the text.
 - A query on its way to a free connection goes straight to it, without the waiting queue.
+- A connection that becomes ready while others are still opening no longer takes the queries meant for those; 50 connections opened at once each run one of 50 queries.
 - Queries hold no more per-query state than they need, so almost nothing outlives a scavenge.
 - One growing buffer per connection, encoded in place and written once at the end of the tick.
 - Plain and direct TLS connections read into one buffer per connection (`onread`) instead of a buffer per chunk, on Node, Bun and Deno.

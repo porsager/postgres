@@ -392,7 +392,7 @@ export function Pool(options, types) {
     connections.add(c)
     lifetime(c)
     listened(channels.pool) && event('open', c)
-    typesLoaded || (types.named && typesLoading ? (c.loading = true) : loadTypes(c))
+    typesLoaded || (typesLoading ? (c.loading = true) : loadTypes(c))
     c.loading || c.typing || typesLoading || recovered()
     drain()
   }
@@ -538,7 +538,7 @@ export function Pool(options, types) {
       return c.close()
 
     idle(c)
-    while (waiting.length > connections.size && usable(c) && c.inflight < options.max_pipeline && plain(waiting.peek()))
+    while (waiting.length > connections.size + opening && usable(c) && c.inflight < options.max_pipeline && plain(waiting.peek()))
       run(c, waiting.shift())
 
     waiting.length && !c.lease && c.inflight < options.max_pipeline && drain()

@@ -571,3 +571,18 @@ t('raw() gets the text of bytea and arrays after the statement is prepared', asy
   const query = () => sql`select '\\x01'::bytea as b, array[1]::int[] as a, ${ 1 }::int as k`.raw().then(([x]) => x.map(String).join())
   return ['\\x01,{1},1 \\x01,{1},1', await query() + ' ' + await query(), await sql.end()]
 })
+
+t('Timestamps read the same in time zones with odd offsets', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const at = '2026-03-29 01:59:59.999999+00'
+  const read = async zone => {
+    await sql`select set_config('timezone', ${ zone }, false)`
+    const [x] = await sql`
+      select ${ at }::timestamptz as a, '1890-01-01 12:00:00+00'::timestamptz as b,
+        '0044-03-15 12:00:00+00 BC'::timestamptz as c, 'infinity'::timestamptz as d
+    `
+    return [x.a.toISOString(), x.b.toISOString(), x.c.getTime(), x.d].join()
+  }
+  const results = [await read('UTC'), await read('Asia/Kolkata'), await read('America/St_Johns'), await read('Europe/Amsterdam')]
+  return [results[0].repeat(4), results.join(''), await sql.end()]
+})

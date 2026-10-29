@@ -96,6 +96,78 @@ function boolean(x, i) {
   return x[i] === 116
 }
 
+const latin1 = typeof Buffer.prototype.latin1Slice === 'function'
+  ? (x, start, end) => x.latin1Slice(start, end)
+  : (x, start, end) => x.toString('latin1', start, end)
+
+function digits(x, i, n) {
+  let v = 0
+  for (const end = i + n; i < end; i++) {
+    const d = x[i] - 48
+    if (d < 0 || d > 9)
+      return -1
+    v = v * 10 + d
+  }
+  return v
+}
+
+function clock(x, i, end, zoned) {
+  const year = digits(x, i, 4)
+  if (year < 1000 || x[i + 4] !== 45 || x[i + 7] !== 45)
+    return NaN
+
+  const month = digits(x, i + 5, 2)
+      , day = digits(x, i + 8, 2)
+
+  if (end - i === 10)
+    return zoned || month < 1 || day < 1 ? NaN : Date.UTC(year, month - 1, day)
+
+  if (x[i + 10] !== 32 || x[i + 13] !== 58 || x[i + 16] !== 58)
+    return NaN
+
+  const hour = digits(x, i + 11, 2)
+      , minute = digits(x, i + 14, 2)
+      , second = digits(x, i + 17, 2)
+
+  let at = i + 19
+    , ms = 0
+
+  if (x[at] === 46) {
+    let scale = 100
+    for (at++; at < end && x[at] >= 48 && x[at] <= 57; at++) {
+      ms += (x[at] - 48) * scale
+      scale = scale / 10 | 0
+    }
+  }
+
+  let offset = 0
+  if (zoned) {
+    const sign = x[at]
+    if ((sign !== 43 && sign !== 45) || (end - at !== 3 && (end - at !== 6 || x[at + 3] !== 58)))
+      return NaN
+    offset = digits(x, at + 1, 2) * 60 + (end - at === 6 ? digits(x, at + 4, 2) : 0)
+    if (offset < 0 || digits(x, at + 1, 2) < 0 || (end - at === 6 && digits(x, at + 4, 2) < 0))
+      return NaN
+    sign === 45 && (offset = -offset)
+    at = end
+  }
+
+  if (at !== end || month < 1 || day < 1 || hour < 0 || minute < 0 || second < 0)
+    return NaN
+
+  return Date.UTC(year, month - 1, day, hour, minute, second, ms) - offset * 60000
+}
+
+function timestamptz(x, i, end) {
+  const t = clock(x, i, end, true)
+  return Number.isNaN(t) ? parseTimestamptz(latin1(x, i, end)) : new Date(t)
+}
+
+function utcStamp(x, i, end) {
+  const t = clock(x, i, end, false)
+  return Number.isNaN(t) ? parseDate(latin1(x, i, end)) : new Date(t)
+}
+
 const shaped = (is, serialize) => x => is(x) ? serialize(x) : string(x)
 
 const shapedTypes = {
@@ -151,6 +223,8 @@ export function Types(options = {}) {
   function decoder(oid, parse) {
     return parse === number && (oid === 21 || oid === 23 || oid === 26) ? integer
       : parse === bool && oid === 16 ? boolean
+      : parse === parseTimestamptz && oid === 1184 ? timestamptz
+      : parse === parseDate && (oid === 1114 || oid === 1082) ? utcStamp
       : null
   }
 
