@@ -109,7 +109,7 @@ export function Connection(ready, options, events) {
 
   function holds(x) {
     return x.describing
-      || (x.gate && x.params === null && !x.error)
+      || (x.gate && x.learn && !x.error)
       || (!!x.error && !x.done)
       || (x.flushing && !x.synced)
       || (x.streaming && x.open)

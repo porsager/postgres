@@ -646,3 +646,9 @@ async function first(sql, refs) {
   const rows = await sql`select repeat('x', ${ 1e6 }) as x`
   refs.push(new WeakRef(rows))
 }
+
+t('The same new query with numbers fired many times at once on one connection is prepared once', async() => {
+  const batch = sql => Promise.all(Array.from({ length: 10 }, (_, i) => sql`select ${ i }::int as x`))
+  const [writes, rows] = await counted(async sql => (await batch(sql), batch(sql)))
+  return [(options.prepare === false ? 2 : 3) + ' 9', writes + ' ' + rows[9][0].x]
+})
