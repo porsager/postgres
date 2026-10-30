@@ -103,22 +103,25 @@ t('Reconnect using SSL', async() => {
   return [1, (await sql`select 1 as x`)[0].x]
 })
 
-t('An ssl object builds one TLS context for its connections, and a new one when a value in it changes', async() => {
+t('An ssl object without a ca builds a TLS context per connection, and with one a context its connections share until a value changes', async() => {
   const create = tls.createSecureContext
       , ssl = { rejectUnauthorized: false }
-      , sql = postgres({ ...options, ssl, max: 4 })
+      , sql = postgres({ ...options, ssl, max: 6 })
   let built = 0
   tls.createSecureContext = (...xs) => (built++, create(...xs))
   try {
     const reserved = [await sql.reserve(), await sql.reserve(), await sql.reserve()]
-        , first = built
+        , without = built
     ssl.ca = tls.rootCertificates
+    reserved.push(await sql.reserve(), await sql.reserve())
+    const shared = built
+    ssl.ca = [...tls.rootCertificates]
     reserved.push(await sql.reserve())
     reserved.forEach(x => x.release())
-    return ['1 2', first + ' ' + built]
+    return ['3 4 5', [without, shared, built].join(' ')]
   } finally {
     tls.createSecureContext = create
-    await sql.end()
+    await sql.end({ timeout: 0 })
   }
 })
 
