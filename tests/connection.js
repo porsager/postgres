@@ -1238,6 +1238,56 @@ t('answer_timeout times a silent query, but not a reserved connection or a curso
   return ['ANSWER_TIMEOUT ran 2', [silent, held, cursor].join(' '), await sql.end()]
 })
 
+t('answer_timeout times a query left running on a reservation once it is released', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1, answer_timeout: 0.2 })
+  const reserved = await sql.reserve()
+  const query = reserved`select pg_sleep(1)`.then(() => 'ran', e => e.code)
+  await delay(50)
+  reserved.release()
+  const code = await query
+  const [{ x }] = await sql`select 1 as x`
+  return ['ANSWER_TIMEOUT 1', code + ' ' + x, await sql.end()]
+})
+
+t('answer_timeout spares a copy from stdin until everything written before end() is sent, then times the answer', { timeout: 10 }, async() => {
+  const clients = []
+  let left = Infinity
+  const proxy = net.createServer(client => {
+    const server = net.connect(options.port || 5432, 'localhost')
+    clients.push(client)
+    client.on('data', x => (server.write(x) || client.pause(), (left -= x.length) > 0 || client.pause()))
+    server.on('drain', () => left > 0 && client.resume())
+    server.on('data', x => client.silent || client.write(x))
+    client.on('error', () => server.destroy())
+    server.on('error', () => client.destroy())
+    client.on('close', () => server.destroy())
+    server.on('close', () => client.destroy())
+  })
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, max: 1, answer_timeout: 0.2 })
+      , finished = x => new Promise(r => (x.on('finish', () => r(x.count)), x.on('error', e => r(e.code))))
+      , line = 'x'.repeat(1024 * 1024 - 1) + '\n'
+  await sql`create table test (x text)`
+  const writable = await sql`copy test from stdin`.writable()
+      , copied = finished(writable)
+  left = 2 * line.length
+  for (let i = 0; i < 32; i++)
+    writable.write(line)
+  writable.end()
+  await delay(500)
+  left = Infinity
+  clients.forEach(x => x.resume())
+  const count = await copied
+  const last = await sql`copy test from stdin`.writable()
+  clients.forEach(x => x.silent = true)
+  last.end('x\n')
+  const code = await finished(last)
+  await sql`drop table test`
+  await sql.end()
+  proxy.close()
+  return ['32 ANSWER_TIMEOUT', count + ' ' + code]
+})
+
 t('An AbortSignal removes a waiting query and cancels a running one', { timeout: 10 }, async() => {
   const sql = postgres({ ...options, max: 1 })
   const reserved = await sql.reserve()

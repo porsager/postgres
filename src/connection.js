@@ -73,6 +73,7 @@ export function Connection(ready, options, events) {
     destroy,
     ref: () => socket.ref(),
     unref: () => socket.unref(),
+    owing: () => answerTimer || owing(),
     backlog,
     heavy,
     get notable() { return notables > 0 }
@@ -97,7 +98,7 @@ export function Connection(ready, options, events) {
   function owing() {
     answerTimer && (timers.clearTimeout(answerTimer), answerTimer = null)
     const x = sent[0]
-    options.answer_timeout && x && !closed && !frames.paused && !x.awaiting && !(x.stream && x.stream.writable)
+    options.answer_timeout && x && !closed && !frames.paused && !x.awaiting && !(x.stream && x.open)
       && !(connection.lease && connection.lease.kind === 'reserve')
       && (answerTimer = timers.setTimeout(answerTimedOut, options.answer_timeout * 1000))
   }
