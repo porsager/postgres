@@ -245,6 +245,8 @@ function Postgres(a, b) {
         })
         if (uncaught && !stopped())
           throw uncaught
+        if (lease.connection.closed)
+          throw lease.connection.closed
       } catch (error) {
         context && !name && (context.outcome = 'rollback')
         stopped()
