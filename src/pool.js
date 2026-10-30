@@ -426,7 +426,7 @@ export function Pool(options, types) {
     nextAttempt = now() + 1000 * (typeof options.backoff === 'function' ? options.backoff(retries) : options.backoff)
 
     const transient = !!error && (error.code === 'CONNECTION_CLOSED' || error.code === '53300')
-        , expired = now() - failingSince >= options.connect_timeout * 1000
+        , expired = options.connect_timeout && now() - failingSince >= options.connect_timeout * 1000
 
     failure = !transient || expired ? { error } : null
     stuck() && opening === 0 && (failure || ending) && waiting.take().forEach((job, i) => reject(job, i ? copy(error) : error))
@@ -516,7 +516,7 @@ export function Pool(options, types) {
 
   function onclose(c, error) {
     connections.delete(c)
-    c.loading && !signal.aborted && attempted(error)
+    c.loading && !signal.aborted && attempted(copy(error))
     ending || replacing.push((c.index + 1) % (options.path ? 1 : options.host.length))
     replacing.length > options.max && replacing.shift()
     c.retired && c.retired.forEach(r => r())

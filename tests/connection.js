@@ -508,7 +508,7 @@ t('Query runs on a new connection if the backend dies while fetching array types
   proxy.close()
   process.off('unhandledRejection', onunhandled)
 
-  return ['1,0', [x, unhandled].join(',')]
+  return ['1,0,true', [x, unhandled, killed].join(',')]
 })
 
 t('Clean closes during startup reject queries and reserves instead of reconnecting forever', async() => {
@@ -544,12 +544,35 @@ t('Clean closes while fetching array types reject queries once connect_timeout h
   await new Promise(r => proxy.listen(0, 'localhost', r))
   const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, connect_timeout: 0.5 })
   const start = Date.now()
-  const code = await sql`select 1`.catch(e => e.code)
+  const error = await sql`select ${ 1 }::int as x`.catch(e => e)
   const waited = Date.now() - start
   await sql.end()
   proxy.close()
 
-  return ['CONNECTION_CLOSED true true', [code, waited >= 500, attempts < 10].join(' ')]
+  return ['CONNECTION_CLOSED true true select $1::int as x 1', [error.code, waited >= 500, attempts < 10, error.query, error.parameters].join(' ')]
+})
+
+t('A clean close while fetching array types is retried when connect_timeout is disabled', async() => {
+  let attempts = 0
+    , closed = false
+
+  const proxy = net.createServer(client => {
+    const server = net.connect(5432, 'localhost')
+    attempts++
+    client.on('data', x => !closed && x.includes('pg_type') ? (closed = true, server.destroy(), client.end()) : server.write(x))
+    server.on('data', x => client.writable && client.write(x))
+    client.on('error', () => server.destroy())
+    server.on('error', () => client.destroy())
+    client.on('close', () => server.destroy())
+  })
+
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, connect_timeout: 0 })
+  const x = await sql`select 1 as x`.then(([x]) => x.x, e => e.code)
+  await sql.end()
+  proxy.close()
+
+  return ['1 true 2', [x, closed, attempts].join(' ')]
 })
 
 t('A query refused with a FATAL error rejects with the peer error instead of reconnecting forever', async() => {
