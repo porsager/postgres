@@ -23,7 +23,7 @@ export function secureOptions(ssl) {
 }
 
 function context(ssl) {
-  if (!node || ssl.secureContext)
+  if (!node || ssl.secureContext || !ssl.ca)
     return ssl
 
   const values = { ...ssl }
