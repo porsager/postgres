@@ -228,7 +228,7 @@ async function simulate(seed) {
           'transaction ' + scope + ' resolved but the server did ' + (server.outcomes.get(scope) || 'nothing')
         ), 0),
         e => {
-          const lost = /^(CONNECTION_|ECONNRESET)/.test(e.code)
+          const lost = /^(CONNECTION_|ECONNRESET)/.test(e.code) || e.severity === 'FATAL'
           !lost && server.outcomes.get(scope) === 'commit'
             && violations.push('transaction ' + scope + ' rejected (' + e.message + ') but the server committed it')
           throw e

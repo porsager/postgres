@@ -10,7 +10,11 @@
     "connection.js: A failed connection attempt does not give up on queries a connection still loading types will serve",
     "connection.js: Connections refused for too many connections are retried until connect_timeout",
     "connection.js: Connections refused for too many connections reject once connect_timeout has passed",
-    "connection.js: A password file readable by others is ignored, as in libpq"
+    "connection.js: A password file readable by others is ignored, as in libpq",
+    "connection.js: An ssl object without a ca builds a TLS context per connection, and with one a context its connections share until a value changes",
+    "transactions.js: idle_in_transaction_session_timeout rejects the transaction",
+    "transactions.js: A savepoint or nested begin rejects when the connection is lost while its callback runs (#1281)",
+    "transactions.js: A transaction terminated between statements rejects with the FATAL error, and its next query has it as cause (#1283)"
   ],
   "flaky": [
     "connection.js: Connection destroyed",

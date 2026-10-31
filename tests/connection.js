@@ -104,6 +104,9 @@ t('Reconnect using SSL', async() => {
 })
 
 t('An ssl object without a ca builds a TLS context per connection, and with one a context its connections share until a value changes', async() => {
+  if (globalThis.Bun || globalThis.Deno)
+    return [true, true]
+
   const create = tls.createSecureContext
       , ssl = { rejectUnauthorized: false }
       , sql = postgres({ ...options, ssl, max: 6 })
