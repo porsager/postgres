@@ -627,14 +627,15 @@ t('A query refused with a FATAL error rejects with the peer error instead of rec
 
 t('Failed array type fetch on a live connection is not an unhandled rejection', async() => {
   let unhandled = 0
+    , fetched = 0
 
   const onunhandled = () => unhandled++
   process.on('unhandledRejection', onunhandled)
 
   const server = net.createServer(socket => {
     socket.on('error', () => socket.destroy())
-    socket.on('data', x => x.includes('typarray')
-      ? socket.write(Buffer.concat([errorResponse('ERROR', '57014'), backendMessage('Z', Buffer.from('I'))]))
+    socket.on('data', x => x.includes('pg_type')
+      ? (fetched++, socket.write(Buffer.concat([errorResponse('ERROR', '57014'), backendMessage('Z', Buffer.from('I'))])))
       : x[0] === 88
         ? socket.end()
         : socket.write(authenticated)
@@ -648,7 +649,7 @@ t('Failed array type fetch on a live connection is not an unhandled rejection', 
   server.close()
   process.off('unhandledRejection', onunhandled)
 
-  return [0, unhandled]
+  return ['1 0', fetched + ' ' + unhandled]
 })
 
 t('end() completes after the backend is terminated mid-query', { timeout: 5 }, async() => {
@@ -763,7 +764,7 @@ t('A query cancelled while its connection starts up leaves the connection in the
 
     const proxy = net.createServer(client => {
       const server = net.connect(options.port || 5432, 'localhost')
-      client.on('data', x => (phase === 'types' && x.includes('typarray') && (holding = true), server.write(x)))
+      client.on('data', x => (phase === 'types' && x.includes('pg_type') && (holding = true), server.write(x)))
       server.on('data', x => holding ? held.push(x) : client.write(x))
       client.on('error', () => server.destroy())
       server.on('error', () => client.destroy())
