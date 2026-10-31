@@ -570,6 +570,7 @@ export function Pool(options, types) {
 
     const x = {
       kind: job.kind,
+      error: null,
       connection: c,
       closed,
       get released() { return released },
@@ -601,6 +602,7 @@ export function Pool(options, types) {
         c.status === 'I' ? onready(c) : c.close()
       },
       onclose(error) {
+        x.error = error
         lost(error)
       }
     }

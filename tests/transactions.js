@@ -874,5 +874,5 @@ t('A savepoint or nested begin rejects when the connection is lost while its cal
     await killer.end()
     await sql.end()
   }
-  return ['CONNECTION_CLOSED CONNECTION_CLOSED,CONNECTION_CLOSED CONNECTION_CLOSED', outcomes.join()]
+  return ['57P01 57P01,57P01 57P01', outcomes.join()]
 })
