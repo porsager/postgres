@@ -1,5 +1,17 @@
 # Changelog
 
+## v4.0.1 - unreleased
+
+### Fixed
+
+- **A transaction the server ends rejects with the server's error** (#1283, #1284). When a `transaction_timeout` (`25P04`), an `idle_in_transaction_session_timeout` (`25P03`) or `pg_terminate_backend` (`57P01`) ended the session, `sql.begin` rejected with `CONNECTION_CLOSED`, so a timeout or a termination looked the same as a network drop; it now rejects with the FATAL error the server sent before closing, as a query in flight already did, and a later query on that connection rejects with `CONNECTION_CLOSED` that has it as `cause`. A server restart or failover ends sessions with `57P01`, so code that retries a transaction on `CONNECTION_CLOSED` should retry on that code too. A FATAL in answer to `COMMIT` leaves the outcome unknown, as a connection lost during `COMMIT` does.
+- **A savepoint or nested `begin` rejects when its transaction's connection is lost** (#1281, #1282). One whose callback was still running when the connection went resolved with the callback's result after the transaction had already rejected; it now rejects with the transaction's error.
+- **A connection closed while the pool reads its array and domain types counts as a failed connection attempt** (#1279). Reconnecting follows `backoff` and waiting queries reject once `connect_timeout` has passed, instead of reconnecting as fast as the server accepts for as long as it keeps closing. With `connect_timeout` set to 0, null or false the pool now keeps trying for as long as it takes, as the option says, also after a refused or closed startup, which used to reject the waiting queries at once.
+
+### Performance
+
+- **An `ssl` object with a `ca` builds its TLS context once** (#1280). The connections made with it share one context instead of each parsing the whole `ca` list again, so with a provider's CA bundle a new connection takes about half the time and CPU, and a burst of them no longer blocks the event loop. Replacing one of the object's values, as with a renewed `cert`, builds a new context for the connections after it.
+
 ## v4.0.0
 
 v4 rewrites everything below the public API: the pool, the connection, the protocol, startup and the socket layer. Queries, helpers, transactions, cursors, COPY, listen, subscribe, large objects and the options work as in 3.4.9, apart from the changes below.
