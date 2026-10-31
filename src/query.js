@@ -1,6 +1,6 @@
 import util from 'util'
 import { build, isQuery, Join, joinStrings } from './build.js'
-import { ours } from './errors.js'
+import { ours, Errors, queryError } from './errors.js'
 import { channels, active, start, finish, now, userName } from './diagnostics.js'
 import { statement } from './result.js'
 
@@ -36,6 +36,8 @@ export class Query extends Promise {
     this.built = null
     this.trace = null
     this.aborts = null
+    this.timer = null
+    this.timedOut = false
 
     this.originError = handler.debug ? new Error() : null
     this.tagged && !handler.debug && !origins.has(strings) && origins.set(strings, located())
@@ -54,6 +56,7 @@ export class Query extends Promise {
   }
 
   resolve(x) {
+    this.timer && untime(this)
     this.aborts && this.aborts()
     this.active = false
     this.settled = true
@@ -62,6 +65,8 @@ export class Query extends Promise {
   }
 
   reject(x) {
+    this.timer && untime(this)
+    this.timedOut && x && timedOut(x) && (x = late(this, x))
     this.aborts && this.aborts()
     this.active = false
     this.settled = true
@@ -237,6 +242,21 @@ export class Query extends Promise {
     this.handle()
     return super.finally(fn)
   }
+}
+
+function untime(q) {
+  q.handler.options.timers.clearTimeout(q.timer)
+  q.timer = null
+}
+
+function timedOut(x) {
+  return x.code === '57014' || (x.code === 'CONNECTION_DESTROYED' && !!x.cause && x.cause.code === 'CANCEL_UNANSWERED')
+}
+
+function late(q, error) {
+  const x = Errors.generic('QUERY_TIMEOUT', 'The query did not finish within query_timeout (' + q.handler.options.query_timeout + ' seconds)')
+  x.cause = error.code === 'CONNECTION_DESTROYED' ? error.cause : error
+  return queryError(x, q, q.handler.debug)
 }
 
 function context(q) {

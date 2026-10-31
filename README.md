@@ -645,6 +645,12 @@ await sql`select * from report()`.signal(AbortSignal.timeout(5000))
 
 A query waits for a connection when every connection is reserved, in a transaction or has `max_pipeline` queries in flight. `queue_timeout` (in seconds) rejects it with `QUEUE_TIMEOUT` if it waits longer, without ever sending it, and the same goes for `sql.begin` and `sql.reserve`. Once a query is sent, PostgreSQL's own `statement_timeout` is the limit.
 
+`query_timeout` (in seconds) limits each query, waiting for a connection and running together; inside `sql.begin` or a reserved connection the clock starts when the query is sent on it. A query that runs out of time is canceled as `.cancel()` would, and rejects with `QUERY_TIMEOUT`, with the `57014` it was canceled with as its `cause`. The `begin`, `commit` and savepoint queries of a transaction and `forEach` are limited too; cursors, streams and `sql.listen` are not.
+
+`statement_timeout` is the better limit while the server answers, since the server enforces it and the outcome is known. `query_timeout` is the backstop for when it does not: a server or network that goes silent leaves a query waiting for as long as TCP takes to notice, which is many minutes with default keepalive settings. When a cancel request, from `.cancel()`, `.signal()` or `query_timeout`, gets no answer within `cancel_timeout` (5 seconds by default), the connection is closed and the pool connects again for the next query. As nobody knows whether the queries on that connection ran, they reject with `CONNECTION_DESTROYED`, or a timed out one with `QUERY_TIMEOUT`, whose `cause` is `CANCEL_UNANSWERED`. `cancel_timeout: 0` waits for the answer as long as it takes.
+
+PostgreSQL cancels whatever the connection is running when the request arrives, so a cancel sent just as a query finishes can cancel the query pipelined after it instead. Postgres.js doesn't send it for a query whose result has already arrived, but one still on its way can't be told apart.
+
 ### Execute
 
 #### ```await sql``.execute()```
@@ -1180,6 +1186,8 @@ const sql = postgres('postgres://username:password@host:port/database', {
   idle_timeout         : 0,             // Idle connection timeout in seconds
   connect_timeout      : 30,            // Connect timeout in seconds
   queue_timeout        : 0,             // Seconds a query may wait for a connection, 0 for no limit
+  query_timeout        : 0,             // Seconds a query may wait and run, 0 for no limit
+  cancel_timeout       : 5,             // Seconds to wait for a canceled query before closing its connection
   keep_alive           : 60,            // TCP keep-alive in seconds, 0 or null for none
   backoff              : fn,            // Seconds to wait before reconnecting, given the attempt
   prepare              : true,          // Automatic creation of prepared statements
@@ -1805,6 +1813,16 @@ This error is thrown for any queries that were pending when the timeout to [`sql
 > Waited more than 5 seconds for a connection
 
 A query, transaction or reserve waited longer than `queue_timeout` for a connection. It was never sent.
+
+##### QUERY_TIMEOUT
+> The query did not finish within query_timeout (5 seconds)
+
+A query took longer than `query_timeout`, waiting and running together, and was canceled. Its `cause` is the `57014` it was canceled with, or `CANCEL_UNANSWERED` when the server didn't answer the cancel, in which case whether the query ran is unknown.
+
+##### CANCEL_UNANSWERED
+> The server did not answer within cancel_timeout (5 seconds) after a query was canceled, so whether it ran is unknown
+
+The `cause` of `CONNECTION_DESTROYED` or `QUERY_TIMEOUT` for the queries on a connection that was closed because a cancel request got no answer within `cancel_timeout`. Whether those queries ran is unknown, as when a connection is lost.
 
 ##### TYPE_NOT_FOUND
 > The type vector does not exist

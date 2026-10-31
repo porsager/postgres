@@ -265,6 +265,10 @@ declare namespace postgres {
     idle_timeout?: number | null | false | undefined
     /** Seconds a query, transaction or reserve may wait for a connection before QUEUE_TIMEOUT; 0 to wait as long as it takes @default 0 */
     queue_timeout?: number | undefined
+    /** Seconds a query may wait and run before it is canceled and rejects with QUERY_TIMEOUT; 0 for no limit @default 0 */
+    query_timeout?: number | undefined
+    /** Seconds to wait for a canceled query to end before closing its connection; 0 to wait as long as it takes @default 5 */
+    cancel_timeout?: number | undefined
     /** Seconds to connect before CONNECT_TIMEOUT; 0, null or false to wait as long as it takes @default 30 */
     connect_timeout?: number | null | false | undefined
     /** Seconds a connection lives at most; a function gives a number per connection; 0, null or false for no limit @default 30 to 60 minutes */
@@ -380,6 +384,8 @@ declare namespace postgres {
     idle_timeout: number | null
     connect_timeout: number
     queue_timeout: number
+    query_timeout: number
+    cancel_timeout: number
     max_lifetime: number | null | (() => number)
     backoff: boolean | number | ((attempts: number) => number)
     keep_alive: number | null
@@ -450,6 +456,8 @@ declare namespace postgres {
       | 'TLS_HANDSHAKE_FAILED'
       | 'NO_COLUMNS'
       | 'QUEUE_TIMEOUT'
+      | 'QUERY_TIMEOUT'
+      | 'CANCEL_UNANSWERED'
       | 'TYPE_NOT_FOUND'
       | 'NESTED_TRANSACTION_MODE'
     message: string

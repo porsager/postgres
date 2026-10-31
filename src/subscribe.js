@@ -20,6 +20,7 @@ export default function Subscribe(postgres, options) {
 
   const sql = subscribe.sql = postgres({
     ...options,
+    query_timeout: 0,
     transform: { column: {}, value: {}, row: {} },
     max: 1,
     idle_timeout: null,

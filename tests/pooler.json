@@ -17,6 +17,7 @@
     "transactions.js: A transaction terminated between statements rejects with the FATAL error, and its next query has it as cause (#1283)"
   ],
   "flaky": [
+    "connection.js: query_timeout cancels a query that runs too long and keeps the connection",
     "connection.js: Connection destroyed",
     "connection.js: requests works after single connect_timeout",
     "connection.js: connect_timeout throws proper error"
@@ -29,6 +30,7 @@
     "listen.js: multiple listeners work after a reconnect"
   ],
   "transaction": [
+    "connection.js: query_timeout does not time cursors or listen",
     "reserve.js: reserve queued behind a terminated connection",
     "reserve.js: Reserved connection rejects queries after its backend is terminated",
     "reserve.js: Releasing a terminated reserved connection does not return it to the pool",
@@ -59,6 +61,7 @@
     "prepared.js: Statements past the connection and pool limits are closed and prepared again when used"
   ],
   "prepared": [
+    "connection.js: query_timeout does not time cursors or listen",
     "connection.js: A NUL character in query text is rejected by the server and leaves the connection usable",
     "reserve.js: reserve queued behind a terminated connection",
     "reserve.js: Reserved connection rejects queries after its backend is terminated",

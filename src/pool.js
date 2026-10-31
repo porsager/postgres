@@ -62,6 +62,8 @@ export function Pool(options, types) {
   return pool
 
   function query(q, lease) {
+    options.query_timeout && !q.timer && !q.settled && !q.cursorFn && !q.streaming && deadline(q)
+
     if (ending && !lease)
       return q.reject(queryError(Errors.connection('CONNECTION_ENDED', options, options.host[0], options.port[0]), q, options.debug))
 
@@ -91,9 +93,16 @@ export function Pool(options, types) {
     place({ q, statement, exclusive: !!q.cursorFn || !!q.streaming || q.alone }, lease)
   }
 
+  function deadline(q) {
+    q.timer = setTimeout(() => {
+      q.timer = null
+      q.settled || (q.timedOut = true, cancel(q))
+    }, options.query_timeout * 1000)
+  }
+
   function describeOnly(q, built, lease) {
     const statement = { name: '', text: built.text, oids: built.oids, columns: null }
-        , run = c => (q.connection = c, c.describe(statement, built.oids).then(
+        , run = c => (q.connection = c, c.describe(statement, built.oids, q).then(
           ({ params, columns }) => q.resolve({ string: built.text, types: params, name: '', columns }),
           error => q.reject(queryError(error, q, options.debug))
         ), q.onwrite && q.onwrite())

@@ -224,17 +224,38 @@ async function negotiate(socket, options) {
     throw Errors.generic('SSL_NOT_SUPPORTED', 'The server does not support SSL connections')
 }
 
-async function cancel(options, host, port, { pid, secret }) {
-  const socket = await Socket(options, host, port)
-  try {
-    await negotiate(socket, options)
-  } catch (error) {
-    socket.destroy()
-    throw error
-  }
-  return new Promise(resolve => {
-    socket.onclose = () => resolve()
-    socket.end(p.Cancel(pid, secret))
+function cancel(options, host, port, { pid, secret }) {
+  const { setTimeout, clearTimeout } = options.timers
+
+  return new Promise((resolve, reject) => {
+    let socket = null
+      , raw = null
+      , written = false
+      , settled = false
+
+    const limit = options.cancel_timeout || options.connect_timeout
+        , timer = limit && setTimeout(() => done(!written && Errors.connection('CONNECT_TIMEOUT', options, host, port)), limit * 1000)
+
+    Socket(options, host, port, x => raw = x).then(async x => {
+      socket = x
+      if (settled)
+        return socket.destroy()
+
+      await negotiate(socket, options)
+      socket.onclose = () => done()
+      written = true
+      socket.end(p.Cancel(pid, secret))
+    }).catch(done)
+
+    function done(error) {
+      if (settled)
+        return
+
+      settled = true
+      timer && clearTimeout(timer)
+      socket ? socket.destroy() : raw && raw.destroy()
+      error ? reject(error) : resolve()
+    }
   })
 }
 

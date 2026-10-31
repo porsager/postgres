@@ -432,13 +432,14 @@ export function Connection(ready, options, events) {
       && b.length === columns.length && columns.every((x, i) => x.type === b[i].type)
   }
 
-  function describe(statement, oids) {
+  function describe(statement, oids, query) {
     return new Promise((resolve, reject) => {
       const x = Exchange('describe', null, connection.lease, x => {
         p.parse(out, '', statement.text, oids)
         p.describe(out, 'S', '')
         sync(x)
       })
+      x.for = query || null
       x.resolve = resolve
       x.reject = reject
       queue(x)
@@ -466,7 +467,7 @@ export function Connection(ready, options, events) {
   function cancel(query) {
     if (running.has(query) || (sent[0] && sent[0].query === query && sent[0].awaiting))
       return (query.aborted = Errors.generic('57014', 'canceling statement due to user request'), Promise.resolve())
-    const i = pending.findIndex(x => x.query === query)
+    const i = pending.findIndex(x => x.query === query || x.for === query)
 
     if (i !== -1) {
       const [x] = pending.splice(i, 1)
@@ -477,13 +478,42 @@ export function Connection(ready, options, events) {
       return Promise.resolve()
     }
 
-    const x = sent.find(x => x.query === query)
+    const x = sent.find(x => x.query === query || x.for === query)
     if (!x)
       return Promise.resolve()
 
-    return x === sent[0] && query.active
-      ? ready.cancel()
+    if (x === sent[0] && x.completed)
+      return (expect(x), Promise.resolve())
+
+    return x === sent[0] && (query.active || x.for)
+      ? cancelling(x)
       : new Promise((resolve, reject) => x.cancel = { resolve, reject })
+  }
+
+  function cancelling(x) {
+    expect(x)
+    return ready.cancel()
+  }
+
+  function expect(x) {
+    options.cancel_timeout && !x.unanswered && (x.unanswered = timers.setTimeout(() => unanswered(x), options.cancel_timeout * 1000))
+  }
+
+  function unanswered(x) {
+    x.unanswered = null
+    const query = x.query || x.for
+    if (closed || x.done || !query || query.settled)
+      return
+
+    destroy(Errors.generic(
+      'CANCEL_UNANSWERED',
+      'The server did not answer within cancel_timeout (' + options.cancel_timeout + ' seconds) after a query was canceled, '
+        + 'so whether it ran is unknown'
+    ))
+  }
+
+  function answered(x) {
+    x.unanswered && (timers.clearTimeout(x.unanswered), x.unanswered = null)
   }
 
   function close() {
@@ -523,6 +553,7 @@ export function Connection(ready, options, events) {
         , fatal = connection.fatal || head && !head.ends && head.error && head.error.severity === 'FATAL' && head.error
     closed = Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
     closed.cause = fatal || error || undefined
+    sent.concat(pending).forEach(x => x.cancel && x.cancel.resolve())
     sent.splice(0).forEach(x => {
       x.stream && x.stream.destroy(closed)
       x.own ? settle(x)
@@ -542,6 +573,7 @@ export function Connection(ready, options, events) {
   }
 
   function settleError(x, error) {
+    answered(x)
     x.kind === 'describe'
       ? x.reject(error)
       : x.query && !x.query.settled && x.query.reject(decorate(x.query, error))
@@ -722,6 +754,7 @@ export function Connection(ready, options, events) {
     result.columns = result.columns || item.columns
 
     item.final && (item.stream && Object.assign(item.stream, { count, command }), item.final(), item.final = null)
+    item.kind !== 'simple' && (item.completed = true)
 
     if (item.kind === 'simple') {
       item.results.push(item.result)
@@ -807,7 +840,7 @@ export function Connection(ready, options, events) {
     const next = sent[0]
     if (next && next.query) {
       next.query.active = true
-      next.cancel && ready.cancel().then(next.cancel.resolve, next.cancel.reject)
+      next.cancel && cancelling(next).then(next.cancel.resolve, next.cancel.reject)
     }
 
     closing && idle() && terminate()
@@ -815,6 +848,7 @@ export function Connection(ready, options, events) {
   }
 
   function settle(x) {
+    answered(x)
     if (x.kind === 'internal')
       return
 
@@ -1150,6 +1184,9 @@ function Exchange(kind, query, lease, write) {
     error: null,
     own: null,
     cancel: null,
+    unanswered: null,
+    completed: false,
+    for: null,
     stream: null,
     copied: false,
     wanted: false,

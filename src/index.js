@@ -340,6 +340,7 @@ function Listen(options) {
   function connection() {
     return sql || (sql = Postgres({
       ...options,
+      query_timeout: 0,
       max: 1,
       idle_timeout: null,
       max_lifetime: null,
@@ -437,7 +438,10 @@ function parseOptions(a, b) {
   'timeout' in o && (console.log('The timeout option is deprecated, use idle_timeout instead'), o.idle_timeout = o.timeout)
   query.sslrootcert === 'system' && (query.ssl = 'verify-full')
 
-  const ints = ['idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive', 'min', 'queue_timeout']
+  const ints = [
+    'idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive', 'min',
+    'queue_timeout', 'query_timeout', 'cancel_timeout'
+  ]
   const defaults = {
     max             : globalThis.Cloudflare ? 3 : 10,
     min             : 0,
@@ -447,6 +451,8 @@ function parseOptions(a, b) {
     idle_timeout    : null,
     connect_timeout : 30,
     queue_timeout   : 0,
+    query_timeout   : 0,
+    cancel_timeout  : 5,
     max_lifetime    : max_lifetime,
     max_pipeline    : 100,
     scheduler       : true,

@@ -1206,6 +1206,172 @@ t('A query that waits less than queue_timeout runs', { timeout: 10 }, async() =>
   return [1, (await query)[0].x, await sql.end()]
 })
 
+async function hushable() {
+  const sockets = new Set()
+  let hushed = false
+  const server = net.createServer(client => {
+    sockets.add(client)
+    const upstream = net.connect(options.port || 5432, options.host || 'localhost')
+    sockets.add(upstream)
+    client.on('data', x => hushed === true || upstream.write(x))
+    upstream.on('data', x => hushed || client.write(x))
+    client.on('error', () => null)
+    upstream.on('error', () => null)
+    client.on('close', () => (sockets.delete(client), upstream.destroy()))
+    upstream.on('close', () => (sockets.delete(upstream), client.destroy()))
+  })
+  await new Promise(r => server.listen(0, 'localhost', r))
+  return {
+    port: server.address().port,
+    hush: x => hushed = x,
+    close: () => (sockets.forEach(x => x.destroy()), server.close())
+  }
+}
+
+t('query_timeout cancels a query that runs too long and keeps the connection', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1, query_timeout: 0.2 })
+  const [{ pid }] = await sql`select pg_backend_pid() as pid`
+  const start = Date.now()
+  const error = await sql`select pg_sleep(2)`.catch(e => e)
+  const took = Date.now() - start
+  const [after] = await sql`select pg_backend_pid() as pid`
+  return [
+    'QUERY_TIMEOUT 57014 true true',
+    [error.code, error.cause && error.cause.code, took < 1000, after.pid === pid].join(' '),
+    await sql.end()
+  ]
+})
+
+t('query_timeout rejects a query whose server stops answering, and the next query gets a new connection', { timeout: 10 }, async() => {
+  const relay = await hushable()
+  const sql = postgres({ ...options, host: 'localhost', port: relay.port, max: 1, query_timeout: 0.2, cancel_timeout: 0.3 })
+  await sql`select 1`
+  relay.hush(true)
+  const start = Date.now()
+  const [error, other] = await Promise.all([sql`select 1`.catch(e => e), sql`select 2`.catch(e => e)])
+  const took = Date.now() - start
+  relay.hush(false)
+  const [after] = await sql`select 1 as x`
+  relay.close()
+  return [
+    'QUERY_TIMEOUT CANCEL_UNANSWERED QUERY_TIMEOUT true 1',
+    [error.code, error.cause && error.cause.code, other.code, took >= 400 && took < 2000, after.x].join(' '),
+    await sql.end()
+  ]
+})
+
+t('An AbortSignal rejects a query whose server stops answering', { timeout: 10 }, async() => {
+  const relay = await hushable()
+  const sql = postgres({ ...options, host: 'localhost', port: relay.port, max: 1, cancel_timeout: 0.3 })
+  await sql`select 1`
+  relay.hush(true)
+  const start = Date.now()
+  const error = await sql`select 1`.signal(AbortSignal.timeout(200)).catch(e => e)
+  const took = Date.now() - start
+  relay.hush(false)
+  const [after] = await sql`select 1 as x`
+  relay.close()
+  return [
+    'CONNECTION_DESTROYED CANCEL_UNANSWERED true 1',
+    [error.code, error.cause && error.cause.code, took < 2000, after.x].join(' '),
+    await sql.end()
+  ]
+})
+
+t('Cancelling a query whose server stops answering settles both the query and the cancel', { timeout: 10 }, async() => {
+  const relay = await hushable()
+  const sql = postgres({ ...options, host: 'localhost', port: relay.port, max: 1, cancel_timeout: 0.3 })
+  await sql`select 1`
+  relay.hush(true)
+  const head = sql`select 1`
+      , next = sql`select 2`
+      , codes = Promise.all([head, next].map(q => q.then(() => 'ran', e => e.code)))
+  await delay(50)
+  await Promise.all([head.cancel(), next.cancel()])
+  const result = await codes
+  relay.hush(false)
+  const [after] = await sql`select 1 as x`
+  relay.close()
+  return ['CONNECTION_DESTROYED CONNECTION_DESTROYED 1', [...result, after.x].join(' '), await sql.end()]
+})
+
+t('A timed out query whose answer is lost rejects as unknown, not as canceled', { timeout: 10 }, async() => {
+  const relay = await hushable()
+  const sql = postgres({ ...options, host: 'localhost', port: relay.port, max: 1, query_timeout: 0.2, cancel_timeout: 0.3 })
+  await sql`create table test (id int)`
+  relay.hush('answers')
+  const error = await sql`insert into test values (1)`.catch(e => e)
+  relay.hush(false)
+  const [{ n }] = await sql`select count(*)::int as n from test`
+  await sql`drop table test`
+  await sql.end()
+  relay.close()
+  return ['QUERY_TIMEOUT CANCEL_UNANSWERED 1', [error.code, error.cause && error.cause.code, n].join(' ')]
+})
+
+t('query_timeout ends a transaction whose server stops answering at COMMIT, and the pool goes on', { timeout: 10 }, async() => {
+  const relay = await hushable()
+  const sql = postgres({ ...options, host: 'localhost', port: relay.port, max: 1, query_timeout: 0.2, cancel_timeout: 0.3, connect_timeout: 0 })
+  await sql`select 1`
+  const error = await sql.begin(async sql => {
+    await sql`select 1`
+    relay.hush(true)
+  }).catch(e => e)
+  relay.hush(false)
+  const [after] = await sql`select 1 as x`
+  relay.close()
+  return ['CONNECTION_CLOSED 1', [error.code, after.x].join(' '), await sql.end()]
+})
+
+t('query_timeout rejects a describe whose server stops answering', { timeout: 10 }, async() => {
+  const relay = await hushable()
+  const sql = postgres({ ...options, host: 'localhost', port: relay.port, max: 1, query_timeout: 0.2, cancel_timeout: 0.3 })
+  await sql`select 1`
+  relay.hush(true)
+  const error = await sql`select ${ 1 }::int as x`.describe().catch(e => e)
+  relay.hush(false)
+  const [after] = await sql`select 1 as x`
+  relay.close()
+  return ['QUERY_TIMEOUT 1', [error.code, after.x].join(' '), await sql.end()]
+})
+
+t('query_timeout counts the time a query waits for a connection', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1, query_timeout: 0.2 })
+  const reserved = await sql.reserve()
+  const error = await sql`select 1`.catch(e => e)
+  reserved.release()
+  const [after] = await sql`select 1 as x`
+  return ['QUERY_TIMEOUT 57014 1', [error.code, error.cause && error.cause.code, after.x].join(' '), await sql.end()]
+})
+
+t('query_timeout times each query in a transaction, not the transaction', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1, query_timeout: 0.3 })
+  const result = await sql.begin(async sql => {
+    await sql`select pg_sleep(0.1)`
+    await delay(200)
+    await sql`select pg_sleep(0.1)`
+    await delay(200)
+    return (await sql`select 1 as x`)[0].x
+  })
+  return [1, result, await sql.end()]
+})
+
+t('query_timeout does not time cursors or listen', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 2, query_timeout: 0.2 })
+  let rows = 0
+  await sql`select x from generate_series(1, 3) x`.cursor(async() => {
+    rows++
+    await delay(150)
+  })
+  let got = null
+  const { unlisten } = await sql.listen('qt', x => got = x)
+  await delay(300)
+  await sql.notify('qt', 'hi')
+  await delay(100)
+  await unlisten()
+  return ['3 hi', rows + ' ' + got, await sql.end()]
+})
+
 t('An AbortSignal removes a waiting query and cancels a running one', { timeout: 10 }, async() => {
   const sql = postgres({ ...options, max: 1 })
   const reserved = await sql.reserve()
