@@ -586,7 +586,7 @@ export function Pool(options, types) {
         if (released)
           return
         released = true
-        c.lease === x && (c.lease = null)
+        c.lease === x && (c.lease = null, c.owing())
         listened(channels.pool) && event('release', c, { kind: job.kind })
         if (c.closed)
           return

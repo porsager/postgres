@@ -267,6 +267,12 @@ declare namespace postgres {
     queue_timeout?: number | undefined
     /** Seconds to connect before CONNECT_TIMEOUT; 0, null or false to wait as long as it takes @default 30 */
     connect_timeout?: number | null | false | undefined
+    /**
+     * Seconds a connection waiting for an answer may receive nothing before it is closed with ANSWER_TIMEOUT;
+     * not on a reserved connection, nor while a cursor's callback, a COPY upload or a paused reader keeps the server waiting
+     * @default null
+     */
+    answer_timeout?: number | null | undefined
     /** Seconds a connection lives at most; a function gives a number per connection; 0, null or false for no limit @default 30 to 60 minutes */
     max_lifetime?: number | null | false | (() => number) | undefined
     /** Seconds before reconnecting after a failure; a function of the number of attempts @default exponential */
@@ -379,6 +385,7 @@ declare namespace postgres {
     scheduler: boolean
     idle_timeout: number | null
     connect_timeout: number
+    answer_timeout: number | null
     queue_timeout: number
     max_lifetime: number | null | (() => number)
     backoff: boolean | number | ((attempts: number) => number)
@@ -417,6 +424,7 @@ declare namespace postgres {
     code:
       | 'CONNECTION_DESTROYED'
       | 'CONNECT_TIMEOUT'
+      | 'ANSWER_TIMEOUT'
       | 'CONNECTION_CLOSED'
       | 'CONNECTION_ENDED'
     errno: this['code']
