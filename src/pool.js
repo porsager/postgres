@@ -532,7 +532,7 @@ export function Pool(options, types) {
     c.idleTimer && clearTimeout(c.idleTimer)
     c.lifeTimer && clearTimeout(c.lifeTimer)
     c.lease && c.lease.onclose && c.lease.onclose(
-      error.cause && error.cause.severity === 'FATAL' ? error.cause
+      error.cause && error.cause.severity === 'FATAL' && !c.uncertain ? error.cause
       : error.code === 'CONNECTION_DESTROYED' ? Errors.connection('CONNECTION_CLOSED', options, c.host, c.port)
       : error
     )

@@ -1,5 +1,6 @@
 {
   "always": [
+    "transactions.js: A FATAL in answer to COMMIT rejects with CONNECTION_CLOSED, with the FATAL as cause",
     "listen.js: listen keeps retrying when a reconnect attempt fails",
     "connection.js: connection parameters",
     "connection.js: Unix socket",

@@ -848,6 +848,25 @@ t('A transaction terminated between statements rejects with the FATAL error, and
   ]
 })
 
+t('A FATAL in answer to COMMIT rejects with CONNECTION_CLOSED, with the FATAL as cause', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1 })
+  await sql`create table test (id int)`
+  await sql`
+    create function test_kill() returns trigger language plpgsql
+    as $$ begin perform pg_terminate_backend(pg_backend_pid()); return null; end $$
+  `
+  await sql`create constraint trigger test_kill after insert on test deferrable initially deferred for each row execute function test_kill()`
+  const error = await sql.begin(sql => sql`insert into test values (1)`).catch(e => e)
+  const [{ n }] = await sql`select count(*)::int as n from test`
+  return [
+    'CONNECTION_CLOSED 57P01 0',
+    [error.code, error.cause && error.cause.code, n].join(' '),
+    await sql`drop table test`,
+    await sql`drop function test_kill`,
+    await sql.end()
+  ]
+})
+
 t('A savepoint or nested begin rejects when the connection is lost while its callback runs (#1281)', { timeout: 10 }, async() => {
   const outcomes = []
   for (const method of ['savepoint', 'begin']) {
