@@ -293,6 +293,8 @@ declare namespace postgres {
     infer?: boolean | undefined
     /** Fetches array types and the types of columns it does not know @default true */
     fetch_types?: boolean | undefined
+    /** Fetches array types and domains when the pool starts instead of when a query first needs them @default false */
+    eager_types?: boolean | undefined
     /** Custom types; see the README */
     types?: T | undefined
 
@@ -396,6 +398,7 @@ declare namespace postgres {
     prepare: boolean
     infer: boolean
     fetch_types: boolean
+    eager_types: boolean
     debug: Options['debug']
     publications: string
     slot: string | null

@@ -130,7 +130,7 @@ export function Connection(ready, options, events) {
 
   function queue(x) {
     if (closed)
-      return settleError(x, closed)
+      return settleError(x, copy(closed))
 
     if (blocker && blocker.streaming && blocker.open)
       return settleError(x, Errors.generic('COPY_IN_PROGRESS', 'You cannot execute queries during copy'))
@@ -690,8 +690,8 @@ export function Connection(ready, options, events) {
 
   function unanswered(x) {
     x.unanswered = null
-    const query = x.query || x.for
-    if (closed || x.done || !query || query.settled)
+    const query = x.batch ? x.batch.query : x.query || x.for
+    if (closed || (x.done && !x.batch) || !query || query.settled)
       return
 
     destroy(Errors.generic(
@@ -702,7 +702,7 @@ export function Connection(ready, options, events) {
   }
 
   function answered(x) {
-    x.unanswered && (timers.clearTimeout(x.unanswered), x.unanswered = null)
+    x.unanswered && (!x.batch || x.batch.query.settled) && (timers.clearTimeout(x.unanswered), x.unanswered = null)
   }
 
   function cancelBatch(query) {
@@ -762,10 +762,10 @@ export function Connection(ready, options, events) {
       x.stream && x.stream.destroy(closed)
       x.own ? settle(x)
         : failed ? settleError(x, x === head ? failed : copy(failed))
-        : settleError(x, closed)
+        : settleError(x, copy(closed))
     })
-    pending.splice(0).forEach(x => x.own ? settle(x) : settleError(x, closed))
-    running.forEach(query => query.settled || query.reject(decorate(query, closed)))
+    pending.splice(0).forEach(x => x.own ? settle(x) : settleError(x, copy(closed)))
+    running.forEach(query => query.settled || query.reject(decorate(query, copy(closed))))
     running.clear()
     open.clear()
     connection.onended && connection.onended()

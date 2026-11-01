@@ -531,7 +531,7 @@ function parseOptions(a, b) {
     unref_sockets   : !!o.unref_sockets,
     passfile        : passfile(env),
     shared_types    : o.shared_types,
-    eager_types     : o.eager_types,
+    eager_types     : !!o.eager_types,
     transform       : parseTransform(o.transform || { undefined: undefined }),
     parameters      : {},
     shared          : { retries: 0 },

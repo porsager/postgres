@@ -508,7 +508,7 @@ const authenticated = Buffer.concat([
   backendMessage('Z', Buffer.from('I'))
 ])
 
-t('Query runs on a new connection if the backend dies while fetching array types', async() => {
+t('A transaction runs on a new connection if the backend dies while fetching array types', async() => {
   let killed = false
     , unhandled = 0
 
@@ -532,8 +532,8 @@ t('Query runs on a new connection if the backend dies while fetching array types
   })
 
   await new Promise(r => proxy.listen(0, 'localhost', r))
-  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port })
-  const x = await sql`select 1 as x`.then(([x]) => x.x, e => e.code)
+  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, eager_types: true })
+  const x = await sql.begin(sql => sql`select 1 as x`).then(([x]) => x.x, e => e.code)
   await sql.end()
   proxy.close()
   process.off('unhandledRejection', onunhandled)
@@ -558,7 +558,7 @@ t('Clean closes during startup reject queries and reserves instead of reconnecti
   return ['CONNECTION_CLOSED,CONNECTION_CLOSED,CONNECTION_CLOSED,true', [...codes, attempts < 10].join(',')]
 })
 
-t('Clean closes while fetching array types reject queries once connect_timeout has passed', { timeout: 10 }, async() => {
+t('Clean closes while fetching array types reject transactions once connect_timeout has passed', { timeout: 10 }, async() => {
   let attempts = 0
 
   const proxy = net.createServer(client => {
@@ -572,17 +572,17 @@ t('Clean closes while fetching array types reject queries once connect_timeout h
   })
 
   await new Promise(r => proxy.listen(0, 'localhost', r))
-  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, connect_timeout: 0.5 })
+  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, connect_timeout: 0.5, eager_types: true })
   const start = Date.now()
-  const error = await sql`select ${ 1 }::int as x`.catch(e => e)
+  const error = await sql.begin(sql => sql`select ${ 1 }::int as x`).catch(e => e)
   const waited = Date.now() - start
   await sql.end()
   proxy.close()
 
-  return ['CONNECTION_CLOSED true true select $1::int as x 1', [error.code, waited >= 500, attempts < 10, error.query, error.parameters].join(' ')]
+  return ['CONNECTION_CLOSED true true', [error.code, waited >= 500, attempts < 10].join(' ')]
 })
 
-t('A clean close while fetching array types is retried when connect_timeout is disabled', async() => {
+t('A transaction waiting for array types is retried after a clean close when connect_timeout is disabled', async() => {
   let attempts = 0
     , closed = false
 
@@ -597,12 +597,53 @@ t('A clean close while fetching array types is retried when connect_timeout is d
   })
 
   await new Promise(r => proxy.listen(0, 'localhost', r))
-  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, connect_timeout: 0 })
-  const x = await sql`select 1 as x`.then(([x]) => x.x, e => e.code)
+  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, connect_timeout: 0, eager_types: true })
+  const x = await sql.begin(sql => sql`select 1 as x`).then(([x]) => x.x, e => e.code)
   await sql.end()
   proxy.close()
 
-  return ['1 true 2', [x, closed, attempts].join(' ')]
+  return ['1 true true', [x, closed, attempts >= 2 && attempts < 10].join(' ')]
+})
+
+async function closingTypes(times) {
+  let closes = 0
+  const proxy = net.createServer(client => {
+    const server = net.connect(options.port || 5432, options.host || 'localhost')
+    client.on('data', x => closes < times && x.includes('pg_catalog.pg_type') ? (closes++, server.destroy(), client.end()) : server.write(x))
+    server.on('data', x => client.writable && client.write(x))
+    client.on('error', () => server.destroy())
+    server.on('error', () => client.destroy())
+    client.on('close', () => server.destroy())
+  })
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+  return { port: proxy.address().port, closes: () => closes, close: () => proxy.close() }
+}
+
+t('A lazy read of array types whose connection closes is retried after backoff', { timeout: 10 }, async() => {
+  await sql`create type test_mood as enum ('ok', 'sad')`
+  const proxy = await closingTypes(1)
+      , lazy = postgres({ ...options, host: 'localhost', port: proxy.port, max: 1, backoff: () => 0.1 })
+  const [{ m }] = await lazy`select '{ok,sad}'::test_mood[] as m`
+  await lazy.end()
+  proxy.close()
+  return ['ok,sad 1', m.join() + ' ' + proxy.closes(), await sql`drop type test_mood`]
+})
+
+t('A lazy read of array types that keeps failing rejects the query once connect_timeout has passed', { timeout: 10 }, async() => {
+  await sql`create type test_mood as enum ('ok', 'sad')`
+  const proxy = await closingTypes(Infinity)
+      , lazy = postgres({ ...options, host: 'localhost', port: proxy.port, max: 1, connect_timeout: 0.5, backoff: () => 0.1 })
+  const start = Date.now()
+  const error = await lazy`select '{ok,sad}'::test_mood[] as m`.catch(e => e)
+  const waited = Date.now() - start
+  const [{ x }] = await lazy`select 1 as x`
+  await lazy.end()
+  proxy.close()
+  return [
+    'CONNECTION_DESTROYED CONNECTION_CLOSED true true 1',
+    [error.code, error.cause && error.cause.code, waited >= 500, proxy.closes() < 20, x].join(' '),
+    await sql`drop type test_mood`
+  ]
 })
 
 t('A query refused with a FATAL error rejects with the peer error instead of reconnecting forever', async() => {
@@ -1347,6 +1388,25 @@ t('query_timeout rejects a describe whose server stops answering', { timeout: 10
   const [after] = await sql`select 1 as x`
   relay.close()
   return ['QUERY_TIMEOUT 1', [error.code, after.x].join(' '), await sql.end()]
+})
+
+t('query_timeout cancels a batch that runs too long', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1, query_timeout: 0.2 })
+  const error = await sql.batch([sql`select 1`, sql`select pg_sleep(2)`]).catch(e => e)
+  const [after] = await sql`select 1 as x`
+  return ['QUERY_TIMEOUT 1', [error.code, after.x].join(' '), await sql.end()]
+})
+
+t('query_timeout rejects a batch whose server stops answering', { timeout: 10 }, async() => {
+  const relay = await hushable()
+  const sql = postgres({ ...options, host: 'localhost', port: relay.port, max: 1, query_timeout: 0.2, cancel_timeout: 0.3 })
+  await sql`select 1`
+  relay.hush(true)
+  const error = await sql.batch([sql`select 1`, sql`select 2`]).catch(e => e)
+  relay.hush(false)
+  const [after] = await sql`select 1 as x`
+  relay.close()
+  return ['QUERY_TIMEOUT CANCEL_UNANSWERED 1', [error.code, error.cause && error.cause.code, after.x].join(' '), await sql.end()]
 })
 
 t('query_timeout counts the time a query waits for a connection', { timeout: 10 }, async() => {

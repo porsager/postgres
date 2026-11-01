@@ -49,6 +49,8 @@ export function Pool(options, types) {
     , failure = null
     , typesLoading = false
     , retryTypes = null
+    , typeRetries = 0
+    , typesFailing = null
 
   const pool = {
     query,
@@ -454,12 +456,29 @@ export function Pool(options, types) {
   }
 
   function fetched(loading) {
-    loading.then(() => typesLoaded = true, error => error instanceof PostgresError && (typesLoaded = true)).then(() => {
+    let failure = null
+    loading.then(() => typesLoaded = true, error => error instanceof PostgresError ? typesLoaded = true : failure = error).then(() => {
       typesLoading = false
       events.typed = typesLoaded
-      typesLoaded
-        ? resume()
-        : paused.size && (retryTypes = setTimeout(() => (retryTypes = null, need()), 1000))
+      if (typesLoaded) {
+        typeRetries = 0
+        typesFailing = null
+        return resume()
+      }
+
+      typesFailing === null && (typesFailing = now())
+      typeRetries++
+      if (options.connect_timeout && now() - typesFailing >= options.connect_timeout * 1000) {
+        typeRetries = 0
+        typesFailing = null
+        return [...paused].forEach(x => {
+          paused.delete(x)
+          x.destroy(failure || Errors.connection('CONNECTION_CLOSED', options, x.host, x.port))
+        })
+      }
+
+      const wait = 1000 * (typeof options.backoff === 'function' ? options.backoff(typeRetries) : options.backoff)
+      paused.size && (retryTypes = setTimeout(() => (retryTypes = null, need()), wait))
     })
   }
 
@@ -624,7 +643,7 @@ export function Pool(options, types) {
 
   function onclose(c, error) {
     connections.delete(c)
-    ;(c.loading || (c.typing && !c.typing.settled)) && !signal.aborted && attempted(copy(error))
+    ;(c.loading || c.typing) && !signal.aborted && attempted(copy(error))
     paused.delete(c)
     ending || replacing.push((c.index + 1) % (options.path ? 1 : options.host.length))
     replacing.length > options.max && replacing.shift()

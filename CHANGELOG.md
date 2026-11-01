@@ -1,11 +1,13 @@
 # Changelog
 
-## v4.0.1 - unreleased
+## v4.1.0 - unreleased
 
 ### New
 
 - **`query_timeout`** (#1278). Seconds a query may take, waiting for a connection and running together, before it is canceled and rejects with `QUERY_TIMEOUT`. Off by default. Unlike `statement_timeout` it also ends a query whose server or network has gone silent, which TCP alone takes many minutes to notice. Transaction control queries and `forEach` are limited too; cursors, streams and `sql.listen` are not.
 - **`cancel_timeout`**, 5 seconds by default: how long a canceled query may take to end before its connection is closed.
+- **`sql.batch([queries])`** sends queries in one round trip with a single Sync: outside a transaction they commit or roll back together, and the batch rejects with the failing query's position in `error.index`.
+- **`eager_types`**: `true` reads array types and domains when the pool starts instead of when a query first meets one.
 
 ### Fixed
 
@@ -14,14 +16,19 @@
 - **A transaction the server ends rejects with the server's error** (#1283, #1284). When a `transaction_timeout` (`25P04`), an `idle_in_transaction_session_timeout` (`25P03`) or `pg_terminate_backend` (`57P01`) ended the session, `sql.begin` rejected with `CONNECTION_CLOSED`, so a timeout or a termination looked the same as a network drop; it now rejects with the FATAL error the server sent before closing, as a query in flight already did, and a later query on that connection rejects with `CONNECTION_CLOSED` that has it as `cause`. A server restart or failover ends sessions with `57P01`, so code that retries a transaction on `CONNECTION_CLOSED` should retry on that code too. A FATAL in answer to `COMMIT` rejects with `CONNECTION_CLOSED` that has it as `cause`, as the outcome is unknown, as it is when the connection is lost during `COMMIT`.
 - **A savepoint or nested `begin` rejects when its transaction's connection is lost** (#1281, #1282). One whose callback was still running when the connection went resolved with the callback's result after the transaction had already rejected; it now rejects with the transaction's error.
 - **A connection closed while the pool reads its array and domain types counts as a failed connection attempt** (#1279). Reconnecting follows `backoff` and waiting queries reject once `connect_timeout` has passed, instead of reconnecting as fast as the server accepts for as long as it keeps closing. With `connect_timeout` set to 0, null or false the pool now keeps trying for as long as it takes, as the option says, also after a refused or closed startup, which used to reject the waiting queries at once.
+- A query failed by a `FATAL` error gives that error to the queries pipelined behind it as well, instead of `CONNECTION_CLOSED`.
+- **Each query on a connection that closes gets its own error.** They shared one error object, so every query pipelined on the connection reported the first one's `query` and `parameters`.
+- **A cached prepared statement no longer keeps the query that prepared it** (#1287). Each connection's entry for a prepared statement kept that query's values and rows for as long as the statement stayed cached, up to 1,000 statements per connection, so an app with many distinct statements grew by their results until every cache was full: about 1.1 GB with 10 connections and 50-row results. They are let go once the query settles. On 4.0.0, `prepare: false` avoids it.
 
 ### Performance
 
 - **An `ssl` object with a `ca` builds its TLS context once** (#1280). The connections made with it share one context instead of each parsing the whole `ca` list again, so with a provider's CA bundle a new connection takes about half the time and CPU, and a burst of them no longer blocks the event loop. Replacing one of the object's values, as with a renewed `cert`, builds a new context for the connections after it.
 - A new statement whose untyped values are all numbers or `null` is prepared, described and run in one round trip, as one whose parameter types are all known is, since those values are written the same for any type the server picks; one with other values only the server can type is still described first, once per connection.
-- A new connection sends its query for array types and domains together with its first queries instead of before them, one round trip less per connection. Leases and values typed as a type the pool hasn't read yet still wait for it.
+- Array types and domains are read when a query first meets a type the pool does not know (an oid from 16384 up), instead of when the pool starts: a pool that only uses built-in types never sends that query, and a new pool's first query costs no more than any other. The connection that met the type waits for it, read on another connection. With custom types given by name they are still read at startup, as their oids are needed before the first query. Leases and values typed as a type the pool hasn't read yet still wait for it. A read whose connection fails is retried after `backoff`, and once `connect_timeout` has passed the connections waiting for it are closed and their queries reject, as for a failed startup. `eager_types: true` reads them when the pool starts, as before.
 - `sql.begin` without a transaction mode sends `BEGIN` together with the first statement; with a mode, which the server can refuse, it still waits for `BEGIN` first.
-- A query failed by a `FATAL` error gives that error to the queries pipelined behind it as well, instead of `CONNECTION_CLOSED`.
+- `timestamptz`, and `timestamp` and `date` read as UTC, are decoded straight from the bytes when they use the built-in parsers, with the text parser for anything else (BC, `infinity`, years before 1000); about 20% more rows per second for rows with timestamps.
+- `bytea` and arrays of `int2`, `int4`, `int8` and `bool` are fetched in binary once a prepared statement's columns are known on the connection, when they use the built-in parsers: the values are the same as from the text, about 4.5 times faster to read for `bytea` and 3 times for an `int4[]`. A custom parser for the type or its elements, and `raw()`, still get the text.
+- A connection that becomes ready while others are still opening no longer takes the queries meant for those; 50 connections opened at once each run one of 50 queries.
 
 ## v4.0.0
 
@@ -53,7 +60,6 @@ The README has an [upgrade guide](./README.md#upgrading-from-v3), with a query t
 
 ### New
 
-- **`sql.batch([queries])`** sends queries in one round trip with a single Sync: outside a transaction they commit or roll back together, and the batch rejects with the failing query's position in `error.index`.
 - **Scheduling across connections:** when every connection is busy, a query is pipelined on the connection where it should be done soonest, from how long each statement took before and how long what is in flight has run, and slow queries are kept together once the rest of the pool is needed for quick ones. In simulations of mixed workloads, the p99 of quick queries fell 2 to 100 times; on PostgreSQL, a 1 ms lookup no longer waits behind a report on a busy pool (p99.9 from 792 ms to 5 ms). `scheduler: false` pipelines on the busy connection with the fewest queries in flight instead; v3 went round-robin over the busy connections. With `max: 1` it is off, as there is only one connection.
 - **`queue_timeout`:** seconds a query, transaction or reserve may wait for a connection before it rejects with `QUEUE_TIMEOUT`, unsent (#1036, #824).
 - **`.signal(abortSignal)`** on a query: aborting rejects it if it is still waiting, or cancels it if it is running.
@@ -130,12 +136,8 @@ The open issues and pull requests were triaged into 33 correctness bugs, each wi
 
 - A statement whose parameter types are all known is prepared, described and run in one round trip; one with parameters only the server can type is described first, once per connection, as in v3.
 - `int2`, `int4`, `oid` and `bool` columns are decoded straight from the bytes when they use the built-in parsers; a custom parser still gets the text.
-- `timestamptz`, and `timestamp` and `date` read as UTC, are decoded straight from the bytes when they use the built-in parsers, with the text parser for anything else (BC, `infinity`, years before 1000); about 20% more rows per second for rows with timestamps.
-- `bytea` and arrays of `int2`, `int4`, `int8` and `bool` are fetched in binary once a prepared statement's columns are known on the connection, when they use the built-in parsers: the values are the same as from the text, about 4.5 times faster to read for `bytea` and 3 times for an `int4[]`. A custom parser for the type or its elements, and `raw()`, still get the text.
 - A query on its way to a free connection goes straight to it, without the waiting queue.
-- A connection that becomes ready while others are still opening no longer takes the queries meant for those; 50 connections opened at once each run one of 50 queries.
 - Queries hold no more per-query state than they need, so almost nothing outlives a scavenge.
-- A cached prepared statement no longer keeps the query that prepared it, with its values and rows: 5,000 statements over 10 connections take about 3 MB of heap instead of 12, and the most the caches can hold is about 8 MB instead of 28.
 - One growing buffer per connection, encoded in place and written once at the end of the tick.
 - Plain and direct TLS connections read into one buffer per connection (`onread`) instead of a buffer per chunk, on Node, Bun and Deno.
 - Rows, column descriptions and command tags are decoded by hand.

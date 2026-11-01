@@ -1244,6 +1244,7 @@ const sql = postgres('postgres://username:password@host:port/database', {
   target_session_attrs : null,          // Use 'read-write' with multiple hosts to
                                         // ensure only connecting to primary
   fetch_types          : true,          // Fetches array types and other types it does not know
+  eager_types          : false,         // Fetches them when the pool starts instead of when first needed
   publications         : 'alltables',   // Publications for sql.subscribe
   slot                 : null,          // A permanent replication slot for sql.subscribe
   onread               : true,          // Read into one shared buffer per connection (Node.js, Bun, Deno)
@@ -1439,7 +1440,9 @@ A few things differ in Workers:
 
 ### Auto fetching of array types
 
-The built-in types and their arrays are known without asking the server. Before its first query a pool asks once for the array types and domains that the database has besides those, so an array of an enum or a domain over a built-in type is read and written like its base type. A type made after that, and any type that is neither, is read and written as text, as in v3.
+The built-in types and their arrays are known without asking the server. The first time a query meets a type the pool doesn't know, the pool asks once for the array types and domains that the database has besides those, so an array of an enum or a domain over a built-in type is read and written like its base type; that connection waits for the answer, which is read on another connection. A type made after that, and any type that is neither, is read and written as text, as in v3. With custom types by name, or `eager_types: true`, they are read when the pool starts instead.
+
+If the connection reading them fails, the read is tried again after `backoff`, and once `connect_timeout` has passed the connections waiting for it are closed and their queries reject.
 
 If you have revoked access to `pg_catalog` this feature will no longer work and will need to be disabled.
 
