@@ -1,4 +1,5 @@
 import net from 'net'
+import tls from 'tls'
 import crypto from 'crypto'
 import { t } from './test.js'
 import { postgres, sql, options, login, login_md5, login_scram, delay, idle_timeout, exec } from './setup.js'
@@ -100,6 +101,28 @@ t('Reconnect using SSL', async() => {
   await delay(200)
 
   return [1, (await sql`select 1 as x`)[0].x]
+})
+
+t('An ssl object without a ca builds a TLS context per connection, and with one a context its connections share until a value changes', async() => {
+  const create = tls.createSecureContext
+      , ssl = { rejectUnauthorized: false }
+      , sql = postgres({ ...options, ssl, max: 6 })
+  let built = 0
+  tls.createSecureContext = (...xs) => (built++, create(...xs))
+  try {
+    const reserved = [await sql.reserve(), await sql.reserve(), await sql.reserve()]
+        , without = built
+    ssl.ca = tls.rootCertificates
+    reserved.push(await sql.reserve(), await sql.reserve())
+    const shared = built
+    ssl.ca = [...tls.rootCertificates]
+    reserved.push(await sql.reserve())
+    reserved.forEach(x => x.release())
+    return ['3 4 5', [without, shared, built].join(' ')]
+  } finally {
+    tls.createSecureContext = create
+    await sql.end({ timeout: 0 })
+  }
 })
 
 t('Login without password', async() => {
@@ -488,7 +511,7 @@ t('Query runs on a new connection if the backend dies while fetching array types
   const proxy = net.createServer(client => {
     const server = net.connect(5432, 'localhost')
     client.on('data', x => {
-      if (!killed && x.includes('typarray')) {
+      if (!killed && x.includes('pg_type')) {
         killed = true
         server.destroy()
         return client.end(errorResponse('FATAL', '57P01'))
@@ -508,7 +531,7 @@ t('Query runs on a new connection if the backend dies while fetching array types
   proxy.close()
   process.off('unhandledRejection', onunhandled)
 
-  return ['1,0', [x, unhandled].join(',')]
+  return ['1,0,true', [x, unhandled, killed].join(',')]
 })
 
 t('Clean closes during startup reject queries and reserves instead of reconnecting forever', async() => {
@@ -526,6 +549,53 @@ t('Clean closes during startup reject queries and reserves instead of reconnecti
   server.close()
 
   return ['CONNECTION_CLOSED,CONNECTION_CLOSED,CONNECTION_CLOSED,true', [...codes, attempts < 10].join(',')]
+})
+
+t('Clean closes while fetching array types reject queries once connect_timeout has passed', { timeout: 10 }, async() => {
+  let attempts = 0
+
+  const proxy = net.createServer(client => {
+    const server = net.connect(5432, 'localhost')
+    attempts++
+    client.on('data', x => x.includes('pg_type') ? (server.destroy(), client.end()) : server.write(x))
+    server.on('data', x => client.writable && client.write(x))
+    client.on('error', () => server.destroy())
+    server.on('error', () => client.destroy())
+    client.on('close', () => server.destroy())
+  })
+
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, connect_timeout: 0.5 })
+  const start = Date.now()
+  const error = await sql`select ${ 1 }::int as x`.catch(e => e)
+  const waited = Date.now() - start
+  await sql.end()
+  proxy.close()
+
+  return ['CONNECTION_CLOSED true true select $1::int as x 1', [error.code, waited >= 500, attempts < 10, error.query, error.parameters].join(' ')]
+})
+
+t('A clean close while fetching array types is retried when connect_timeout is disabled', async() => {
+  let attempts = 0
+    , closed = false
+
+  const proxy = net.createServer(client => {
+    const server = net.connect(5432, 'localhost')
+    attempts++
+    client.on('data', x => !closed && x.includes('pg_type') ? (closed = true, server.destroy(), client.end()) : server.write(x))
+    server.on('data', x => client.writable && client.write(x))
+    client.on('error', () => server.destroy())
+    server.on('error', () => client.destroy())
+    client.on('close', () => server.destroy())
+  })
+
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+  const sql = postgres({ ...options, host: 'localhost', port: proxy.address().port, connect_timeout: 0 })
+  const x = await sql`select 1 as x`.then(([x]) => x.x, e => e.code)
+  await sql.end()
+  proxy.close()
+
+  return ['1 true 2', [x, closed, attempts].join(' ')]
 })
 
 t('A query refused with a FATAL error rejects with the peer error instead of reconnecting forever', async() => {

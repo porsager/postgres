@@ -847,3 +847,32 @@ t('A transaction terminated between statements rejects with the FATAL error, and
     await sql.end()
   ]
 })
+
+t('A savepoint or nested begin rejects when the connection is lost while its callback runs (#1281)', { timeout: 10 }, async() => {
+  const outcomes = []
+  for (const method of ['savepoint', 'begin']) {
+    const sql = postgres({ ...options, max: 1 })
+        , killer = postgres({ ...options, max: 1 })
+    let started
+      , release
+      , settled
+    const pid = new Promise(r => started = r)
+        , gate = new Promise(r => release = r)
+        , child = new Promise(r => settled = r)
+    const root = sql.begin(sql =>
+      sql[method](async sql => {
+        const [x] = await sql`select pg_backend_pid() as pid`
+        started(x.pid)
+        await gate
+        return 'child'
+      }).then(() => 'fulfilled', e => e.code).then(x => (settled(x), x))
+    ).catch(e => e.code)
+    await killer`select pg_terminate_backend(${ await pid })`
+    const outer = await root
+    release()
+    outcomes.push(outer + ' ' + await child)
+    await killer.end()
+    await sql.end()
+  }
+  return ['CONNECTION_CLOSED CONNECTION_CLOSED,CONNECTION_CLOSED CONNECTION_CLOSED', outcomes.join()]
+})
