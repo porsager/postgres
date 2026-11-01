@@ -123,6 +123,31 @@ t('listen reconnects', async() => {
   return [connects, 2]
 })
 
+t('listen keeps retrying when a reconnect attempt fails', { timeout: 20 }, async() => {
+  const admin = postgres({ ...options, user: 'postgres', pass: '', max: 1 })
+  await admin`drop role if exists postgres_js_test_listen`
+  await admin`create role postgres_js_test_listen login`
+  const sql = postgres({ ...options, host: process.env.PGSOCKET || '/tmp', user: 'postgres_js_test_listen', pass: '', backoff: () => 0.1 })
+      , xs = []
+
+  let listens = 0
+  try {
+    await sql.listen('test', x => xs.push(x), () => listens++)
+    await admin`alter role postgres_js_test_listen nologin`
+    await admin`select pg_terminate_backend(pid) from pg_stat_activity where usename = 'postgres_js_test_listen'`
+    await delay(500)
+    await admin`alter role postgres_js_test_listen login`
+    await until(() => listens === 2)
+    await admin.notify('test', 'a')
+    await until(() => xs.length === 1)
+    return ['2 a', listens + ' ' + xs[0]]
+  } finally {
+    await sql.end()
+    await admin`drop role postgres_js_test_listen`
+    await admin.end()
+  }
+})
+
 t('listen result reports correct connection state after reconnection', async() => {
   const sql = postgres(options)
       , xs = []
