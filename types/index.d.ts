@@ -102,6 +102,9 @@ declare namespace postgres {
     types?: number[] | undefined
   }
 
+  /** Quote a name as an identifier the way `sql(name)` does, without `transform`: `a.b"c` becomes `"a"."b""c"` */
+  function escapeIdentifier(str: string): string
+
   /** snake_case to PascalCase */
   function toPascal(str: string): string
   namespace toPascal {

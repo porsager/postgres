@@ -40,6 +40,11 @@ t('Transform column names in helpers', async() => {
   ]
 })
 
+t('escapeIdentifier quotes like sql(name)', async() => [
+  sql`select * from ${ sql('s.t"x') }`.text,
+  'select * from ' + postgres.escapeIdentifier('s.t"x')
+])
+
 t('Transform undefined to null', async() => {
   const sql = postgres({ host: 'localhost', port: 1, transform: { undefined: null } })
   return [JSON.stringify(['select $1', [null]]), show(sql`select ${ undefined }`)]

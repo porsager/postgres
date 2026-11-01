@@ -680,6 +680,15 @@ Values go in `args` and are referred to as `$1`, `$2` and so on, so they are nev
 sql.unsafe('select * from users where id = $1 and age > $2', [id, age])
 ```
 
+Identifiers can't go in `args`. `postgres.escapeIdentifier` quotes one the way `sql(name)` does, but without applying `transform`:
+
+```js
+sql.unsafe('select * from ' + postgres.escapeIdentifier('app.users') + ' where id = $1', [id])
+
+// Which results in:
+select * from "app"."users" where id = $1
+```
+
 `options` takes:
 
 | Option | Default | |
