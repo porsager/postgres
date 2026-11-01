@@ -457,7 +457,7 @@ t('idle_in_transaction_session_timeout rejects the transaction', { timeout: 5 },
     await sql`select 1`
   }).catch(e => e)
   await sql.end()
-  return ['CONNECTION_CLOSED', error.code]
+  return ['25P03', error.code]
 })
 
 t('Transaction queries fail after its connection is gone even if the callback continues', { timeout: 5 }, async() => {
@@ -491,7 +491,7 @@ t('Disconnect rejects queued transaction queries and allows reconnect', async() 
     const results = await Promise.allSettled(queries)
     const [{ x }] = await sql`select 1 as x`
     return [
-      'CONNECTION_CLOSED,rejected,rejected,rejected,1',
+      '57P01,rejected,rejected,rejected,1',
       [error.code, ...results.map(x => x.status), x].join(',')
     ]
   } finally {
@@ -799,6 +799,53 @@ t('sql.rollback() comes after the queries already made, and the connection is le
   const [{ n }] = await sql`select count(*)::int as n from test`
       , [{ status }] = await sql`select state as status from pg_stat_activity where pid = pg_backend_pid()`
   return ['true 0 active', same + ' ' + n + ' ' + status, await sql`drop table test`, await sql.end()]
+})
+
+t('A transaction ended by transaction_timeout rejects with the FATAL error instead of CONNECTION_CLOSED (#1283)', async() => {
+  const [{ supported }] = await sql`select current_setting('server_version_num')::int >= 170000 as supported`
+  if (!supported)
+    return [true, true]
+
+  const timed = postgres({ ...options, max: 1 })
+  const error = await timed.begin(async sql => {
+    await sql`select set_config('transaction_timeout', '200', true)`
+    await sql`select pg_sleep(2)`
+  }).catch(e => e)
+  return ['25P04 FATAL', error.code + ' ' + error.severity, await timed.end()]
+})
+
+t('A transaction whose backend is terminated mid-query rejects with the FATAL error (#1283)', async() => {
+  const sql = postgres({ ...options, max: 1 })
+      , killer = postgres({ ...options, max: 1 })
+  const error = await sql.begin(async sql => {
+    const [{ pid }] = await sql`select pg_backend_pid() as pid`
+    const query = sql`select pg_sleep(2)`.execute()
+    while (!(await killer`select wait_event = 'PgSleep' as sleeping from pg_stat_activity where pid = ${ pid }`)[0].sleeping)
+      await delay(1)
+    await killer`select pg_terminate_backend(${ pid })`
+    await query
+  }).catch(e => e)
+  return ['57P01 FATAL', error.code + ' ' + error.severity, await killer.end(), await sql.end()]
+})
+
+t('A transaction terminated between statements rejects with the FATAL error, and its next query has it as cause (#1283)', async() => {
+  const sql = postgres({ ...options, max: 1 })
+      , killer = postgres({ ...options, max: 1 })
+  let settled
+  const next = new Promise(r => settled = r)
+  const error = await sql.begin(async sql => {
+    const [{ pid }] = await sql`select pg_backend_pid() as pid`
+    await killer`select pg_terminate_backend(${ pid })`
+    await delay(100)
+    settled(await sql`select 1`.catch(e => e))
+  }).catch(e => e)
+  const later = await next
+  return [
+    '57P01 FATAL CONNECTION_CLOSED 57P01',
+    [error.code, error.severity, later.code, later.cause && later.cause.code].join(' '),
+    await killer.end(),
+    await sql.end()
+  ]
 })
 
 t('A savepoint or nested begin rejects when the connection is lost while its callback runs (#1281)', { timeout: 10 }, async() => {

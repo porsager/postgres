@@ -522,7 +522,11 @@ export function Pool(options, types) {
     c.retired && c.retired.forEach(r => r())
     c.idleTimer && clearTimeout(c.idleTimer)
     c.lifeTimer && clearTimeout(c.lifeTimer)
-    c.lease && c.lease.onclose && c.lease.onclose(error.code === 'CONNECTION_DESTROYED' ? Errors.connection('CONNECTION_CLOSED', options, c.host, c.port) : error)
+    c.lease && c.lease.onclose && c.lease.onclose(
+      error.cause && error.cause.severity === 'FATAL' ? error.cause
+      : error.code === 'CONNECTION_DESTROYED' ? Errors.connection('CONNECTION_CLOSED', options, c.host, c.port)
+      : error
+    )
     options.onclose && options.onclose(c.id)
     listened(channels.pool) && event('close', c, { error })
     connections.size === 0 && opening === 0 && statements.clear()

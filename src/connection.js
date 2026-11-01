@@ -519,9 +519,10 @@ export function Connection(ready, options, events) {
     blocker = null
     fence = null
     notables = 0
-    closed = Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
-    closed.cause = connection.fatal || error || undefined
     const head = sent[0]
+        , fatal = connection.fatal || head && !head.ends && head.error && head.error.severity === 'FATAL' && head.error
+    closed = Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
+    closed.cause = fatal || error || undefined
     sent.splice(0).forEach(x => {
       x.stream && x.stream.destroy(closed)
       x.own ? settle(x)
