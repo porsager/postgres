@@ -30,10 +30,18 @@
     "/types/index.d.ts"
   ],
   "author": "Rasmus Porsager <rasmus@porsager.com> (https://www.porsager.com)",
+  "keywords": ["postgres", "postgresql", "pg", "client", "driver", "sql", "database", "cloudflare-workers"],
   "funding": {
     "type": "individual",
     "url": "https://github.com/sponsors/porsager"
   },
-  "license": "Unlicense",
-  "repository": "porsager/postgres"
+  "homepage": "https://github.com/porsager/postgres#readme",
+  "bugs": {
+    "url": "https://github.com/porsager/postgres/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/porsager/postgres.git"
+  },
+  "license": "Unlicense"
 }
