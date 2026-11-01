@@ -471,7 +471,7 @@ t('subscribe gives unchanged TOAST values as undefined, transforms values and re
   await sub.subscribe('update:test', () => { throw new Error('sync') }, () => {}, e => errors.push(e.message))
   await sql`insert into test (name, big) values ('a', (select string_agg(md5(random()::text), '') from generate_series(1, 1000)))`
   await sql`update test set name = 'b'`
-  await until(() => seen.length && errors.length)
+  await until(() => seen.length && errors.length, 20000, () => JSON.stringify({ seen, errors }))
   await sub.end()
   return ['B undefined sync', seen.join() + ' ' + errors.join(), await done()]
 })
