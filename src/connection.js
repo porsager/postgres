@@ -520,7 +520,7 @@ export function Connection(ready, options, events) {
     fence = null
     notables = 0
     const head = sent[0]
-        , fatal = connection.fatal || head && head.error && head.error.severity === 'FATAL' && head.error
+        , fatal = connection.fatal || head && !head.ends && head.error && head.error.severity === 'FATAL' && head.error
     closed = Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
     closed.cause = fatal || error || undefined
     sent.splice(0).forEach(x => {
