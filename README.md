@@ -917,7 +917,11 @@ const data = await sql`SELECT ${ sql('aTest', 'bTest') } FROM camel_case`
 console.log(data) // [ { aTest: 1, bTest: '1' } ]
 ```
 
+The built-in transforms also rename the keys of JSON values in results, but send JSON values as they are. Add `json: false` to leave JSON values as they are both ways, or `json: true` to rename their keys when sending as well: `postgres({ transform: { ...postgres.camel, json: false } })`.
+
 To only perform half of the transformation (eg. only the transformation **to** or **from** camel case), use the other transformation functions:
+
+> For historical reasons `postgres.toCamel`, `postgres.toPascal` and `postgres.toKebab` also transform the names given to helpers, as `camel`, `pascal` and `kebab` do. To transform only the column names of results, use `{ column: { from: postgres.toCamel } }`.
 
 ```js
 // Transform the column names only to camel case

@@ -7,6 +7,7 @@
 - **`query_timeout`** (#1278). Seconds a query may take, waiting for a connection and running together, before it is canceled and rejects with `QUERY_TIMEOUT`. Off by default. Unlike `statement_timeout` it also ends a query whose server or network has gone silent, which TCP alone takes many minutes to notice. Transaction control queries and `forEach` are limited too; cursors, streams and `sql.listen` are not.
 - **`cancel_timeout`**, 5 seconds by default: how long a canceled query may take to end before its connection is closed.
 - **`sql.batch([queries])`** sends queries in one round trip with a single Sync: outside a transaction they commit or roll back together, and the batch rejects with the failing query's position in `error.index`.
+- **`json` on a transform** (#1169). The built-in transforms rename the keys of JSON values in results but send JSON values as they are. `json: false` leaves JSON values as they are both ways, and `json: true` renames their keys when sending too, with the transform's `column.to`. Without it nothing changes.
 - **`eager_types`**: `true` reads array types and domains when the pool starts instead of when a query first meets one.
 
 ### Fixed

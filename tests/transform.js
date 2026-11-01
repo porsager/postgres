@@ -240,3 +240,46 @@ t('transform.row applies to .values() rows too, as in v3', async() => {
   const [row] = await sql`select 1 as a`.values()
   return ['1 true', row[0] + ' ' + row.transformed, await sql.end()]
 })
+
+async function jsonTable(transform) {
+  const raw = postgres({ ...options, max: 1, onnotice: false })
+      , sql = postgres({ ...options, max: 1, transform })
+  await raw`create table test (id int, home_address jsonb)`
+  return { raw, sql, done: async() => (await raw`drop table test`, await sql.end(), await raw.end()) }
+}
+
+t('json: true renames the keys of JSON values sent, and a value read matches again', async() => {
+  const { raw, sql, done } = await jsonTable({ ...postgres.camel, json: true })
+  await sql`insert into test ${ sql({ id: 1, homeAddress: { streetName: 'Main St', past: [{ zipCode: 1 }], note: 'keepThis' } }) }`
+  const [{ home_address }] = await raw`select home_address from test`
+  const [user] = await sql`select * from test`
+  const found = await sql`select id from test where home_address @> ${ sql.json(user.homeAddress) }`
+  return [
+    '{"note":"keepThis","past":[{"zip_code":1}],"street_name":"Main St"} Main St 1',
+    [JSON.stringify(home_address), user.homeAddress.streetName, found.length].join(' '),
+    await done()
+  ]
+})
+
+t('JSON values are sent as they are without json: true', async() => {
+  const { raw, sql, done } = await jsonTable(postgres.camel)
+  await sql`insert into test ${ sql({ id: 1, homeAddress: { streetName: 'Main St' } }) }`
+  const [{ home_address }] = await raw`select home_address from test`
+  return ['{"streetName":"Main St"}', JSON.stringify(home_address), await done()]
+})
+
+t('json: false leaves JSON values as they are both ways', async() => {
+  const { sql, done } = await jsonTable({ ...postgres.camel, json: false })
+  await sql`insert into test ${ sql({ id: 1, homeAddress: { street_name: 'Main St', zipCode: 1 } }) }`
+  const [user] = await sql`select * from test`
+  const found = await sql`select id from test where home_address @> ${ sql.json(user.homeAddress) }`
+  return ['{"zipCode":1,"street_name":"Main St"} 1', JSON.stringify(user.homeAddress) + ' ' + found.length, await done()]
+})
+
+t('json: false keeps a value transform of your own', async() => {
+  const { sql, done } = await jsonTable({ value: { from: x => typeof x === 'number' ? x + 1 : x }, json: false })
+  await sql`insert into test values (1, ${ sql.json({ a_b: 1 }) })`
+  const [{ id, home_address }] = await sql`select * from test`
+  return ['2 {"a_b":1}', id + ' ' + JSON.stringify(home_address), await done()]
+})
+

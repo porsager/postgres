@@ -574,14 +574,16 @@ function max_lifetime() {
 }
 
 function parseTransform(x) {
+  const value = typeof x.value === 'function' ? x.value : x.value && x.value.from
   return {
     undefined: x.undefined,
+    json: x.json === true || (x.json === false ? false : undefined),
     column: {
       from: typeof x.column === 'function' ? x.column : x.column && x.column.from,
       to: x.column && x.column.to
     },
     value: {
-      from: typeof x.value === 'function' ? x.value : x.value && x.value.from,
+      from: x.json === false && value && value.keys ? undefined : value,
       to: x.value && x.value.to
     },
     row: {

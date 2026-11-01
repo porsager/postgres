@@ -341,6 +341,8 @@ declare namespace postgres {
   interface TransformOptions {
     /** What undefined is sent as, instead of failing with UNDEFINED_VALUE */
     undefined?: any
+    /** JSON keys: true renames them in values sent too, with `column.to`; false leaves JSON values as they are both ways; unset renames them in results only */
+    json?: boolean | undefined
     column?: ((column: string) => string) | {
       /** Column names in results */
       from?: ((column: string) => string) | undefined
@@ -359,6 +361,7 @@ declare namespace postgres {
 
   interface Transform {
     undefined: any
+    json: boolean | undefined
     column: {
       from: ((column: string) => string) | undefined
       to: ((column: string) => string) | undefined

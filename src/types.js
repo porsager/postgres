@@ -195,6 +195,9 @@ export function Types(options = {}) {
   register(custom.filter(x => !named.includes(x)))
   custom.forEach(x => [x.to].concat(x.from || []).forEach(oid => own.add(oid)))
 
+  const keys = options.transform && options.transform.json && options.transform.column.to
+  keys && [114, 3802].forEach(oid => own.has(oid) || (serializers[oid] = renamed(serializers[oid], keys)))
+
   const bases = {}
 
   return {
@@ -478,8 +481,28 @@ export const fromCamel = x => x.replace(/([A-Z])/g, '_$1').toLowerCase()
 export const fromPascal = x => (x.slice(0, 1) + x.slice(1).replace(/([A-Z])/g, '_$1')).toLowerCase()
 export const fromKebab = x => x.replace(/-/g, '_')
 
+function renamed(serialize, fn) {
+  return x => serialize(rename(x, fn))
+}
+
+function rename(x, fn) {
+  if (Array.isArray(x))
+    return x.map(x => rename(x, fn))
+
+  if (x === null || typeof x !== 'object' || (Object.getPrototypeOf(x) !== Object.prototype && Object.getPrototypeOf(x) !== null))
+    return x
+
+  const out = {}
+  for (const k in x)
+    Object.hasOwn(x, k) && Object.defineProperty(out, fn(k), { value: rename(x[k], fn), enumerable: true, writable: true, configurable: true })
+  return out
+}
+
 function createJsonTransform(fn) {
-  return function jsonTransform(x, column) {
+  jsonTransform.keys = true
+  return jsonTransform
+
+  function jsonTransform(x, column) {
     return typeof x === 'object' && x !== null && (column.type === 114 || column.type === 3802)
       ? Array.isArray(x)
         ? x.map(x => jsonTransform(x, column))
