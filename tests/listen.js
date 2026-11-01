@@ -1,3 +1,4 @@
+import net from 'net'
 import { t } from './test.js'
 import { postgres, options, delay } from './setup.js'
 
@@ -146,6 +147,39 @@ t('listen keeps retrying when a reconnect attempt fails', { timeout: 20 }, async
     await admin`drop role postgres_js_test_listen`
     await admin.end()
   }
+})
+
+t('listen keeps retrying while a restarting server refuses connections', { timeout: 20 }, async() => {
+  const sockets = new Set()
+  let server = null
+  const open = port => new Promise(r => {
+    server = net.createServer(client => {
+      const upstream = net.connect(options.port || 5432, options.host || 'localhost')
+      sockets.add(client).add(upstream)
+      client.pipe(upstream).pipe(client)
+      const drop = () => (client.destroy(), upstream.destroy())
+      client.on('error', drop).on('close', drop)
+      upstream.on('error', drop).on('close', drop)
+    }).listen(port, 'localhost', () => r(server.address().port))
+  })
+  const port = await open(0)
+  const sql = postgres({ ...options, host: 'localhost', port, backoff: () => 0.1 })
+      , xs = []
+
+  let listens = 0
+  await sql.listen('restart', x => xs.push(x), () => listens++)
+  sockets.forEach(x => x.destroy())
+  await new Promise(r => server.close(r))
+  await delay(400)
+  await open(port)
+  await until(() => listens === 2)
+  await sql.notify('restart', 'a')
+  await until(() => xs.length === 1)
+  const result = listens + ' ' + xs[0]
+  await sql.end()
+  sockets.forEach(x => x.destroy())
+  server.close()
+  return ['2 a', result]
 })
 
 t('listen result reports correct connection state after reconnection', async() => {

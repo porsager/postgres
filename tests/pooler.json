@@ -1,5 +1,6 @@
 {
   "always": [
+    "listen.js: listen keeps retrying when a reconnect attempt fails",
     "connection.js: connection parameters",
     "connection.js: Unix socket",
     "errors.js: throws correct error when authentication fails",
@@ -30,6 +31,7 @@
     "listen.js: multiple listeners work after a reconnect"
   ],
   "transaction": [
+    "listen.js: listen keeps retrying while a restarting server refuses connections",
     "connection.js: query_timeout does not time cursors or listen",
     "reserve.js: reserve queued behind a terminated connection",
     "reserve.js: Reserved connection rejects queries after its backend is terminated",
@@ -61,6 +63,7 @@
     "prepared.js: Statements past the connection and pool limits are closed and prepared again when used"
   ],
   "prepared": [
+    "listen.js: listen keeps retrying while a restarting server refuses connections",
     "connection.js: query_timeout does not time cursors or listen",
     "connection.js: A NUL character in query text is rejected by the server and leaves the connection usable",
     "reserve.js: reserve queued behind a terminated connection",

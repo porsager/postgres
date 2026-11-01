@@ -332,7 +332,7 @@ function Listen(options) {
   return {
     listen,
     end: () => {
-      channels.forEach(channel => clearTimeout(channel.timer))
+      channels.forEach(channel => channel.timer && options.timers.clearTimeout(channel.timer))
       return closing || (sql ? (closing = sql.end({ timeout: 0 })) : Promise.resolve())
     }
   }
@@ -370,7 +370,7 @@ function Listen(options) {
 
       retries++
       const seconds = typeof options.backoff === 'function' ? options.backoff(retries) : options.backoff
-      channel.timer = setTimeout(() => !closing && channels.get(name) === channel && relisten(channel, name, retries), seconds * 1000)
+      channel.timer = options.timers.setTimeout(() => !closing && channels.get(name) === channel && relisten(channel, name, retries), seconds * 1000)
     })
   }
 
