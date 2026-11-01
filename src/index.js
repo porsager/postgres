@@ -329,7 +329,10 @@ function Listen(options) {
 
   return {
     listen,
-    end: () => closing || (sql ? (closing = sql.end({ timeout: 0 })) : Promise.resolve())
+    end: () => {
+      channels.forEach(channel => clearTimeout(channel.timer))
+      return closing || (sql ? (closing = sql.end({ timeout: 0 })) : Promise.resolve())
+    }
   }
 
   function connection() {
@@ -344,18 +347,28 @@ function Listen(options) {
         if (closing)
           return
 
-        channels.forEach((channel, name) => {
-          channel.result = start(name)
-          channel.result.then(result => {
-            Object.assign(channel.state, result.state)
-            channel.listeners.forEach(l => l.onlisten && l.onlisten())
-          }, () => {})
-        })
+        channels.forEach((channel, name) => relisten(channel, name))
       },
       onnotify(channel, payload) {
         channels.has(channel) && [...channels.get(channel).listeners].forEach(l => l.fn(payload))
       }
     }))
+  }
+
+  function relisten(channel, name, retries = 0) {
+    channel.timer = null
+    channel.result = start(name)
+    channel.result.then(result => {
+      Object.assign(channel.state, result.state)
+      channel.listeners.forEach(l => l.onlisten && l.onlisten())
+    }, () => {
+      if (closing || channels.get(name) !== channel)
+        return
+
+      retries++
+      const seconds = typeof options.backoff === 'function' ? options.backoff(retries) : options.backoff
+      channel.timer = setTimeout(() => !closing && channels.get(name) === channel && relisten(channel, name, retries), seconds * 1000)
+    })
   }
 
   function start(name) {
