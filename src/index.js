@@ -15,7 +15,7 @@ import {
   fromKebab
 } from './types.js'
 
-import { Identifier, Builder } from './build.js'
+import { Identifier, Builder, escapeIdentifier } from './build.js'
 import { Query, CLOSE } from './query.js'
 import { Pool } from './pool.js'
 import { Errors, PostgresError } from './errors.js'
@@ -34,6 +34,7 @@ Object.assign(Postgres, {
   fromPascal,
   fromCamel,
   fromKebab,
+  escapeIdentifier,
   BigInt: {
     to: 20,
     from: [20],

@@ -174,6 +174,8 @@ pass(postgres())
 
 const named: string = postgres.toCamel('a_b')
 postgres.fromCamel(named)
+const quoted: string = postgres.escapeIdentifier('a.b')
+sql.unsafe('select * from ' + quoted)
 
 dc.subscribe('tracing:postgres:query:asyncEnd', message => {
   const x = message as QueryTrace
