@@ -1449,6 +1449,66 @@ t('A cancel request that fails over TLS does not crash the process, for query_ti
   ]
 })
 
+t('A query that times out while pipelined does not cancel the query after it', { timeout: 20 }, async() => {
+  const sql = postgres({ ...options, max: 1, query_timeout: 0.3 })
+  await sql`select 1`
+  const outcomes = []
+  for (let i = 0; i < 10; i++) {
+    const slow = sql`select pg_sleep(0.4)`.then(() => 'ok', e => e.code)
+        , fast = sql`select ${ i }::int as x`.then(() => 'ok', e => e.code)
+    await delay(150)
+    const third = sql`select pg_sleep(0.1), ${ i }::int as y`.then(() => 'ok', e => e.code)
+    outcomes.push([await slow, await fast, await third].join('/'))
+  }
+  return ['QUERY_TIMEOUT/ok/ok', [...new Set(outcomes)].join(), await sql.end()]
+})
+
+t('A timed out query waiting behind an untimed one is ended when the server goes silent', { timeout: 15 }, async() => {
+  const relay = await hushable()
+  const sql = postgres({ ...options, host: 'localhost', port: relay.port, max: 1, query_timeout: 0.3, cancel_timeout: 0.4 })
+  let behind = null
+  const start = Date.now()
+  const error = await sql.begin(async sql => {
+    await sql`select x from generate_series(1, 2) x`.cursor(async() => {
+      if (behind)
+        return
+      relay.hush(true)
+      behind = sql`select 1`.catch(e => e)
+      await behind
+    })
+  }).catch(e => e)
+  const timed = await behind
+  const took = Date.now() - start
+  relay.hush(false)
+  const [{ x }] = await sql`select 1 as x`
+  relay.close()
+  return [
+    'QUERY_TIMEOUT CANCEL_UNANSWERED true true 1',
+    [timed.code, timed.cause && timed.cause.code, !!error, took < 5000, x].join(' '),
+    await sql.end()
+  ]
+})
+
+t('A query waiting for types that times out rejects without closing its connection, and the type read is bounded', { timeout: 15 }, async() => {
+  await sql`create type test_mood as enum ('ok', 'sad')`
+  const proxy = net.createServer(client => {
+    const server = net.connect(options.port || 5432, options.host || 'localhost')
+    client.on('data', x => x.includes('pg_catalog.pg_type') || server.write(x))
+    server.on('data', x => client.writable && client.write(x))
+    client.on('error', () => server.destroy())
+    server.on('error', () => client.destroy())
+    client.on('close', () => server.destroy())
+  })
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+  const lazy = postgres({ ...options, host: 'localhost', port: proxy.address().port, max: 1, query_timeout: 0.3, cancel_timeout: 0.3, connect_timeout: 1 })
+  const [{ pid }] = await lazy`select pg_backend_pid() as pid`
+  const error = await lazy`select '{ok,sad}'::test_mood[] as m`.catch(e => e)
+  const [after] = await lazy`select pg_backend_pid() as pid`
+  await lazy.end({ timeout: 0 })
+  proxy.close()
+  return ['QUERY_TIMEOUT true', error.code + ' ' + (after.pid === pid), await sql`drop type test_mood`]
+})
+
 t('query_timeout counts the time a query waits for a connection', { timeout: 10 }, async() => {
   const sql = postgres({ ...options, max: 1, query_timeout: 0.2 })
   const reserved = await sql.reserve()

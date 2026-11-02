@@ -649,7 +649,7 @@ A query waits for a connection when every connection is reserved, in a transacti
 
 `statement_timeout` is the better limit while the server answers, since the server enforces it and the outcome is known. `query_timeout` is the backstop for when it does not: a server or network that goes silent leaves a query waiting for as long as TCP takes to notice, which is many minutes with default keepalive settings. When a cancel request, from `.cancel()`, `.signal()` or `query_timeout`, gets no answer within `cancel_timeout` (5 seconds by default), the connection is closed and the pool connects again for the next query. As nobody knows whether the queries on that connection ran, they reject with `CONNECTION_DESTROYED`, or a timed out one with `QUERY_TIMEOUT`, whose `cause` is `CANCEL_UNANSWERED`. `cancel_timeout: 0` waits for the answer as long as it takes.
 
-PostgreSQL cancels whatever the connection is running when the request arrives, so a cancel sent just as a query finishes can cancel the query pipelined after it instead. Postgres.js doesn't send it for a query whose result has already arrived, but one still on its way can't be told apart.
+PostgreSQL cancels whatever the connection is running when the request arrives, so a cancel sent just as a query finishes can cancel the query pipelined after it instead. Postgres.js doesn't send it for a query whose result has already arrived, and a query that runs out of time while it waits behind another one on its connection gets its own `query_timeout` once its turn comes before it is canceled, so a quick query just finishes. If the server sends nothing for `cancel_timeout` while such a query waits, the connection is closed.
 
 ### Execute
 

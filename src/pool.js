@@ -495,8 +495,17 @@ export function Pool(options, types) {
       const q = new Query([text], [], Object.assign(() => {}, { options }), { simple: true })
       q.executed = true
       q.then(resolve, reject)
+      bound(c, q)
       c.simple(q, text)
     })
+  }
+
+  function bound(c, q) {
+    if (!options.query_timeout)
+      return
+
+    const timer = setTimeout(() => q.settled || c.cancel(q).catch(noop), options.query_timeout * 1000)
+    q.then(() => clearTimeout(timer), () => clearTimeout(timer))
   }
 
   function retype() {
@@ -522,6 +531,7 @@ export function Pool(options, types) {
       q.executed = true
       q.then(resolve, reject)
       types.named || (c.typing = q)
+      bound(c, q)
       c.simple(q, text)
     })).then(() => typesLoaded = true, error => error instanceof PostgresError
       ? typesLoaded = true
