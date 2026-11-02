@@ -397,7 +397,7 @@ function Listen(options) {
 
   function start(name) {
     const x = connection()
-    return x`listen ${ x.unsafe('"' + name.replace(/"/g, '""') + '"') }`
+    return x`listen ${ x.identifier(name) }`
   }
 
   async function listen(name, fn, onlisten) {
@@ -430,7 +430,7 @@ function Listen(options) {
       if (closing || !x)
         return
 
-      await x`unlisten ${ x.unsafe('"' + name.replace(/"/g, '""') + '"') }`.catch(e => {
+      await x`unlisten ${ x.identifier(name) }`.catch(e => {
         if (!/^CONNECTION_/.test(e.code))
           throw e
       })
