@@ -5,6 +5,7 @@ import { channels, active, start, finish, now, userName } from './diagnostics.js
 import { statement } from './result.js'
 
 const origins = new WeakMap()
+    , noop = () => {}
 
 export const CLOSE = {}
 
@@ -118,9 +119,9 @@ export class Query extends Promise {
       return this
 
     if (signal.aborted)
-      return (this.cancel(), this)
+      return (this.cancel().catch(noop), this)
 
-    const abort = () => this.cancel()
+    const abort = () => this.cancel().catch(noop)
     signal.addEventListener('abort', abort, { once: true })
     this.aborts = () => (this.aborts = null, signal.removeEventListener('abort', abort))
     return this

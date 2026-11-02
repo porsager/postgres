@@ -5,6 +5,7 @@ import { Errors, PostgresError, queryError } from './errors.js'
 import { channels, listened } from './diagnostics.js'
 
 const begins = /\bbegin\b/i
+    , noop = () => {}
     , starts = /\bstart\b/gi
     , transaction = /^transaction\b/i
 
@@ -117,7 +118,7 @@ export function Pool(options, types) {
   function deadline(q) {
     q.timer = setTimeout(() => {
       q.timer = null
-      q.settled || (q.timedOut = true, cancel(q))
+      q.settled || (q.timedOut = true, cancel(q).catch(noop))
     }, options.query_timeout * 1000)
   }
 

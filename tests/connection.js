@@ -1428,6 +1428,27 @@ t('query_timeout rejects a batch whose server stops answering', { timeout: 10 },
   return ['QUERY_TIMEOUT CANCEL_UNANSWERED 1', [error.code, error.cause && error.cause.code, after.x].join(' '), await sql.end()]
 })
 
+t('A cancel request that fails over TLS does not crash the process, for query_timeout and signal', { timeout: 15 }, async() => {
+  const relay = await hushable()
+  const connect = extra => postgres({ ...options, host: 'localhost', port: relay.port, ssl: 'require', max: 1, cancel_timeout: 0.5, ...extra })
+      , timed = connect({ query_timeout: 0.2 })
+      , signalled = connect()
+  await Promise.all([timed`select 1`, signalled`select 1`])
+  relay.hush(true)
+  const result = await Promise.all([
+    timed`select 1`.catch(e => e.code + ' ' + (e.cause && e.cause.code)),
+    signalled`select 1`.signal(AbortSignal.timeout(200)).catch(e => e.code + ' ' + (e.cause && e.cause.code))
+  ])
+  relay.hush(false)
+  relay.close()
+  return [
+    'QUERY_TIMEOUT CANCEL_UNANSWERED,CONNECTION_DESTROYED CANCEL_UNANSWERED',
+    result.join(),
+    await timed.end({ timeout: 0 }),
+    await signalled.end({ timeout: 0 })
+  ]
+})
+
 t('query_timeout counts the time a query waits for a connection', { timeout: 10 }, async() => {
   const sql = postgres({ ...options, max: 1, query_timeout: 0.2 })
   const reserved = await sql.reserve()
