@@ -13,7 +13,7 @@
     }
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=18"
   },
   "scripts": {
     "test": "node tests/unit && node tests/index.js && node tests/simulate.js",
