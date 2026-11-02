@@ -497,7 +497,7 @@ const backendMessage = (type, body) => {
   return Buffer.concat([header, body])
 }
 
-const errorResponse = (severity, code) => backendMessage('E', Buffer.from('S' + severity + '\0V' + severity + '\0C' + code + '\0M' + code + '\0\0'))
+const errorResponse = (severity, code, localizedOnly) => backendMessage('E', Buffer.from('S' + severity + '\0' + (localizedOnly ? '' : 'V' + severity + '\0') + 'C' + code + '\0M' + code + '\0\0'))
 
 const userTypeColumn = backendMessage('T', Buffer.concat([
   Buffer.from([0, 1]), Buffer.from('x\0'), Buffer.from([0, 0, 0, 0, 0, 0, 0, 0, 0x40, 0x74, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0])
@@ -671,6 +671,25 @@ t('A query refused with a FATAL error rejects with the peer error instead of rec
   process.off('unhandledRejection', onunhandled)
 
   return ['08P01,true,0', [code, attempts < 10, unhandled].join(',')]
+})
+
+t('A FATAL with the severity only in the S field rejects the query and sql.begin with it', async() => {
+  const server = await listening(net.createServer(socket => {
+    let started = false
+    socket.on('error', () => socket.destroy())
+    socket.on('data', () => started
+      ? socket.end(errorResponse('FATAL', '08P01', true))
+      : (started = true, socket.write(authenticated))
+    )
+  }))
+
+  const sql = postgres({ ...options, host: '127.0.0.1', port: server.address().port })
+  const query = await sql`select 1`.catch(e => e.code)
+      , begin = await sql.begin(sql => sql`select 1`).catch(e => e.code)
+  await sql.end()
+  server.close()
+
+  return ['08P01,08P01', [query, begin].join(',')]
 })
 
 t('Failed array type fetch on a live connection is not an unhandled rejection', async() => {

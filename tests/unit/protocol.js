@@ -189,6 +189,13 @@ t('Decode ErrorResponse fields', async() => {
   ]
 })
 
+t('Decode ErrorResponse with the severity only in the S field', async() => {
+  const e = decode(p.error, msg('E',
+    str('SFATAL'), str('C08P01'), str('Mserver login has been failing, try again later (server_login_retry)'), Buffer.from([0])
+  ))
+  return ['FATAL|FATAL|08P01', [e.severity, e.severity_local, e.code].join('|')]
+})
+
 t('Decode RowDescription', async() => {
   const columns = decode(p.rowDescription, msg('T', i16(2),
     str('id'), i32(16384), i16(1), i32(23), i16(4), i32(-1), i16(0),
