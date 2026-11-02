@@ -716,7 +716,7 @@ const table_name = 'friends'
 
 await sql`
   create or replace trigger ${sql(triggerName)}
-  after ${sql.unsafe(eventType)} on ${sql.unsafe(`${schema_name}.${table_name}`)}
+  after ${sql.unsafe(eventType)} on ${sql.identifier(schema_name, table_name)}
   for each row
   execute function ${sql(triggerFnName)}()
 `
