@@ -40,6 +40,11 @@ type SerializableObject<T, K extends readonly any[], TT> =
       & Record<string, any>
     >
 
+type GenericRow<T, K extends readonly any[], TT> =
+  K['length'] extends 0
+    ? Record<string, postgres.ParameterOrJSON<TT> | undefined>
+    : Partial<Record<Keys & keyof T & (K extends readonly [readonly (infer C)[]] ? C : K[number]), postgres.ParameterOrJSON<TT> | undefined>>
+
 type First<T, K extends readonly any[], TT> =
   T extends TemplateStringsArray ? TemplateStringsArray :
   T extends string ? string :
@@ -799,6 +804,24 @@ declare namespace postgres {
      * @example const select = <T extends 'users' | 'posts'>(table: T) => sql`select * from ${ sql(table) }`
      */
     <T extends string, K extends readonly string[]>(first: T, ...rest: K): Helper<T, K>
+
+    /**
+     * Rows whose type is a type parameter
+     * @example const insert = <T extends { name: string }>(rows: T[]) => sql`insert into users ${ sql(rows) }`
+     */
+    <T extends object, K extends readonly (Keys & keyof T)[] | [readonly (Keys & keyof T)[]] | [readonly string[]]>(
+      first: readonly (T & GenericRow<T, K, TTypes[keyof TTypes]>)[],
+      ...rest: K
+    ): Helper<readonly T[], K>
+
+    /**
+     * An object whose type is a type parameter
+     * @example const update = <T extends { name: string }>(row: T) => sql`update users set ${ sql(row, 'name') } where id = 1`
+     */
+    <T extends object, K extends readonly (Keys & keyof T)[] | [readonly (Keys & keyof T)[]] | [readonly string[]]>(
+      first: T & GenericRow<T, K, TTypes[keyof TTypes]> & { [Symbol.iterator]?: never },
+      ...rest: K
+    ): Helper<T, K>
 
     /**
      * A query

@@ -64,6 +64,12 @@ async function queries() {
   await selectFrom('users')
   const selectColumns = <T extends string>(a: T, b: T) => sql`select ${ sql(a, b) } from users`
   await selectColumns('id', 'name')
+  const insertRow = <T extends { name: string }>(row: T) => sql`insert into users ${ sql(row) }`
+  await insertRow({ name: 'a' })
+  const insertRows = <T extends { name: string, age: number }>(rows: T[]) => sql`insert into users ${ sql(rows, 'name') }`
+  await insertRows([{ name: 'a', age: 1 }])
+  const updateColumns = <T extends { name: string, age: number }>(row: T, columns: ('name' | 'age')[]) => sql`update users set ${ sql(row, columns) } where id = 1`
+  await updateColumns({ name: 'a', age: 1 }, ['age'])
   await sql`select * from users ${ true ? sql`where id = ${ 1 }` : sql`` }`
   await sql`select ${ sql.json({ a: [1, 2] }) }::json`
   await sql`select ${ [1, 2, 3] }::int[]`
@@ -104,6 +110,10 @@ async function queries() {
   await sql('users')
   // @ts-expect-error removed in v4
   sql.array([1, 2]).value
+  // @ts-expect-error a symbol is not a value
+  const insertSymbol = <T extends { name: symbol }>(row: T) => sql`insert into users ${ sql(row) }`
+  // @ts-expect-error a symbol is not a value
+  const insertSymbolRows = <T extends { name: symbol }>(rows: T[]) => sql`insert into users ${ sql(rows, ['name']) }`
 }
 
 async function transactions() {
