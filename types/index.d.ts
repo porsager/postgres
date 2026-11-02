@@ -795,6 +795,12 @@ declare namespace postgres {
     <T, K extends Rest<T>>(first: T & First<T, K, TTypes[keyof TTypes]>, ...rest: K): Return<T, K>
 
     /**
+     * An identifier whose type is a type parameter
+     * @example const select = <T extends 'users' | 'posts'>(table: T) => sql`select * from ${ sql(table) }`
+     */
+    <T extends string, K extends readonly string[]>(first: T, ...rest: K): Helper<T, K>
+
+    /**
      * A query
      * @example const users = await sql<User[]>`select * from users where id = ${ id }`
      */

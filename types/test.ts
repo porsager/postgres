@@ -60,6 +60,10 @@ async function queries() {
   await sql`insert into users ${ sql([{ name: 'a', age: 1 }, { name: 'b', age: 2 }]) }`
   await sql`update users set ${ sql({ name: 'b' }) } where id = 1`
   await sql`select * from ${ sql('users') } where id in ${ sql([1, 2, 3]) }`
+  const selectFrom = <T extends 'users' | 'posts'>(table: T) => sql`select * from ${ sql(table) }`
+  await selectFrom('users')
+  const selectColumns = <T extends string>(a: T, b: T) => sql`select ${ sql(a, b) } from users`
+  await selectColumns('id', 'name')
   await sql`select * from users ${ true ? sql`where id = ${ 1 }` : sql`` }`
   await sql`select ${ sql.json({ a: [1, 2] }) }::json`
   await sql`select ${ [1, 2, 3] }::int[]`
