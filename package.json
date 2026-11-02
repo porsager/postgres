@@ -23,7 +23,8 @@
     "coverage": "node tests/coverage.js",
     "test:types": "cd types && npm install && npm test",
     "test:cf": "sh tests/cf/run.sh",
-    "lint": "eslint src tests"
+    "lint": "eslint --max-warnings 0 src tests",
+    "prepublishOnly": "npm run lint && npm test"
   },
   "files": [
     "/src/*.js",

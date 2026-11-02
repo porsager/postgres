@@ -3,6 +3,17 @@ name: test
 on: [push, pull_request]
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --global --ignore-scripts eslint@8.57.1
+      - run: eslint --max-warnings 0 src tests
+
   test:
     name: Node v${{ matrix.node }} on PostgreSQL v${{ matrix.postgres }}
     strategy:

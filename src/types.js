@@ -396,8 +396,8 @@ export function serializeArray(xs, serialize = string, delimiter = ',', undefine
 
 function serializeDate(x) {
   return x === Infinity ? 'infinity'
-       : x === -Infinity ? '-infinity'
-       : (x instanceof Date ? x : new Date(x)).toISOString()
+    : x === -Infinity ? '-infinity'
+    : (x instanceof Date ? x : new Date(x)).toISOString()
 }
 
 const timestamp = /^(\d{4,})-(\d\d)-(\d\d)(?: (\d\d):(\d\d):(\d\d)(?:\.(\d+))?)?(?:([+-])(\d\d)(?::(\d\d))?(?::(\d\d))?)?( BC)?$/

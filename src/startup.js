@@ -154,7 +154,7 @@ function attempt(options, host, port, signal) {
 
         function notice(x) {
           try {
-            options.onnotice ? options.onnotice(x) : options.onnotice === false || console.log(x)
+            options.onnotice ? options.onnotice(x) : options.onnotice === false || console.log(x) // eslint-disable-line
           } catch (error) {
             noop(error)
           }

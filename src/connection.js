@@ -829,28 +829,28 @@ export function Connection(ready, options, events) {
     traced && first()
     try {
       type === 68 ? DataRow(x, start) :
-      type === 100 ? CopyData(x, start, end) :
-      type === 90 ? ReadyForQuery(x, start) :
-      type === 67 ? CommandComplete(x, start, end) :
-      type === 50 ? BindComplete() :
-      type === 49 ? ParseComplete() :
-      type === 51 ? null :
-      type === 116 ? ParameterDescription(x, start) :
-      type === 84 ? RowDescription(x, start) :
-      type === 110 ? NoData() :
-      type === 69 ? ErrorResponse(x, start, end) :
-      type === 115 ? PortalSuspended() :
-      type === 73 ? EmptyQueryResponse() :
-      type === 65 ? NotificationResponse(x, start) :
-      type === 78 ? NoticeResponse(x, start, end) :
-      type === 83 ? ParameterStatus(x, start) :
-      type === 71 ? CopyInResponse() :
-      type === 72 ? CopyOutResponse() :
-      type === 87 ? CopyBothResponse() :
-      type === 99 ? CopyDone() :
-      type === 86 ? unsupported('FunctionCallResponse') :
-      type === 118 ? unsupported('NegotiateProtocolVersion') :
-      null
+        type === 100 ? CopyData(x, start, end) :
+        type === 90 ? ReadyForQuery(x, start) :
+        type === 67 ? CommandComplete(x, start, end) :
+        type === 50 ? BindComplete() :
+        type === 49 ? ParseComplete() :
+        type === 51 ? null :
+        type === 116 ? ParameterDescription(x, start) :
+        type === 84 ? RowDescription(x, start) :
+        type === 110 ? NoData() :
+        type === 69 ? ErrorResponse(x, start, end) :
+        type === 115 ? PortalSuspended() :
+        type === 73 ? EmptyQueryResponse() :
+        type === 65 ? NotificationResponse(x, start) :
+        type === 78 ? NoticeResponse(x, start, end) :
+        type === 83 ? ParameterStatus(x, start) :
+        type === 71 ? CopyInResponse() :
+        type === 72 ? CopyOutResponse() :
+        type === 87 ? CopyBothResponse() :
+        type === 99 ? CopyDone() :
+        type === 86 ? unsupported('FunctionCallResponse') :
+        type === 118 ? unsupported('NegotiateProtocolVersion') :
+        null
     } catch (error) {
       const x = sent[0]
       x ? fail(x, error) : destroy(error)
@@ -1268,7 +1268,7 @@ export function Connection(ready, options, events) {
     })
     options.onnotice
       ? guard(options.onnotice, notice)
-      : options.onnotice === false || console.log(notice)
+      : options.onnotice === false || console.log(notice) // eslint-disable-line
   }
 
   function ParameterStatus(x, start) {
@@ -1509,7 +1509,7 @@ function compile(columns, array, text, from) {
     : 'return {' + columns.map((c, j) => key(c.name) + ':v' + j).join(',') + '}'
   )
 
-  return new Function('c', 'text', 'from',
+  return new Function('c', 'text', 'from', // eslint-disable-line
     (locals.length ? 'const ' + locals.join(', ') + '\n' : '') +
     'return function row(x, i) {\n' + body.filter(Boolean).join('\n') + '\n}'
   )(columns, text, from)

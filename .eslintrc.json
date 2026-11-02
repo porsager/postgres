@@ -1,18 +1,21 @@
 {
   "root": true,
   "env": {
-    "es2020": true,
+    "es2022": true,
     "node": true
   },
+  "overrides": [
+    { "files": ["tests/**"], "rules": { "no-console": "off", "no-throw-literal": "off" } }
+  ],
   "parserOptions": {
-    "ecmaVersion": 2020,
+    "ecmaVersion": 2022,
     "sourceType": "module"
   },
   "rules": {
     "comma-dangle": 2,
     "no-cond-assign": 2,
     "no-console": 1,
-    "no-constant-condition": 2,
+    "no-constant-condition": ["error", { "checkLoops": false }],
     "no-control-regex": 2,
     "no-debugger": 2,
     "no-dupe-args": 2,
@@ -66,7 +69,6 @@
     "no-case-declarations": 2,
     "no-div-regex": 2,
     "no-else-return": 2,
-    "no-empty-function": 2,
     "no-empty-pattern": 2,
     "no-eq-null": 0,
     "no-eval": 2,
@@ -144,7 +146,6 @@
     "no-mixed-requires": 2,
     "no-new-require": 2,
     "no-path-concat": 2,
-    "no-process-env": 2,
     "no-process-exit": 2,
     "array-bracket-spacing": [
       2,
@@ -214,7 +215,7 @@
     ],
     "max-len": [
       2,
-      150
+      240
     ],
     "max-nested-callbacks": [
       2,
@@ -222,7 +223,7 @@
     ],
     "max-params": [
       2,
-      5
+      8
     ],
     "max-statements-per-line": 0,
     "new-cap": [

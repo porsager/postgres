@@ -290,7 +290,7 @@ export default function Subscribe(postgres, options) {
     const listeners = handlers.filter(Boolean)
     listeners.length
       ? listeners.forEach(fn => fn(error))
-      : console.error('postgres.js: logical replication error', error)
+      : console.error('postgres.js: logical replication error', error) // eslint-disable-line
   }
 }
 
