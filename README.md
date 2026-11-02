@@ -454,6 +454,18 @@ await sql`
 select "id" from "users"
 ```
 
+A dot is read as a separator, so `sql('app.users')` gives `"app"."users"`. For a name that contains a dot, give its parts to `sql.identifier`, which quotes each part as it is, without the `transform`, and joins them with `.`:
+```js
+const schema = 'acme.inc'
+
+await sql`
+  select * from ${ sql.identifier(schema, 'users') }
+`
+
+// Which results in:
+select * from "acme.inc"."users"
+```
+
 ### Quick primer on interpolation
 
 Here's a quick oversight over all the ways to do interpolation in a query template string:

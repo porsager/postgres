@@ -817,6 +817,9 @@ declare namespace postgres {
     ): PendingQuery<T>
     unsafe<T extends any[] = (Row & Iterable<Row>)[]>(query: string, options: UnsafeQueryOptions): PendingQuery<T>
 
+    /** An identifier from its parts, each quoted as it is and joined with `.`, so a part may contain a dot */
+    identifier(...parts: string[]): Helper<string, []>
+
     /** Several queries in one round trip with one Sync, in one implicit transaction outside `sql.begin`; resolves with their results in order */
     batch<T extends readonly PendingQuery<any>[] | []>(queries: T): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }>
 

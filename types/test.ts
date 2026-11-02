@@ -60,6 +60,7 @@ async function queries() {
   await sql`insert into users ${ sql([{ name: 'a', age: 1 }, { name: 'b', age: 2 }]) }`
   await sql`update users set ${ sql({ name: 'b' }) } where id = 1`
   await sql`select * from ${ sql('users') } where id in ${ sql([1, 2, 3]) }`
+  await sql`select * from ${ sql.identifier('my.schema', 'users') }`
   await sql`select * from users ${ true ? sql`where id = ${ 1 }` : sql`` }`
   await sql`select ${ sql.json({ a: [1, 2] }) }::json`
   await sql`select ${ [1, 2, 3] }::int[]`

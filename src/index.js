@@ -15,7 +15,7 @@ import {
   fromKebab
 } from './types.js'
 
-import { Identifier, Builder } from './build.js'
+import { Identifier, Builder, escapeIdentifier } from './build.js'
 import { Query, CLOSE } from './query.js'
 import { Pool } from './pool.js'
 import { Errors, PostgresError } from './errors.js'
@@ -101,6 +101,7 @@ function Postgres(a, b) {
       types: typed,
       typed,
       unsafe,
+      identifier: (...parts) => new Identifier(parts.map(identifier).join('.')),
       batch,
       notify,
       array,
@@ -114,7 +115,7 @@ function Postgres(a, b) {
       return strings && Array.isArray(strings.raw)
         ? new Query(strings, args, handler)
         : typeof strings === 'string' && !args.length
-          ? new Identifier(options.transform.column.to ? options.transform.column.to(strings) : strings)
+          ? new Identifier(escapeIdentifier(options.transform.column.to ? options.transform.column.to(strings) : strings))
           : new Builder(strings, args)
     }
 
