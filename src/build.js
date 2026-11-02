@@ -12,7 +12,7 @@ class NotTagged {
 export class Identifier extends NotTagged {
   constructor(value) {
     super()
-    this.value = escapeIdentifier(value)
+    this.value = value
   }
 }
 
