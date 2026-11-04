@@ -27,6 +27,11 @@ const sql = postgres({
 
 postgres('postgres://user@host/db', { ssl: { rejectUnauthorized: false } })
 postgres()
+postgres({ types: { numeric: { from: [1700], parse: Number } } })
+postgres({ types: { int4: { to: 23 } } }).typed.int4(1)
+postgres({ types: { text: { to: 25, from: 25, serialize: String, parse: String } } })
+// @ts-expect-error not a property of a custom type
+postgres({ types: { int4: { oid: 23 } } })
 
 // @ts-expect-error not an sslnegotiation
 postgres({ sslnegotiation: 'eventually' })
