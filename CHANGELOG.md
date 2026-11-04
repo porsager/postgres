@@ -10,6 +10,7 @@
 - **`json` on a transform** (#1169). The built-in transforms rename the keys of JSON values in results but send JSON values as they are. `json: false` leaves JSON values as they are both ways, and `json: true` renames their keys when sending too, with the transform's `column.to`. Without it nothing changes.
 - **`eager_types`**: `true` reads array types and domains when the pool starts instead of when a query first meets one.
 - **`sql.identifier(...parts)`** (#1292). An identifier from its parts, each quoted as it is and joined with `.`, for a name that contains a dot, which `sql(name)` reads as a separator: `sql.identifier('acme.inc', 'users')` gives `"acme.inc"."users"`. The `transform` is not applied. With no parts it throws `NO_PARTS`.
+- **Node.js 18** is supported again: `engines` is `>=18` and CI runs it. Nothing in Postgres.js needs 20; `using`, `await using` and tracing are used where the runtime has them. Loading it with `require` still needs Node.js 20.19 or 22.12.
 
 ### Fixed
 

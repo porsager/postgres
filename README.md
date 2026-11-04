@@ -19,7 +19,7 @@
 $ npm install postgres
 ```
 
-Postgres.js needs Node.js 20 or later, Bun, or Cloudflare Workers. Deno runs it through its Node.js compatibility. It is an ES module with no dependencies.
+Postgres.js needs Node.js 18 or later, Bun, or Cloudflare Workers. Deno runs it through its Node.js compatibility. It is an ES module with no dependencies.
 
 > **Upgrading from v3?** The API is the same apart from a short list of changes. Read [Upgrading from v3](#upgrading-from-v3) first: parameter types are now decided by the server, which changes how a `Date` is written to `timestamp` and `date` columns outside UTC.
 
@@ -2022,7 +2022,7 @@ If it returns no columns, or the time zone is `UTC` and so is your Node.js proce
 
 ### Everything else
 
-- **Runtimes.** Node.js 20 or later, Bun and Cloudflare Workers; Deno runs the npm package. Postgres.js is an ES module; `require('postgres').default` works on Node.js 20.19 and 22.12 and later.
+- **Runtimes.** Node.js 18 or later, Bun and Cloudflare Workers; Deno runs the npm package. Postgres.js is an ES module; `require('postgres').default` works on Node.js 20.19 and 22.12 and later.
 - **`sql.array()` is removed.** Pass the array as it is, with a cast where the query doesn't decide its type: `${ ids }::int[]`.
 - **Transactions are stricter.** A `COMMIT` the server answers with `ROLLBACK` rejects with `TRANSACTION_ROLLED_BACK`, a query on a transaction or reserved connection after it ended rejects, a query that can't be built inside a transaction aborts it, and a `begin` sent outside `sql.begin`, a reserved connection or `max: 1` rejects with `UNSAFE_TRANSACTION` and is rolled back.
 - **Domains** are read and written as their base type, so a domain over `int[]` comes back as an array of numbers.
