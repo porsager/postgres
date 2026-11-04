@@ -118,6 +118,10 @@ async function queries() {
   const insertSymbol = <T extends { name: symbol }>(row: T) => sql`insert into users ${ sql(row) }`
   // @ts-expect-error a symbol is not a value
   const insertSymbolRows = <T extends { name: symbol }>(rows: T[]) => sql`insert into users ${ sql(rows, ['name']) }`
+  // @ts-expect-error a symbol is not a value
+  const updateSymbol = sql`update users set ${ sql({ name: Symbol(), age: 1 }, ['name']) } where id = 1`
+  // @ts-expect-error a symbol is not a value
+  const insertSymbolRowsSpread = (columns: 'name'[]) => sql`insert into users ${ sql([{ name: Symbol() }], ...columns) }`
 }
 
 async function transactions() {

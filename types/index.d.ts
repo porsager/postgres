@@ -32,18 +32,18 @@ type UnwrapPromiseArray<T> = T extends readonly any[]
 
 type Keys = string
 
+type Columns<K extends readonly any[]> = K extends readonly [readonly (infer C)[]] ? C : K[number]
+
 type SerializableObject<T, K extends readonly any[], TT> =
-  number extends K['length']
-    ? {}
-    : Partial<
-      Record<Keys & keyof T & (K['length'] extends 0 ? string : K[number]), postgres.ParameterOrJSON<TT> | undefined>
-      & Record<string, any>
-    >
+  Partial<
+    Record<Keys & keyof T & (K['length'] extends 0 ? string : Columns<K>), postgres.ParameterOrJSON<TT> | undefined>
+    & Record<string, any>
+  >
 
 type GenericRow<T, K extends readonly any[], TT> =
   K['length'] extends 0
     ? Record<string, postgres.ParameterOrJSON<TT> | undefined>
-    : Partial<Record<Keys & keyof T & (K extends readonly [readonly (infer C)[]] ? C : K[number]), postgres.ParameterOrJSON<TT> | undefined>>
+    : Partial<Record<Keys & keyof T & Columns<K>, postgres.ParameterOrJSON<TT> | undefined>>
 
 type First<T, K extends readonly any[], TT> =
   T extends TemplateStringsArray ? TemplateStringsArray :
