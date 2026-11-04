@@ -454,6 +454,18 @@ await sql`
 select "id" from "users"
 ```
 
+A dot is read as a separator, so `sql('app.users')` gives `"app"."users"`. For a name that contains a dot, give its parts to `sql.identifier`, which quotes each part as it is, without the `transform`, and joins them with `.`:
+```js
+const schema = 'acme.inc'
+
+await sql`
+  select * from ${ sql.identifier(schema, 'users') }
+`
+
+// Which results in:
+select * from "acme.inc"."users"
+```
+
 ### Quick primer on interpolation
 
 Here's a quick oversight over all the ways to do interpolation in a query template string:
@@ -649,7 +661,7 @@ A query waits for a connection when every connection is reserved, in a transacti
 
 `statement_timeout` is the better limit while the server answers, since the server enforces it and the outcome is known. `query_timeout` is the backstop for when it does not: a server or network that goes silent leaves a query waiting for as long as TCP takes to notice, which is many minutes with default keepalive settings. When a cancel request, from `.cancel()`, `.signal()` or `query_timeout`, gets no answer within `cancel_timeout` (5 seconds by default), the connection is closed and the pool connects again for the next query. As nobody knows whether the queries on that connection ran, they reject with `CONNECTION_DESTROYED`, or a timed out one with `QUERY_TIMEOUT`, whose `cause` is `CANCEL_UNANSWERED`. `cancel_timeout: 0` waits for the answer as long as it takes.
 
-PostgreSQL cancels whatever the connection is running when the request arrives, so a cancel sent just as a query finishes can cancel the query pipelined after it instead. Postgres.js doesn't send it for a query whose result has already arrived, but one still on its way can't be told apart.
+PostgreSQL cancels whatever the connection is running when the request arrives, so a cancel sent just as a query finishes can cancel the query pipelined after it instead. Postgres.js doesn't send it for a query whose result has already arrived, and a query that runs out of time while it waits behind another one on its connection gets its own `query_timeout` once its turn comes before it is canceled, so a quick query just finishes. If the server sends nothing for `cancel_timeout` while such a query waits, the connection is closed.
 
 ### Execute
 
@@ -704,7 +716,7 @@ const table_name = 'friends'
 
 await sql`
   create or replace trigger ${sql(triggerName)}
-  after ${sql.unsafe(eventType)} on ${sql.unsafe(`${schema_name}.${table_name}`)}
+  after ${sql.unsafe(eventType)} on ${sql.identifier(schema_name, table_name)}
   for each row
   execute function ${sql(triggerFnName)}()
 `
@@ -1490,6 +1502,8 @@ In both transaction modes a session belongs to a client only for the length of a
 With `max_prepared_statements`, PgBouncer keeps one prepared statement on each server connection for every query text and set of parameter types, shared by all its clients. After a column changes type, a connection may be handed the statement prepared before the change, which still describes the old parameter types; where the server can cast the old type to the new one, there is no error to act on. Use `prepare: false` through PgBouncer if columns change type while the application runs.
 
 PgBouncer refuses startup parameters it does not know, so a `connection` option like `{ 'some.var': 1 }` needs [`ignore_startup_parameters`](https://www.pgbouncer.org/config.html#ignore_startup_parameters) or `SET` inside a transaction instead. The pid in `state` is the pooler's, not the server's, so `pg_terminate_backend(state.pid)` does not end the session.
+
+Supavisor before 2.10, the pooler behind Supabase's port 6543, hangs on pipelined queries in transaction mode: the queries are sent but their answers never arrive. Use `max_pipeline: 1` there until you are on 2.10 or later. Setting `query_timeout` also keeps a pooler that stops answering from hanging the application: the queries reject with `QUERY_TIMEOUT` and the pool connects again.
 
 ## Custom Types
 

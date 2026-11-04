@@ -15,7 +15,7 @@ import {
   fromKebab
 } from './types.js'
 
-import { Identifier, Builder } from './build.js'
+import { Identifier, Builder, escapeIdentifier } from './build.js'
 import { Query, CLOSE } from './query.js'
 import { Pool } from './pool.js'
 import { Errors, PostgresError } from './errors.js'
@@ -101,6 +101,7 @@ function Postgres(a, b) {
       types: typed,
       typed,
       unsafe,
+      identifier: (...parts) => new Identifier(parts.map(identifier).join('.')),
       batch,
       notify,
       array,
@@ -114,7 +115,7 @@ function Postgres(a, b) {
       return strings && Array.isArray(strings.raw)
         ? new Query(strings, args, handler)
         : typeof strings === 'string' && !args.length
-          ? new Identifier(options.transform.column.to ? options.transform.column.to(strings) : strings)
+          ? new Identifier(escapeIdentifier(options.transform.column.to ? options.transform.column.to(strings) : strings))
           : new Builder(strings, args)
     }
 
@@ -215,7 +216,6 @@ function Postgres(a, b) {
 
     let savepoints = 0
       , prepare = null
-      , opening = null
 
     context && Object.assign(context, {
       connection: lease.connection.id,
@@ -224,8 +224,7 @@ function Postgres(a, b) {
     })
 
     try {
-      const began = control(lease, 'begin ' + mode.replace(/[^a-z ]/ig, ''))
-      normal(mode) ? await began : (opening = began).catch(() => {})
+      await control(lease, 'begin ' + mode.replace(/[^a-z ]/ig, ''))
       const done = scope(fn)
       done.catch(() => {})
       return await Promise.race([done, lease.closed])
@@ -270,9 +269,6 @@ function Postgres(a, b) {
         if (lease.connection.closed)
           throw lease.error || lease.connection.closed
       } catch (error) {
-        const refused = !name && opening && await opening.then(() => null, e => e)
-        if (refused)
-          throw refused
         context && !name && (context.outcome = 'rollback')
         stopped()
           ? rolled && await rolled.catch(() => {})
@@ -291,7 +287,6 @@ function Postgres(a, b) {
       }
 
       if (!name) {
-        opening && await opening
         const done = await control(lease, prepare ? 'prepare transaction \'' + prepare.replace(/'/g, '\'\'') + '\'' : 'commit')
         context && (context.outcome = prepare ? 'prepare' : done.command === 'COMMIT' ? 'commit' : 'rollback')
 
@@ -402,7 +397,7 @@ function Listen(options) {
 
   function start(name) {
     const x = connection()
-    return x`listen ${ x.unsafe('"' + name.replace(/"/g, '""') + '"') }`
+    return x`listen ${ x.identifier(name) }`
   }
 
   async function listen(name, fn, onlisten) {
@@ -435,7 +430,7 @@ function Listen(options) {
       if (closing || !x)
         return
 
-      await x`unlisten ${ x.unsafe('"' + name.replace(/"/g, '""') + '"') }`.catch(e => {
+      await x`unlisten ${ x.identifier(name) }`.catch(e => {
         if (!/^CONNECTION_/.test(e.code))
           throw e
       })

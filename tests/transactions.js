@@ -921,8 +921,8 @@ async function writes(fn) {
   }
 }
 
-t('begin sends BEGIN together with the first statement', async() => [
-  '2 1',
+t('begin waits for BEGIN before the first statement', async() => [
+  '3 1',
   await writes(sql => sql.begin(sql => sql`select ${ 1 }::int as x`).then(([x]) => x.x))
 ])
 
@@ -936,4 +936,29 @@ t('begin with a mode the server refuses runs none of the statements', async() =>
   const error = await sql.begin('isolation level nonsense', sql => sql`insert into test values (1)`).catch(e => e.code)
   const [{ n }] = await sql`select count(*)::int as n from test`
   return ['42601 0', error + ' ' + n, await sql`drop table test`]
+})
+
+t('A transaction whose BEGIN is canceled writes nothing', { timeout: 30 }, async() => {
+  const victim = postgres({ ...options, max: 1, connection: { application_name: 'begin_cancel' } })
+      , other = postgres({ ...options, max: 1 })
+  await other`create table test (i int)`
+  const spraying = { on: true }
+  const spray = (async() => {
+    while (spraying.on)
+      await other`select pg_cancel_backend(pid) from pg_stat_activity where application_name = 'begin_cancel'`
+  })()
+  let wrong = 0
+    , canceled = 0
+  for (let i = 0; i < 500; i++) {
+    const failed = await victim.begin(async sql => {
+      await sql`insert into test values (${ i })`
+      await sql`insert into test values (${ i })`
+    }).then(() => false, e => e.code === '57014' || Promise.reject(e))
+    const [{ n }] = await other`select count(*)::int as n from test where i = ${ i }`
+    failed && canceled++
+    ;(failed ? n !== 0 : n !== 2) && wrong++
+  }
+  spraying.on = false
+  await spray
+  return ['0 true', wrong + ' ' + (canceled > 0), await other`drop table test`, await victim.end(), await other.end()]
 })

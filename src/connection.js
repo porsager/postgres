@@ -37,6 +37,7 @@ export function Connection(ready, options, events) {
 
   let blocker = null
     , stash = null
+    , heard = timers.now()
     , rolling = false
     , fence = null
     , drained = null
@@ -80,7 +81,7 @@ export function Connection(ready, options, events) {
     get notable() { return notables > 0 }
   }
 
-  socket.ondata = x => frames.push(x)
+  socket.ondata = x => (heard = timers.now(), frames.push(x))
   socket.ondrain = ondrain
   socket.onclose = onclose
   ready.rest && ready.rest.length && frames.push(ready.rest)
@@ -318,7 +319,7 @@ export function Connection(ready, options, events) {
     const next = sent[0]
     if (next && next.query) {
       next.query.active = true
-      next.cancel && ready.cancel().then(next.cancel.resolve, next.cancel.reject)
+      next.cancel && turn(next)
     }
     release()
   }
@@ -654,6 +655,12 @@ export function Connection(ready, options, events) {
     if (query.parts)
       return cancelBatch(query)
 
+    if (stash && sent[0] && sent[0].query === query) {
+      sent[0].own = Errors.generic('57014', 'canceling statement due to user request')
+      go()
+      return Promise.resolve()
+    }
+
     if (running.has(query) || (sent[0] && sent[0].query === query && sent[0].awaiting))
       return (query.aborted = Errors.generic('57014', 'canceling statement due to user request'), Promise.resolve())
     const i = pending.findIndex(x => x.query === query || x.for === query)
@@ -674,9 +681,49 @@ export function Connection(ready, options, events) {
     if (x === sent[0] && x.completed)
       return (expect(x), Promise.resolve())
 
-    return x === sent[0] && (query.active || x.for)
-      ? cancelling(x)
-      : new Promise((resolve, reject) => x.cancel = { resolve, reject })
+    if (x === sent[0] && (query.active || x.for))
+      return cancelling(x)
+
+    quiet(x)
+    return new Promise((resolve, reject) => x.cancel = { resolve, reject })
+  }
+
+  function turn(x) {
+    x.silence && (timers.clearTimeout(x.silence), x.silence = null)
+    const go = () => {
+      x.silence = null
+      if (closed || x.done || sent[0] !== x)
+        return x.cancel.resolve()
+
+      if (x.completed)
+        return (expect(x), x.cancel.resolve())
+
+      cancelling(x).then(x.cancel.resolve, x.cancel.reject)
+    }
+
+    x.query && x.query.timedOut && options.query_timeout
+      ? x.silence = timers.setTimeout(go, options.query_timeout * 1000)
+      : defer(go)
+  }
+
+  function quiet(x) {
+    if (!options.cancel_timeout || x.silence)
+      return
+
+    const ms = options.cancel_timeout * 1000
+        , check = () => {
+          x.silence = null
+          const query = x.query || x.for
+          if (closed || x.done || !query || query.settled)
+            return
+
+          const idle = timers.now() - heard
+          idle >= ms
+            ? destroy(Errors.generic('CANCEL_UNANSWERED', 'The server sent nothing within cancel_timeout (' + options.cancel_timeout + ' seconds) while a canceled query waited, so whether it ran is unknown'))
+            : x.silence = timers.setTimeout(check, ms - idle)
+        }
+
+    x.silence = timers.setTimeout(check, ms)
   }
 
   function cancelling(x) {
@@ -702,6 +749,7 @@ export function Connection(ready, options, events) {
   }
 
   function answered(x) {
+    x.silence && (timers.clearTimeout(x.silence), x.silence = null)
     x.unanswered && (!x.batch || x.batch.query.settled) && (timers.clearTimeout(x.unanswered), x.unanswered = null)
   }
 
@@ -1072,7 +1120,7 @@ export function Connection(ready, options, events) {
     const next = sent[0]
     if (next && next.query) {
       next.query.active = true
-      next.cancel && cancelling(next).then(next.cancel.resolve, next.cancel.reject)
+      next.cancel && turn(next)
     }
 
     closing && idle() && terminate()
@@ -1092,6 +1140,7 @@ export function Connection(ready, options, events) {
 
     const { query } = x
         , cursor = x.origin || (x.portal ? x : null)
+
     cursor && (x.own || x.error || !x.suspended) && unfence(cursor)
 
     if (x.own)
@@ -1437,6 +1486,7 @@ function Exchange(kind, query, lease, write) {
     own: null,
     cancel: null,
     unanswered: null,
+    silence: null,
     completed: false,
     for: null,
     stream: null,

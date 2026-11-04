@@ -1,5 +1,6 @@
 {
   "always": [
+    "connection.js: A cancel request that fails over TLS does not crash the process, for query_timeout and signal",
     "transactions.js: A FATAL in answer to COMMIT rejects with CONNECTION_CLOSED, with the FATAL as cause",
     "listen.js: listen keeps retrying when a reconnect attempt fails",
     "connection.js: connection parameters",

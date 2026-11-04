@@ -40,6 +40,14 @@ t('Transform column names in helpers', async() => {
   ]
 })
 
+t('Identifier from parts is not transformed', async() => {
+  const sql = postgres({ host: 'localhost', port: 1, transform: postgres.camel })
+  return [
+    JSON.stringify(['select "foo_bar", "fooBar"', []]),
+    show(sql`select ${ sql('fooBar') }, ${ sql.identifier('fooBar') }`)
+  ]
+})
+
 t('Transform undefined to null', async() => {
   const sql = postgres({ host: 'localhost', port: 1, transform: { undefined: null } })
   return [JSON.stringify(['select $1', [null]]), show(sql`select ${ undefined }`)]

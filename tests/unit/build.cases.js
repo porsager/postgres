@@ -12,6 +12,7 @@ export default [
   ['Unsafe with parameters', sql => sql.unsafe('select $1', [1]), 'select $1', [1]],
   ['Identifier', sql => sql`select 1 as ${ sql('a') }`, 'select 1 as "a"', []],
   ['Identifier with schema and quote', sql => sql`select * from ${ sql('s.t"x') }`, 'select * from "s"."t""x"', []],
+  ['Identifier from parts keeps their dots (#1292)', sql => sql`select * from ${ sql.identifier('s.x', 't"y') }`, 'select * from "s.x"."t""y"', []],
   ['Select columns', sql => sql`select ${ sql(['a', 'b']) } from x`, 'select "a","b" from x', []],
   ['Select object', sql => sql`select ${ sql({ a: 1, b: sql`now()` }) }`, 'select $1 as "a",now() as "b"', [1]],
   ['Insert object', sql => sql`insert into x ${ sql({ a: 1, b: 'b' }) }`, 'insert into x ("a","b")values($1,$2)', [1, 'b']],
