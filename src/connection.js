@@ -1140,6 +1140,7 @@ export function Connection(ready, options, events) {
 
     const { query } = x
         , cursor = x.origin || (x.portal ? x : null)
+
     cursor && (x.own || x.error || !x.suspended) && unfence(cursor)
 
     if (x.own)

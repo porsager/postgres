@@ -1491,6 +1491,8 @@ With `max_prepared_statements`, PgBouncer keeps one prepared statement on each s
 
 PgBouncer refuses startup parameters it does not know, so a `connection` option like `{ 'some.var': 1 }` needs [`ignore_startup_parameters`](https://www.pgbouncer.org/config.html#ignore_startup_parameters) or `SET` inside a transaction instead. The pid in `state` is the pooler's, not the server's, so `pg_terminate_backend(state.pid)` does not end the session.
 
+Supavisor before 2.10, the pooler behind Supabase's port 6543, hangs on pipelined queries in transaction mode: the queries are sent but their answers never arrive. Use `max_pipeline: 1` there until you are on 2.10 or later. Setting `query_timeout` also keeps a pooler that stops answering from hanging the application: the queries reject with `QUERY_TIMEOUT` and the pool connects again.
+
 ## Custom Types
 
 You can add ergonomic support for custom types, or simply use `sql.typed(value, type)` inline, where type is the PostgreSQL `oid` for the type and the correctly serialized string. _(`oid` values for types can be found in the `pg_catalog.pg_type` table.)_
