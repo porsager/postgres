@@ -92,6 +92,11 @@ async function queries() {
   const raw = await sql`select 1 as x`.raw()
   raw[0][0]
 
+  const parsed = await sql<{ n: number }[]>`select 1.5::numeric as n`.parsers({ 1700: Number, 17: null })
+  expect<Equal<typeof parsed[number], { n: number }>>()
+  await sql`select 1 as x`.values().parsers(column => column.name === 'x' ? null : column.parser)
+  await sql.unsafe('select 1 as x').parsers(null)
+
   const statement = await sql`select ${ 1 }::int as x`.describe()
   statement.types.map(x => x + 1)
 

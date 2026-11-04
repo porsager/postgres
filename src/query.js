@@ -210,6 +210,11 @@ export class Query extends Promise {
     return this
   }
 
+  parsers(parsers) {
+    this.ownParsers = parsers || null
+    return this
+  }
+
   handle() {
     if (this.executed)
       return

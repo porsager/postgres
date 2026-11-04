@@ -84,3 +84,55 @@ t('A column named __proto__ is an own property and does not become the prototype
   }
   return ['undefined true name+__proto__ true|undefined true name+__proto__ true', results.join('|')]
 })
+
+t('A query\'s own parsers apply to its rows only', async() => {
+  const query = () => sql`select 1.5::numeric as n, 2 as i from generate_series(1, 40)`
+      , [own, plain] = await Promise.all([query().parsers({ 1700: Number }), query()])
+  return [
+    'number number string number',
+    [typeof own[39].n, typeof own[39].i, typeof plain[39].n, typeof plain[39].i].join(' ')
+  ]
+})
+
+t('A query\'s own parsers can be picked by column, null keeping the server\'s text', async() => {
+  const rows = await sql`select 1 as a, 2 as b, 'x' as c from generate_series(1, 40)`
+    .parsers(column => column.name === 'a' ? null : column.name === 'c' ? x => x.toUpperCase() : column.parser)
+  return ['string 2 X|string 2 X', [rows[0], rows[39]].map(x => typeof x.a + ' ' + x.b + ' ' + x.c).join('|')]
+})
+
+t('Queries of one statement with different parsers each get their own', async() => {
+  const query = () => sql`select 1.5::numeric as n from generate_series(1, 40)`
+      , xs = await Promise.all([
+        query().parsers({ 1700: Number }),
+        query().parsers({ 1700: x => 'n' + x }),
+        query(),
+        query().parsers({ 1700: Number })
+      ])
+  return ['number n1.5 1.5 number', [typeof xs[0][39].n, xs[1][39].n, xs[2][39].n, typeof xs[3][39].n].join(' ')]
+})
+
+t('A query\'s own parsers get the columns the instance reads in binary as text', async() => {
+  const query = () => sql`select '\\x01'::bytea as b, array[1, 2]::int[] as a`
+  await query()
+  await query()
+  const [own] = await query().parsers({ 17: x => 'b:' + x, 1007: x => 'a:' + x })
+      , [plain] = await query()
+  return [
+    'b:\\x01 a:{1,2} true [1,2]',
+    [own.b, own.a, Buffer.isBuffer(plain.b), JSON.stringify(plain.a)].join(' ')
+  ]
+})
+
+t('A query\'s own parsers apply to .values() and .forEach() rows, and .raw() leaves them out', async() => {
+  const values = await sql`select 1.5::numeric as n from generate_series(1, 40)`.values().parsers({ 1700: Number })
+      , raw = await sql`select 1.5::numeric as n`.raw().parsers({ 1700: Number })
+  let each = 0
+  await sql`select 1.5::numeric as n from generate_series(1, 40)`.parsers({ 1700: Number }).forEach(x => each += x.n)
+  return ['number true 60', typeof values[39][0] + ' ' + Buffer.isBuffer(raw[0][0]) + ' ' + each]
+})
+
+t('A query\'s own parser that throws fails that query only', async() => {
+  const error = await sql`select 1 as x`.parsers({ 23: () => { throw new Error('nope') } }).catch(e => e.message)
+      , [{ x }] = await sql`select 1 as x`
+  return ['nope 1', error + ' ' + x]
+})

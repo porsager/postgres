@@ -592,6 +592,11 @@ declare namespace postgres {
 
   type ColumnList<T> = (T extends string ? Column<T> : never)[]
 
+  /** A query's own parsers: by type, keyed by oid, or a function picking one for each column; null keeps the server's text */
+  type QueryParsers =
+    | { readonly [oid: number]: ((raw: string) => unknown) | null }
+    | ((column: Column<string>) => ((raw: string) => unknown) | null | undefined)
+
   interface State {
     status: string
     pid: number
@@ -641,6 +646,8 @@ declare namespace postgres {
     cancel(): Promise<void>
     /** Cancels it when the signal aborts: `.signal(AbortSignal.timeout(5000))` */
     signal(signal: AbortSignal | null | undefined): this
+    /** Parses its values with parsers of its own instead of the instance's: `.parsers({ 1700: Number })` */
+    parsers(parsers: QueryParsers | null | undefined): this
 
     /** @deprecated renamed to `.forEach` */
     stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<TRow[number]>) => void): never
