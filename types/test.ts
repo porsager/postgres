@@ -73,6 +73,11 @@ async function queries() {
   await updateColumns({ name: 'a', age: 1 }, ['age'])
 
   await sql`select * from ${ sql.identifier('my.schema', 'users') }`
+  await sql`select * from ${ sql.identifier('users') }`
+  const parts: [string, ...string[]] = ['my.schema', 'users']
+  await sql`select * from ${ sql.identifier(...parts) }`
+  // @ts-expect-error at least one part
+  sql.identifier()
 
   await sql`select * from users ${ true ? sql`where id = ${ 1 }` : sql`` }`
   await sql`select ${ sql.json({ a: [1, 2] }) }::json`
