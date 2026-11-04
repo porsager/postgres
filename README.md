@@ -572,6 +572,21 @@ Using `.raw` will return rows as an array with `Buffer` values for each column, 
 
 This can be useful for specific performance/transformation reasons. The column definitions are still included on the result array, plus access to parsers for each column.
 
+### Parsers for One Query
+#### ```sql``.parsers(parsers)```
+
+Using `.parsers` will parse this query's values with parsers of its own, while every other query keeps the instance's [`types`](#custom-types). Give them by type, keyed by oid, on top of the instance's, or as a function that gets each column and returns the parser for it. A column given `null` keeps the server's text.
+
+```js
+const [row] = await sql`select 1.5::numeric as price, now() as at`.parsers({ 1700: Number })
+// row = { price: 1.5, at: Date }
+
+const rows = await sql`select id, body from posts`.parsers(column => column.name === 'body' ? null : column.parser)
+// the body as the server's text, the id as the instance parses it
+```
+
+The parsers are picked once for each result, and a query that reuses the same ones reuses the same compiled row reader.
+
 ### Queries in Files
 #### `await sql.file(path, [args], [options]) -> Result[]`
 

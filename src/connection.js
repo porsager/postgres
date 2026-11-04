@@ -18,6 +18,7 @@ const text = p.text
     , unknown = 100
     , states = new WeakMap()
     , after = 16
+    , variety = 16
 
 let ids = 1
   , compiles = true
@@ -442,7 +443,7 @@ export function Connection(ready, options, events) {
     }
 
     if (current && current !== x.previous && usable(current, statement)) {
-      const b = query.isRaw === true ? null : binaries(current)
+      const b = query.isRaw === true || query.ownParsers ? null : binaries(current)
       x.entry = current
       x.columns = b ? b.columns : current.columns
       x.formats = b ? b.formats : null
@@ -977,10 +978,11 @@ export function Connection(ready, options, events) {
 
   function DataRow(x, start) {
     const item = sent[0]
-        , { query, columns } = item
+        , { query } = item
         , raw = query.isRaw
         , from = raw !== true ? transform.value.from : null
-        , shape = item.shaped === columns ? item.reader : (item.shaped = columns, item.reader = Rows(columns))
+        , shape = item.shaped === item.columns ? item.reader : (item.shaped = item.columns, item.reader = query.ownParsers && raw !== true ? Parsed(item.columns, query.ownParsers) : Rows(item.columns))
+        , columns = shape.columns
         , fast = raw !== true && read(shape, !!raw, text, from)
         , n = columns.length
         , result = item.result
@@ -1511,11 +1513,33 @@ function Rows(columns) {
       seen: 0,
       object: null,
       array: null,
+      variants: null,
       compilable: compiles && columns.length <= 512 && !columns.some(x => String(x.name) === '__proto__')
     }
     states.set(columns, state)
   }
   return state
+}
+
+function Parsed(columns, parsers) {
+  const state = Rows(columns)
+      , list = columns.map(typeof parsers === 'function'
+        ? c => parsers(c) || null
+        : c => c.type in parsers ? parsers[c.type] || null : c.parser
+      )
+
+  if (list.every((x, i) => x === columns[i].parser))
+    return state
+
+  const variants = state.variants || (state.variants = [])
+      , found = variants.find(v => v.list.every((x, i) => x === list[i]))
+
+  if (found)
+    return found.state
+
+  const variant = { list, state: Rows(columns.map((c, i) => list[i] === c.parser ? c : { ...c, parser: list[i], decode: null })) }
+  variants.length < variety && variants.push(variant)
+  return variant.state
 }
 
 function read(state, array, text, from) {

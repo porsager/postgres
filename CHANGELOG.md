@@ -11,6 +11,7 @@
 - **`eager_types`**: `true` reads array types and domains when the pool starts instead of when a query first meets one.
 - **`sql.identifier(...parts)`** (#1292). An identifier from its parts, each quoted as it is and joined with `.`, for a name that contains a dot, which `sql(name)` reads as a separator: `sql.identifier('acme.inc', 'users')` gives `"acme.inc"."users"`. The `transform` is not applied. With no parts it throws `NO_PARTS`.
 - **Node.js 18** is supported again: `engines` is `>=18` and CI runs it. Nothing in Postgres.js needs 20; `using`, `await using` and tracing are used where the runtime has them. Loading it with `require` still needs Node.js 20.19 or 22.12.
+- **``sql`...`.parsers(parsers)``** (#1294). A query's own parsers, for its rows only: by type, `{ [oid]: parse }`, on top of the instance's `types`, or a function that gets each column and returns the parser for it, `null` for the server's text. A library that knows how to decode some queries' columns can decode them once, inside the row reader, while every other query on the instance and its pool keeps the instance's parsers. Such a query receives every column as text, so `bytea` and the integer arrays otherwise read in binary reach its parsers as text. A query without `.parsers()` reads its rows as before.
 
 ### Fixed
 
