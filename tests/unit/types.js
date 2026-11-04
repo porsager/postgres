@@ -72,6 +72,21 @@ t('Parse timestamp without time zone as local time, like v3', async() => [
   parse(1114, '2024-01-02 03:04:05.678').getTime() + ',' + parse(1114, '0050-06-15 12:30:00').getTime()
 ])
 
+t('Parse timestamp without time zone when the same wall time fell in a daylight saving gap in 2000', async() => {
+  const tz = process.env.TZ
+  process.env.TZ = 'Europe/Berlin'
+  try {
+    // 2000-03-26 02:30 did not exist in Berlin, 2021-03-26 02:30 did
+    const x = parse(1114, '2021-03-26 02:30:00')
+    return [
+      '2021-03-26T01:30:00.000Z',
+      x.toISOString()
+    ]
+  } finally {
+    tz === undefined ? delete process.env.TZ : process.env.TZ = tz
+  }
+})
+
 t('Parse date as UTC midnight, like v3', async() => [
   'date:2024-01-02T00:00:00.000Z|date:0050-06-15T00:00:00.000Z',
   show(parse(1082, '2024-01-02')) + '|' + show(parse(1082, '0050-06-15'))
