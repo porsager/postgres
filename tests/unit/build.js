@@ -48,6 +48,11 @@ t('Identifier from parts is not transformed', async() => {
   ]
 })
 
+t('Identifier from no parts throws', async() => [
+  'NO_PARTS',
+  (() => { try { sql.identifier() } catch (e) { return e.code } })()
+])
+
 t('Transform undefined to null', async() => {
   const sql = postgres({ host: 'localhost', port: 1, transform: { undefined: null } })
   return [JSON.stringify(['select $1', [null]]), show(sql`select ${ undefined }`)]

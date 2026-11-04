@@ -101,7 +101,12 @@ function Postgres(a, b) {
       types: typed,
       typed,
       unsafe,
-      identifier: (...parts) => new Identifier(parts.map(identifier).join('.')),
+      identifier: (...parts) => {
+        if (!parts.length)
+          throw Errors.generic('NO_PARTS', 'sql.identifier needs at least one part')
+
+        return new Identifier(parts.map(identifier).join('.'))
+      },
       batch,
       notify,
       array,

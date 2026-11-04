@@ -1897,6 +1897,11 @@ On Cloudflare Workers: the TLS handshake could not be completed, most often beca
 
 An insert or update helper was given an empty object or an empty list of columns, which would make invalid SQL.
 
+##### NO_PARTS
+> sql.identifier needs at least one part
+
+`sql.identifier()` was called with no parts, which would leave the name out of the query.
+
 ##### CONNECT_TIMEOUT
 > write CONNECT_TIMEOUT host:port
 

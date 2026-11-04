@@ -470,6 +470,7 @@ declare namespace postgres {
       | 'SASL_SIGNATURE_MISMATCH'
       | 'TLS_HANDSHAKE_FAILED'
       | 'NO_COLUMNS'
+      | 'NO_PARTS'
       | 'QUEUE_TIMEOUT'
       | 'QUERY_TIMEOUT'
       | 'CANCEL_UNANSWERED'
