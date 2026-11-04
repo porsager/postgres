@@ -172,13 +172,14 @@ declare namespace postgres {
   /** int8 as bigint: `types: { bigint: postgres.BigInt }` */
   const BigInt: PostgresType<bigint>
 
+  /** Each property can be left out: only `from` and `parse` for a type that is only parsed, only `to` to name an oid for `sql.typed` */
   interface PostgresType<T = any> {
     /** The oid values of this type are sent as, or the type's name, looked up when the pool starts */
-    to: number | string
-    /** The oids or type names parsed with `parse` */
-    from: (number | string)[]
-    serialize: (value: T) => unknown
-    parse: (raw: any) => T
+    to?: number | string
+    /** The oid or type name parsed with `parse`, or an array of them */
+    from?: number | string | (number | string)[]
+    serialize?: (value: T) => unknown
+    parse?: (raw: any) => T
   }
 
   interface ConnectionParameters {
