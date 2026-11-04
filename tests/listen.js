@@ -246,13 +246,13 @@ t('multiple listeners and unlisten one', async() => {
   return ['1a2a1b', xs.join('')]
 })
 
-t('Listen connection closes after the last unlisten', async() => {
+t('Listen after the last unlisten uses the same connection (#1298)', async() => {
   const sql = postgres(options)
-  const { state: { pid }, unlisten } = await sql.listen('test', () => {})
-  await unlisten()
-  const gone = async() => (await sql`select count(*)::int as n from pg_stat_activity where pid = ${ pid }`)[0].n === 0
-  await until(gone)
-  return [true, await gone(), await sql.end()]
+  const first = await sql.listen('test', () => {})
+  await first.unlisten()
+  const second = await sql.listen('test', () => {})
+  await second.unlisten()
+  return [true, first.state.pid === second.state.pid, await sql.end()]
 })
 
 t('Original listen handles unsubscribe after a reconnect', async() => {

@@ -1163,6 +1163,18 @@ t('unref_sockets lets the process exit while connections are idle', { timeout: 2
   return ['done true false', unref.out + ' ' + unref.exited + ' ' + kept.exited]
 })
 
+t('The process exits after the last unlisten and stays while listening (#1022, #1298)', { timeout: 20 }, async() => {
+  const script = unlisten => [
+    'const postgres = (await import(' + JSON.stringify(new URL('../src/index.js', import.meta.url).href) + ')).default',
+    'const sql = postgres(' + JSON.stringify(options) + ')',
+    'const { unlisten } = await sql.listen("test", () => {})',
+    unlisten ? 'await unlisten()' : '',
+    'console.log("done")'
+  ].join('\n')
+  const [unlistened, listening] = await Promise.all([exits(script(true)), exits(script(false))])
+  return ['done true done false', [unlistened.out, unlistened.exited, listening.out, listening.exited].join(' ')]
+})
+
 t('sql and reserved connections are async disposable', async() => {
   const sql = postgres(options)
   const reserved = await sql.reserve()

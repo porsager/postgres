@@ -354,10 +354,12 @@ function Listen(options) {
   const channels = new Map()
   let sql = null
     , closing = null
+    , alive = null
 
   return {
     listen,
     end: () => {
+      release()
       channels.forEach(channel => channel.timer && options.timers.clearTimeout(channel.timer))
       return closing || (sql ? (closing = sql.end({ timeout: 0 })) : Promise.resolve())
     }
@@ -370,6 +372,7 @@ function Listen(options) {
       max: 1,
       idle_timeout: null,
       max_lifetime: null,
+      unref_sockets: true,
       fetch_types: false,
       no_subscribe: true,
       onclose() {
@@ -400,6 +403,14 @@ function Listen(options) {
     })
   }
 
+  function hold() {
+    alive || (alive = setInterval(() => {}, 1 << 30))
+  }
+
+  function release() {
+    alive && (clearInterval(alive), alive = null)
+  }
+
   function start(name) {
     const x = connection()
     return x`listen ${ x.identifier(name) }`
@@ -412,12 +423,14 @@ function Listen(options) {
 
     const channel = channels.get(name)
     channel.listeners.add(listener)
+    hold()
     let result
     try {
       result = await channel.result
     } catch (error) {
       channel.listeners.delete(listener)
       channel.listeners.size || channels.delete(name)
+      channels.size || release()
       throw error
     }
     Object.assign(channel.state, result.state)
@@ -430,6 +443,7 @@ function Listen(options) {
         return
 
       channels.get(name) === channel && channels.delete(name)
+      channels.size || release()
       const x = sql
 
       if (closing || !x)
@@ -439,10 +453,6 @@ function Listen(options) {
         if (!/^CONNECTION_/.test(e.code))
           throw e
       })
-      if (channels.size === 0 && sql === x) {
-        sql = null
-        await x.end()
-      }
     }
   }
 }
