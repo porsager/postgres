@@ -27,6 +27,21 @@ t('Undefined values in any row of a multi row insert throw, whatever the order (
   ].map(fn => { try { fn().text } catch (e) { return e.code } }).join(' ')
 ])
 
+t('Insert helper after a quoted schema and an unquoted table (#1304)', async() => [
+  [
+    '["insert into \\"s\\".t (\\"a\\")values($1)",[1]]',
+    '["insert into \\"s\\".t (\\"a\\")values($1)",[1]]',
+    '["insert into \\"s\\".t as x (\\"a\\")values($1)",[1]]',
+    '["insert into \\"s\\".\\"t\\".u (\\"a\\")values($1)",[1]]'
+  ].join(' '),
+  [
+    show(sql`insert into ${ sql('s') }.t ${ sql({ a: 1 }) }`),
+    show(sql`insert into "s".t ${ sql({ a: 1 }) }`),
+    show(sql`insert into ${ sql('s') }.t as x ${ sql({ a: 1 }) }`),
+    show(sql`insert into "s"."t".u ${ sql({ a: 1 }) }`)
+  ].join(' ')
+])
+
 t('A join has the length of the items it kept', async() => [
   '2 0',
   sql`and`.join([sql`a`, false, sql`b`]).length + ' ' + sql`and`.join([]).length

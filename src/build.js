@@ -170,8 +170,10 @@ function context(sql) {
       i--
       if (sql[i] === '.')
         i--
-      else
-        depth === 0 && c === '"' && words.push(sql.slice(i + 1, end + 1))
+      else if (depth === 0 && c === '"' && sql[end + 1] === '.' && words.length)
+        words[words.length - 1] = sql.slice(i + 1, end + 1) + words[words.length - 1]
+      else if (depth === 0 && c === '"')
+        words.push(sql.slice(i + 1, end + 1))
     } else if (/[a-z_0-9$]/i.test(c)) {
       const end = i + 1
       while (i >= 0 && /[a-z_0-9$.]/i.test(sql[i]))
