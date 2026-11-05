@@ -41,18 +41,6 @@ t('A percent-encoded password is decoded (#735)', async() => [
   parsed('postgres://u:p%25ss%23w%40rd@h/db')
 ])
 
-t('PGSSLMODE sets ssl, and a url or an option comes first', async() => {
-  const before = process.env.PGSSLMODE
-  process.env.PGSSLMODE = 'verify-full'
-  const modes = [
-    postgres({ max: 1 }).options.ssl,
-    postgres('postgres://h/db?sslmode=require', { max: 1 }).options.ssl,
-    postgres({ max: 1, ssl: 'prefer' }).options.ssl
-  ]
-  before === undefined ? delete process.env.PGSSLMODE : process.env.PGSSLMODE = before
-  return ['verify-full,require,prefer', modes.join()]
-})
-
 t('Hosts with ports in the host option, as in v3', async() => [
   JSON.stringify([['a', 'b'], [1, 2], 'u', '', 'db', null]),
   parsed(undefined, { host: 'a:1,b:2', user: 'u', database: 'db' })
@@ -77,6 +65,18 @@ t('sql.array() is removed, and says so', async() => [
   'ARRAY_REMOVED',
   (() => { try { postgres({ max: 1 }).array([1]) } catch (e) { return e.code } })()
 ])
+
+t('PGSSLMODE sets ssl, and a url or an option comes first', async() => {
+  const before = process.env.PGSSLMODE
+  process.env.PGSSLMODE = 'verify-full'
+  const modes = [
+    postgres({ max: 1 }).options.ssl,
+    postgres('postgres://h/db?sslmode=require', { max: 1 }).options.ssl,
+    postgres({ max: 1, ssl: 'prefer' }).options.ssl
+  ]
+  before === undefined ? delete process.env.PGSSLMODE : process.env.PGSSLMODE = before
+  return ['verify-full,require,prefer', modes.join()]
+})
 
 t('channel_binding from options, the url and PGCHANNELBINDING, as libpq reads it', async() => {
   const before = process.env.PGCHANNELBINDING
