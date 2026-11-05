@@ -472,7 +472,7 @@ function parseOptions(a, b) {
   o.no_prepare && (o.prepare = false)
   query.sslmode && (query.ssl = query.sslmode, delete query.sslmode)
   'timeout' in o && (console.log('The timeout option is deprecated, use idle_timeout instead'), o.idle_timeout = o.timeout) // eslint-disable-line
-  query.sslrootcert === 'system' && (query.ssl = 'verify-full')
+  const files = certificates(query)
 
   const ints = [
     'idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive', 'min',
@@ -554,9 +554,35 @@ function parseOptions(a, b) {
     }
   }
 
+  options.ssl = withCertificates(options.ssl, files)
   options.infer = options.infer === true || options.infer === 'true'
   options.max === 1 && (options.scheduler = false)
   return options
+}
+
+function certificates(query) {
+  const { sslrootcert, sslcert, sslkey } = query
+      , files = {}
+
+  delete query.sslrootcert
+  delete query.sslcert
+  delete query.sslkey
+  sslrootcert === 'system' && (query.ssl = 'verify-full')
+  sslrootcert && sslrootcert !== 'system' && (files.ca = fs.readFileSync(sslrootcert))
+  sslcert && (files.cert = fs.readFileSync(sslcert))
+  sslkey && (files.key = fs.readFileSync(sslkey))
+  Object.keys(files).length && !query.ssl && (query.ssl = 'require')
+  return files
+}
+
+function withCertificates(ssl, files) {
+  if (!ssl || ssl === 'disable' || !Object.keys(files).length)
+    return ssl
+
+  return typeof ssl === 'object' ? { ...files, ...ssl }
+    : ssl === 'verify-full' ? files
+    : files.ca ? { ...files, checkServerIdentity: () => undefined }
+    : { ...files, rejectUnauthorized: false }
 }
 
 function tsa(o, url, env) {

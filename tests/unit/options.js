@@ -1,4 +1,6 @@
 import { t } from '../test.js'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 import postgres from '../../src/index.js'
 
 const parsed = (url, o) => {
@@ -39,6 +41,34 @@ t('A password with characters that are not percent-encoded is used as written (#
 t('A percent-encoded password is decoded (#735)', async() => [
   JSON.stringify([['h'], [5432], 'u', 'p%ss#w@rd', 'db', null]),
   parsed('postgres://u:p%25ss%23w%40rd@h/db')
+])
+
+t('sslrootcert=system verifies and is not sent to the server', async() => {
+  const { ssl, connection } = postgres('postgres://h/db?sslrootcert=system', { max: 1 }).options
+  return ['verify-full,false', ssl + ',' + ('sslrootcert' in connection)]
+})
+
+t('sslrootcert with a file uses it as the CA, with the server name only for verify-full', async() => {
+  const file = fileURLToPath(new URL('../copy.csv', import.meta.url))
+      , url = 'postgres://h/db?sslrootcert=' + file
+      , full = postgres(url + '&sslmode=verify-full', { max: 1 }).options
+      , ca = postgres(url + '&sslmode=verify-ca', { max: 1 }).options
+      , none = postgres(url, { max: 1 }).options
+  return [
+    'true,false,false,true,true',
+    [
+      full.ssl.ca.equals(fs.readFileSync(file)),
+      'checkServerIdentity' in full.ssl,
+      'sslrootcert' in full.connection,
+      typeof ca.ssl.checkServerIdentity === 'function',
+      typeof none.ssl.checkServerIdentity === 'function'
+    ].join()
+  ]
+})
+
+t('sslmode=disable wins over sslrootcert', async() => [
+  false,
+  postgres('postgres://h/db?sslmode=disable&sslrootcert=' + fileURLToPath(new URL('../copy.csv', import.meta.url)), { max: 1 }).options.ssl
 ])
 
 t('Hosts with ports in the host option, as in v3', async() => [
