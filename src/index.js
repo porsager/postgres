@@ -514,7 +514,7 @@ function parseOptions(a, b) {
       (acc, [k, d]) => {
         const value = k in o && o[k] !== undefined ? o[k] : k in query
           ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
-          : env['PG' + k.toUpperCase()] || d
+          : k === 'ssl' && env.PGSSLMODE || env['PG' + k.toUpperCase()] || d
         acc[k] = typeof value === 'string' && ints.includes(k)
           ? +value
           : value
