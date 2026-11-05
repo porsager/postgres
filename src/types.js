@@ -456,8 +456,11 @@ function parseTimestamp(x) {
   if (!p || typeof p === 'number')
     return p || new Date(x)
 
-  // Set the date before the time: building it in year 2000 and moving the year afterwards
-  // would carry over a shift from a daylight saving gap in 2000 into the real year.
+  if (p.year >= 100)
+    return new Date(p.year, p.month, p.day, p.hour, p.minute, p.second, p.ms)
+
+  // The constructor maps years 0 to 99 to 19xx. Set the date before the time, as moving
+  // the year afterwards would keep a shift from a daylight saving gap in the first year.
   const date = new Date(2000, 0, 1)
   date.setFullYear(p.year, p.month, p.day)
   date.setHours(p.hour, p.minute, p.second, p.ms)
