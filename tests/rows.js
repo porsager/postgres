@@ -111,6 +111,15 @@ t('Queries of one statement with different parsers each get their own', async() 
   return ['number n1.5 1.5 number', [typeof xs[0][39].n, xs[1][39].n, xs[2][39].n, typeof xs[3][39].n].join(' ')]
 })
 
+t('Queries of one statement with more than 16 different parsers each get their own', async() => {
+  const query = () => sql`select 1.5::numeric as n from generate_series(1, 40)`
+      , xs = []
+  for (let i = 0; i < 20; i++)
+    xs.push((await query().parsers({ 1700: x => i + ':' + x }))[39].n)
+  xs.push(typeof (await query().parsers({ 1700: Number }))[39].n)
+  return ['0:1.5 19:1.5 number', [xs[0], xs[19], xs[20]].join(' ')]
+})
+
 t('A query\'s own parsers get the columns the instance reads in binary as text', async() => {
   const query = () => sql`select '\\x01'::bytea as b, array[1, 2]::int[] as a`
   await query()

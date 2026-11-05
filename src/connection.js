@@ -1538,7 +1538,8 @@ function Parsed(columns, parsers) {
     return found.state
 
   const variant = { list, state: Rows(columns.map((c, i) => list[i] === c.parser ? c : { ...c, parser: list[i], decode: null })) }
-  variants.length < variety && variants.push(variant)
+  variants.length === variety && variants.shift()
+  variants.push(variant)
   return variant.state
 }
 
