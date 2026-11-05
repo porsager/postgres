@@ -585,7 +585,7 @@ const rows = await sql`select id, body from posts`.parsers(column => column.name
 // the body as the server's text, the id as the instance parses it
 ```
 
-The parsers are picked once for each result, and a query that reuses the same ones reuses the same compiled row reader.
+The parsers are picked once for each result, and a query that reuses the same ones reuses the same compiled row reader. Pass the same functions each time: an inline one like `x => +x` is a new function on every call, so each query using it compiles a reader of its own.
 
 ### Queries in Files
 #### `await sql.file(path, [args], [options]) -> Result[]`
