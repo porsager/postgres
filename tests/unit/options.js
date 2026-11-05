@@ -66,6 +66,18 @@ t('sslrootcert with a file uses it as the CA, with the server name only for veri
   ]
 })
 
+t('ssl true keeps the full check with sslrootcert in the url', async() => {
+  const url = 'postgres://h/db?sslrootcert=' + fileURLToPath(new URL('../copy.csv', import.meta.url))
+      , option = postgres(url, { max: 1, ssl: true }).options.ssl
+      , query = postgres(url + '&ssl=true', { max: 1 }).options.ssl
+  return ['false,false,false,false', [
+    'checkServerIdentity' in option,
+    'rejectUnauthorized' in option,
+    'checkServerIdentity' in query,
+    'rejectUnauthorized' in query
+  ].join()]
+})
+
 t('sslmode=disable wins over sslrootcert', async() => [
   false,
   postgres('postgres://h/db?sslmode=disable&sslrootcert=' + fileURLToPath(new URL('../copy.csv', import.meta.url)), { max: 1 }).options.ssl
