@@ -1270,6 +1270,18 @@ const sql = postgres('postgres://username:password@host:port/database', {
 
 Note that `max_lifetime = 60 * (30 + Math.random() * 30)` by default. This resolves to an interval between 30 and 60 minutes to optimize for the benefits of prepared statements **and** working nicely with Linux's OOM killer.
 
+### Connection parameters
+
+`connection` sets run-time parameters as each connection starts. The lists of names (`search_path`, `temp_tablespaces`, `local_preload_libraries`, `session_preload_libraries` and `output_plugin_libraries`) can be given as an array, and each name is then quoted, so it keeps its case and may contain a space, a comma, a dot or a quote. An array for any other parameter is joined with commas as it is.
+
+```js
+const sql = postgres({
+  connection: {
+    search_path: ['Acme Inc.', 'public'] // Sent as "Acme Inc.","public"
+  }
+})
+```
+
 ### Dynamic passwords
 
 When clients need to use alternative authentication schemes such as access tokens or connections to databases with rotating passwords, provide either a synchronous or asynchronous function that will resolve the dynamic password value at connection time.

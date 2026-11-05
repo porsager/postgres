@@ -73,6 +73,20 @@ t('Startup has no type byte and ends with an empty name', async() => {
   ]
 })
 
+t('Startup quotes each name in an array for a list of names, and joins other arrays as they are', async() => {
+  const body = Buffer.concat([
+    i32(196608),
+    str('search_path'), str('"My ""Schema""","a.b"'),
+    str('Temp_Tablespaces'), str('"T"'),
+    str('DateStyle'), str('ISO,DMY'),
+    Buffer.from([0])
+  ])
+  return [
+    hex(Buffer.concat([i32(body.length + 4), body])),
+    hex(p.Startup({ search_path: ['My "Schema"', 'a.b'], Temp_Tablespaces: ['T'], DateStyle: ['ISO', 'DMY'] }))
+  ]
+})
+
 t('SSLRequest and CancelRequest', async() => [
   hex(Buffer.concat([i32(8), i32(80877103), i32(16), i32(80877102), i32(1234), i32(-5)])),
   hex(Buffer.concat([p.SSLRequest(), p.Cancel(1234, -5)]))

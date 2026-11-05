@@ -182,7 +182,7 @@ declare namespace postgres {
     parse?: (raw: any) => T
   }
 
-  interface ConnectionParameters {
+  interface ConnectionParameters<List = never> {
     /** @default 'postgres.js' */
     application_name: string
     default_transaction_isolation: 'read uncommitted' | 'read committed' | 'repeatable read' | 'serializable'
@@ -195,7 +195,7 @@ declare namespace postgres {
     DateStyle: string
     IntervalStyle: string
     TimeZone: string
-    [name: string]: string | number | boolean
+    [name: string]: string | number | boolean | List
   }
 
   type SSL = boolean | 'require' | 'allow' | 'prefer' | 'verify-full' | 'disable' | TlsOptions
@@ -317,8 +317,8 @@ declare namespace postgres {
 
     /** Transforms of column names, values and rows */
     transform?: TransformOptions | undefined
-    /** Run-time parameters sent at startup */
-    connection?: Partial<ConnectionParameters> | undefined
+    /** Run-time parameters sent at startup. An array is joined with commas, and each item of search_path, temp_tablespaces, local_preload_libraries, session_preload_libraries and output_plugin_libraries is quoted as a name */
+    connection?: Partial<ConnectionParameters<readonly string[]>> | undefined
     /** For several hosts: which kind of server to settle on @default process.env.PGTARGETSESSIONATTRS */
     target_session_attrs?: 'read-write' | 'read-only' | 'primary' | 'standby' | 'prefer-standby' | null | undefined
 
@@ -414,7 +414,7 @@ declare namespace postgres {
     onread: boolean
     unref_sockets: boolean
     target_session_attrs: Options['target_session_attrs']
-    connection: Partial<ConnectionParameters>
+    connection: Partial<ConnectionParameters<readonly string[]>>
     types: { [K in keyof T]: PostgresType<T[K]> }
     transform: Transform
     parameters: Record<string, string>

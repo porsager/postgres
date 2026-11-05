@@ -39,6 +39,11 @@ postgres({ types: { text: { to: 25, from: 25, serialize: String, parse: String }
 // @ts-expect-error not a property of a custom type
 postgres({ types: { int4: { oid: 23 } } })
 
+const given: string | number | boolean | readonly string[] | undefined = postgres({ connection: { search_path: ['Mixed Case', 'public'], temp_tablespaces: ['fast'] as const } }).options.connection.search_path
+// @ts-expect-error a parameter of its own type takes no array
+postgres({ connection: { application_name: ['a'] } })
+const reported: string | number | boolean = postgres().parameters.server_version
+
 // @ts-expect-error not an sslnegotiation
 postgres({ sslnegotiation: 'eventually' })
 // @ts-expect-error not an ssl mode

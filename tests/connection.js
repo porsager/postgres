@@ -1074,6 +1074,13 @@ t('Falsy connection parameters are left out of the startup message, as in v3', a
   return ['"$user", public', search_path, await sql.end()]
 })
 
+t('An array for search_path is sent as a list of quoted names', async() => {
+  const sql = postgres({ ...options, max: 1, connection: { search_path: ['Mixed, Case.v2', 'public'] } })
+  await sql`create schema "Mixed, Case.v2"`
+  const [{ x }] = await sql`select current_schemas(false)::text as x`
+  return ['{"Mixed, Case.v2",public}', x, await sql`drop schema "Mixed, Case.v2"`, await sql.end()]
+})
+
 t('sql.options.parsers and sql.options.serializers are objects keyed by oid', async() => {
   const sql = postgres(options)
   const { parsers, serializers } = sql.options

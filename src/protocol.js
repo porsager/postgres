@@ -162,12 +162,20 @@ function one(fn) {
   }
 }
 
+const nameLists = ['search_path', 'temp_tablespaces', 'local_preload_libraries', 'session_preload_libraries', 'output_plugin_libraries']
+
 export function startup(w, parameters) {
   w.untyped().i32(196608)
   for (const k in parameters)
-    parameters[k] && w.str(unbroken(k, k)).str(unbroken(k, '' + parameters[k]))
+    parameters[k] && w.str(unbroken(k, k)).str(unbroken(k, parameter(k, parameters[k])))
 
   return w.u8(0).endUntyped()
+}
+
+function parameter(k, x) {
+  return Array.isArray(x) && nameLists.includes(k.toLowerCase())
+    ? x.map(x => '"' + x.replace(/"/g, '""') + '"').join(',')
+    : '' + x
 }
 
 function unbroken(k, x) {
