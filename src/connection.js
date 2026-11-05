@@ -1377,9 +1377,24 @@ export function Connection(ready, options, events) {
     }
   }
 
+  function abandoned(item) {
+    return (error, callback) => {
+      callback(error)
+      if (!item.stream)
+        return
+
+      item.stream = null
+      cancel(item.query).catch(noop)
+      if (frames.paused) {
+        frames.resume()
+        frames.paused || socket.resume()
+      }
+    }
+  }
+
   function CopyOutResponse() {
     const item = sent[0]
-    item.stream = new Stream.Readable({ read: readable(item) })
+    item.stream = new Stream.Readable({ read: readable(item), destroy: abandoned(item) })
     item.open = false
     frames.own(true)
     item.query.resolve(item.stream)

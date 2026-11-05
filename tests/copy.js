@@ -169,6 +169,16 @@ t('Copy read with back-pressure', async() => {
   return [bufferSize, result, await sql`drop table test`]
 })
 
+t('Destroying a copy read stream frees the connection', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const readable = await sql`copy (select repeat('x', 1000) from generate_series(1, 1000000)) to stdout`.readable()
+  await new Promise(r => readable.once('readable', r))
+  readable.destroy()
+  const [{ x }] = await sql`select 1 as x`
+  await sql.end()
+  return [1, x]
+})
+
 t('Copy read through a slow pipeline keeps every byte and never stalls', { timeout: 30 }, () => slowCopy(sql))
 
 t('Copy read through a slow pipeline over direct TLS keeps every byte', { timeout: 30 }, async() => {
