@@ -1,6 +1,6 @@
 # Changelog
 
-## v4.1.0 - unreleased
+## v4.1.0 - 5 November 2026
 
 ### New
 
@@ -40,7 +40,7 @@
 - `bytea` and arrays of `int2`, `int4`, `int8` and `bool` are fetched in binary once a prepared statement's columns are known on the connection, when they use the built-in parsers: the values are the same as from the text, about 4.5 times faster to read for `bytea` and 3 times for an `int4[]`. A custom parser for the type or its elements, and `raw()`, still get the text.
 - A connection that becomes ready while others are still opening no longer takes the queries meant for those; 50 connections opened at once each run one of 50 queries.
 
-## v4.0.0
+## v4.0.0 - 29 October 2026
 
 v4 rewrites everything below the public API: the pool, the connection, the protocol, startup and the socket layer. Queries, helpers, transactions, cursors, COPY, listen, subscribe, large objects and the options work as in 3.4.9, apart from the changes below.
 
