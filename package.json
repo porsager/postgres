@@ -1,6 +1,6 @@
 {
   "name": "postgres",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Fastest full featured PostgreSQL client for Node.js, Bun and Cloudflare Workers",
   "type": "module",
   "main": "src/index.js",
@@ -30,7 +30,16 @@
     "/types/index.d.ts"
   ],
   "author": "Rasmus Porsager <rasmus@porsager.com> (https://www.porsager.com)",
-  "keywords": ["postgres", "postgresql", "pg", "client", "driver", "sql", "database", "cloudflare-workers"],
+  "keywords": [
+    "postgres",
+    "postgresql",
+    "pg",
+    "client",
+    "driver",
+    "sql",
+    "database",
+    "cloudflare-workers"
+  ],
   "funding": {
     "type": "individual",
     "url": "https://github.com/sponsors/porsager"
