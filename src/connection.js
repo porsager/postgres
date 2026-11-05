@@ -1384,7 +1384,6 @@ export function Connection(ready, options, events) {
         return
 
       item.stream = null
-      cancel(item.query).catch(noop)
       if (frames.paused) {
         frames.resume()
         frames.paused || socket.resume()
