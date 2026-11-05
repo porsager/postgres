@@ -4,7 +4,7 @@ import type { ConnectionOptions as TlsOptions } from 'node:tls'
 type ParsedTypes<T extends Record<string, postgres.PostgresType>> =
   Record<string, postgres.PostgresType> extends T
     ? {}
-    : { [K in keyof T]: T[K] extends postgres.PostgresType<infer R> ? R : never }
+    : { [K in keyof T]: T[K] extends postgres.PostgresType<infer R> ? unknown extends R ? 0 extends 1 & R ? R : postgres.SerializableParameter : R : never }
 
 declare function postgres<T extends Record<string, postgres.PostgresType> = {}>(
   options?: postgres.Options<T>
