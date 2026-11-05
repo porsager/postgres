@@ -16,14 +16,15 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "npm run lint && node tests/unit && node tests/index.js && node tests/simulate.js",
+    "test": "node tests/unit && node tests/index.js && node tests/simulate.js",
     "test:unit": "node tests/unit",
     "test:integration": "node tests/index.js",
     "test:simulate": "node tests/simulate.js",
     "coverage": "node tests/coverage.js",
     "test:types": "cd types && npm install && npm test",
     "test:cf": "sh tests/cf/run.sh",
-    "lint": "eslint --max-warnings 0 src tests"
+    "lint": "eslint --max-warnings 0 src tests",
+    "prepublishOnly": "npm run lint"
   },
   "files": [
     "/src/*.js",
