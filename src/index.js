@@ -580,7 +580,7 @@ function withCertificates(ssl, files) {
     return ssl
 
   return typeof ssl === 'object' ? { ...files, ...ssl }
-    : ssl === 'verify-full' ? files
+    : ssl === true || ssl === 'true' || ssl === 'verify-full' ? files
     : files.ca ? { ...files, checkServerIdentity: () => undefined }
     : { ...files, rejectUnauthorized: false }
 }
