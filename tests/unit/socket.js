@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events'
+import tls from 'tls'
 import { t } from '../test.js'
 import { Socket } from '../../src/socket.js'
 
@@ -12,6 +13,16 @@ function fake() {
   x.resume = () => x.paused = false
   return x
 }
+
+t('Socket upgrade verifies the certificate against an IP host', async() => {
+  const connect = tls.connect
+  let seen
+  tls.connect = x => (seen = x, fake())
+  const socket = await Socket({ socket: () => fake() }, '127.0.0.1', 5432)
+  socket.upgrade()
+  tls.connect = connect
+  return ['127.0.0.1', seen.host]
+})
 
 t('Socket takes the user socket', async() => {
   const raw = fake()
