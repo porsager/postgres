@@ -1479,6 +1479,7 @@ const sql = postgres()
 | `database`         | `PGDATABASE`             |
 | `username`         | `PGUSERNAME` or `PGUSER` |
 | `password`         | `PGPASSWORD`             |
+| `ssl`              | `PGSSLMODE`              |
 | `application_name` | `PGAPPNAME`              |
 | `idle_timeout`     | `PGIDLE_TIMEOUT`         |
 | `connect_timeout`  | `PGCONNECT_TIMEOUT`      |
