@@ -385,7 +385,7 @@ export function error(x, start, end) {
     fields[errorFields[x[i]] || String.fromCharCode(x[i])] = x.toString('utf8', i + 1, zero)
     i = zero + 1
   }
-  // The non-localized V field is optional: some servers and poolers send only S.
+
   fields.severity || (fields.severity = fields.severity_local)
   return fields
 }

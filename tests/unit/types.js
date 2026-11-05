@@ -76,7 +76,6 @@ t('Parse timestamp without time zone when the same wall time fell in a daylight 
   const tz = process.env.TZ
   process.env.TZ = 'Europe/Berlin'
   try {
-    // 2000-03-26 02:30 did not exist in Berlin, 2021-03-26 02:30 did
     const x = parse(1114, '2021-03-26 02:30:00')
     return [
       '2021-03-26T01:30:00.000Z',

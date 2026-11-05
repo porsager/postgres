@@ -145,7 +145,6 @@ function wrap(socket, host) {
       unlisten()
       const secure = tls.connect({
         socket,
-        // Node only knows the name to verify from here when the socket was opened with an IP
         host: host || undefined,
         servername: net.isIP(host || '') ? undefined : host,
         ...options
