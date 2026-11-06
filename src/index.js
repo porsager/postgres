@@ -571,7 +571,7 @@ function certificates(query) {
   sslrootcert && sslrootcert !== 'system' && (files.ca = fs.readFileSync(sslrootcert))
   sslcert && (files.cert = fs.readFileSync(sslcert))
   sslkey && (files.key = fs.readFileSync(sslkey))
-  Object.keys(files).length && !query.ssl && (query.ssl = 'require')
+  Object.keys(files).length && !query.ssl && (query.ssl = process.env.PGSSLMODE || process.env.PGSSL || 'require')
   return files
 }
 
