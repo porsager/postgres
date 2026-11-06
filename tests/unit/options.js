@@ -108,6 +108,19 @@ t('sql.array() is removed, and says so', async() => [
   (() => { try { postgres({ max: 1 }).array([1]) } catch (e) { return e.code } })()
 ])
 
+t('PGSSLMODE is kept with sslrootcert in the url', async() => {
+  const before = process.env.PGSSLMODE
+      , url = 'postgres://h/db?sslrootcert=' + fileURLToPath(new URL('../copy.csv', import.meta.url))
+
+  process.env.PGSSLMODE = 'verify-full'
+  const full = postgres(url, { max: 1 }).options.ssl
+  process.env.PGSSLMODE = 'disable'
+  const plain = postgres(url, { max: 1 }).options.ssl
+  before === undefined ? delete process.env.PGSSLMODE : process.env.PGSSLMODE = before
+
+  return ['undefined,false', typeof full.checkServerIdentity + ',' + plain]
+})
+
 t('PGSSLMODE sets ssl, and a url or an option comes first', async() => {
   const before = process.env.PGSSLMODE
   process.env.PGSSLMODE = 'verify-full'
