@@ -477,6 +477,11 @@ declare namespace postgres {
       | 'CANCEL_UNANSWERED'
       | 'TYPE_NOT_FOUND'
       | 'NESTED_TRANSACTION_MODE'
+      | 'AUTHENTICATION_INCOMPLETE'
+      | 'BATCH_NOT_ARRAY'
+      | 'BATCH_NOT_QUERY'
+      | 'BATCH_EXECUTED'
+      | 'BATCH_UNSUPPORTED'
     message: string
   }
 
