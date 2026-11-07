@@ -1833,6 +1833,11 @@ Making queries has to be done using the sql function as a [tagged template](http
 
 Postgres supports many different authentication types. This one is not supported. Cleartext, MD5, SCRAM-SHA-256 and SCRAM-SHA-256-PLUS are.
 
+##### AUTHENTICATION_INCOMPLETE
+> The server was ready before it accepted the authentication
+
+The server said it was ready for queries before it had accepted the password, for example in the middle of a SCRAM exchange or without asking for authentication at all. The connection is refused, so authentication can not be skipped by something between the client and the server.
+
 ##### SASL_MECHANISM_NOT_SUPPORTED / SASL_NONCE_MISMATCH
 The server offered no SASL mechanism Postgres.js supports (SCRAM-SHA-256 or, over TLS, SCRAM-SHA-256-PLUS), or its answer did not continue the client's nonce, which means something between them interfered.
 
@@ -1917,6 +1922,11 @@ An insert or update helper was given an empty object or an empty list of columns
 > sql.identifier needs at least one part
 
 `sql.identifier()` was called with no parts, which would leave the name out of the query.
+
+##### BATCH_NOT_ARRAY / BATCH_NOT_QUERY / BATCH_EXECUTED / BATCH_UNSUPPORTED
+> sql.batch takes an array of queries
+
+[`sql.batch`](#batches) was given something it can not send. `BATCH_NOT_ARRAY`: the argument is not an array. `BATCH_NOT_QUERY`: an item is not a query made with `sql`, such as a string, or what `.readable()`, `.writable()` or `.cursor()` without a callback return. `BATCH_EXECUTED`: an item has already run, because it was awaited, is a `.forEach()`, which starts at once, or was in another batch. `BATCH_UNSUPPORTED`: an item is a `.describe()` or a `.cursor(fn)`. The message names the position of the item. These are thrown by the `sql.batch()` call itself, before anything is sent, so `sql.batch(queries).catch(...)` does not catch them; `await` it inside `try`.
 
 ##### CONNECT_TIMEOUT
 > write CONNECT_TIMEOUT host:port
