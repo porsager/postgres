@@ -1,5 +1,5 @@
 import { t } from '../test.js'
-import { Types } from '../../src/types.js'
+import { Types, toCamel, toPascal } from '../../src/types.js'
 
 const types = Types({})
     , parse = (oid, x) => types.parser(oid)(x)
@@ -211,4 +211,9 @@ t('Array round trip keeps NULL and "NULL" apart', async() => [
 t('Parse timestamptz in a DateStyle other than ISO as Date does', async() => [
   'date:2026-10-19T12:00:00.000Z',
   show(parse(1184, 'Mon Oct 19 12:00:00 2026 UTC'))
+])
+
+t('toCamel and toPascal keep a trailing underscore and an empty name', async() => [
+  'a_,aB_,,A_,AB_,',
+  [toCamel('a_'), toCamel('a_b_'), toCamel(''), toPascal('a_'), toPascal('a_b_'), toPascal('')].join()
 ])

@@ -63,6 +63,14 @@ t('Transform nested json in arrays', async() => {
   return ['aBcD', (await sql`select '[{"a_b":1},{"c_d":2}]'::jsonb as x`)[0].x.map(Object.keys).join('')]
 })
 
+t('Transform json keys ending with an underscore', async() => {
+  const sql = postgres({
+    ...options,
+    transform: postgres.camel
+  })
+  return ['a_,bC_', Object.keys((await sql`select '{"a_":1,"b_c_":2}'::jsonb as x`)[0].x).join()]
+})
+
 t('Transform deeply nested json object in arrays', async() => {
   const sql = postgres({
     ...options,
