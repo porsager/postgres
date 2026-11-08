@@ -55,6 +55,15 @@ t('Cursor custom with less results than batch size', async() => {
   return ['20', order.join(',')]
 })
 
+t('Cursor yields rows of commands without a row count', async() => {
+  const order = []
+  for await (const rows of sql.unsafe('show server_version_num').cursor(5))
+    order.push(rows.length)
+  for await (const rows of sql`explain select 1`.cursor(5))
+    order.push(rows.length)
+  return ['1,1', order.join(',')]
+})
+
 t('Cursor cancel', async() => {
   let result
   await sql`select * from generate_series(1,10) as x`.cursor(async([{ x }]) => {

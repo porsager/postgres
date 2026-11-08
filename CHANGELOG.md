@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **`.cursor()` yields the rows of `SHOW`, `EXPLAIN` and other commands without a row count.** Their last batch was only passed on when the command tag had a count, so a cursor over them yielded nothing.
 - **`PGSSLMODE` is kept when a url has `sslrootcert`, `sslcert` or `sslkey`.** Such a url without an `sslmode` used `require` even if `PGSSLMODE` was set, so `PGSSLMODE=verify-full` dropped the host name check and `PGSSLMODE=disable` used TLS.
 
 ## v4.1.0 - 5 November 2026
