@@ -1043,7 +1043,8 @@ export function Connection(ready, options, events) {
     if (item.rows) {
       item.finished = true
       item.flushing && sync(item)
-      result.count && (item.last = new Promise(r => r(item.query.cursorFn(result)))).catch(noop)
+      if (result.count || result.length)
+        (item.last = new Promise(r => r(item.query.cursorFn(result)))).catch(noop)
     }
 
     item.nosync && !item.error && part(item)

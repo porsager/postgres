@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **`.cursor()` yields the rows of `SHOW`, `EXPLAIN` and other commands without a row count.** Their last batch was only passed on when the command tag had a count, so a cursor over them yielded nothing.
 - **`PGSSLMODE` is kept when a url has `sslrootcert`, `sslcert` or `sslkey`.** Such a url without an `sslmode` used `require` even if `PGSSLMODE` was set, so `PGSSLMODE=verify-full` dropped the host name check and `PGSSLMODE=disable` used TLS.
 - **A connection error without a `stack` rejects the waiting queries** (#1312). Adding the calling line to such an error threw, so the queries waiting for a connection never settled and the pool stopped retrying. On Bun a DNS error such as `EAI_AGAIN` has no `stack`, so a query to a host that doesn't resolve hung forever.
 
