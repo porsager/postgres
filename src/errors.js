@@ -62,12 +62,18 @@ function locations() {
 
 export function withOrigin(error, origin) {
   origin && Object.defineProperty(error, 'stack', {
-    value: [error.stack.split('\n')[0], ...origin.split('\n').slice(1).filter(x => !ours(x))].join('\n'),
+    value: [firstLine(error), ...origin.split('\n').slice(1).filter(x => !ours(x))].join('\n'),
     writable: true,
     configurable: true,
     enumerable: false
   })
   return error
+}
+
+function firstLine(error) {
+  return typeof error.stack === 'string'
+    ? error.stack.split('\n')[0]
+    : (error.name || 'Error') + (error.message ? ': ' + error.message : '')
 }
 
 export function queryError(error, q, debug) {

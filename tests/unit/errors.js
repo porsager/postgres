@@ -39,6 +39,18 @@ t('Connection error stack includes the calling line', async() => {
   return [true, e.stack.includes(here)]
 })
 
+t('Connection error without a stack rejects queued queries with the calling line', async() => {
+  const error = Object.assign(new Error('getaddrinfo EAI_AGAIN db.invalid'), { code: 'EAI_AGAIN' })
+  Object.defineProperty(error, 'stack', { value: undefined })
+  const sql = postgres({ socket: () => { throw error }, max: 1 })
+  const [a, b] = await Promise.all([sql`select 1`.catch(x => x), sql`select 2`.catch(x => x)])
+  await sql.end()
+  return [
+    'EAI_AGAIN|EAI_AGAIN|Error: getaddrinfo EAI_AGAIN db.invalid|true',
+    [a.code, b.code, a.stack.split('\n')[0], a.stack.includes(here)].join('|')
+  ]
+})
+
 t('Undefined value error stack includes the calling line', async() => {
   const sql = offline()
   const e = await sql`select ${ undefined }`.catch(x => x)
