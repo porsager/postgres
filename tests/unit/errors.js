@@ -1,5 +1,5 @@
 import { t } from '../test.js'
-import { PostgresError } from '../../src/errors.js'
+import { PostgresError, withOrigin } from '../../src/errors.js'
 import postgres from '../../src/index.js'
 
 const here = new URL(import.meta.url).pathname
@@ -16,6 +16,13 @@ t('PostgresError from server fields', async() => {
 t('PostgresError from a message string', async() => {
   const e = new PostgresError('Error message.')
   return ['Error message.|false', e.message + '|' + ('0' in e)]
+})
+
+t('Error without a stack keeps its message when adding an origin', async() => {
+  const error = new Error('DNS lookup failed')
+  error.stack = undefined
+  const result = withOrigin(error, 'Error\n    at query (app.js:1:1)')
+  return ['DNS lookup failed|true', result.stack.split('\n')[0] + '|' + result.stack.includes('app.js:1:1')]
 })
 
 t('PostgresError is exported from the package', async() => [

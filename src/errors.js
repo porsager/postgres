@@ -62,7 +62,7 @@ function locations() {
 
 export function withOrigin(error, origin) {
   origin && Object.defineProperty(error, 'stack', {
-    value: [error.stack.split('\n')[0], ...origin.split('\n').slice(1).filter(x => !ours(x))].join('\n'),
+    value: [String(error.stack ?? error.message).split('\n')[0], ...origin.split('\n').slice(1).filter(x => !ours(x))].join('\n'),
     writable: true,
     configurable: true,
     enumerable: false
