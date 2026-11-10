@@ -1,6 +1,6 @@
 import { t } from '../test.js'
 
-t.ready = Promise.all(['protocol', 'socket', 'types', 'build', 'errors', 'pool', 'options'].map(area =>
+t.ready = Promise.all(['protocol', 'socket', 'types', 'build', 'errors', 'pool', 'options', 'cancel'].map(area =>
   import('./' + area + '.js').catch(error =>
     t(area + ' loads', async() => { throw error })
   )
