@@ -85,6 +85,7 @@ function wrap(socket, host) {
     get closed() { return closed },
     get shared() { return !!socket.shared },
     get negotiated() { return !!socket.secure || !!socket.negotiated },
+    get serial() { return !!socket.serial },
     certificate() {
       const x = typeof socket.getPeerCertificate === 'function' && socket.getPeerCertificate()
       return x && x.raw || null

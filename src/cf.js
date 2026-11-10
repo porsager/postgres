@@ -67,6 +67,7 @@ function Stream(raw, secure, host, port) {
   Object.assign(x, {
     secure,
     negotiated: true,
+    serial: true,
     destroyed: false,
     write(data) {
       if (closed)

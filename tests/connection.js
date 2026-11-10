@@ -364,6 +364,44 @@ t('multiple queries before connect', async() => {
   ]
 })
 
+t('A query after a described one waits for it on a serial socket (#1319)', async() => {
+  const result = []
+  for (const serial of [false, true]) {
+    let writes = null
+    const sql = postgres({
+      ...options,
+      max: 1,
+      fetch_types: false,
+      socket: () => {
+        const raw = net.connect(options.port || 5432, options.host || 'localhost')
+        const write = raw.write
+        raw.serial = serial
+        raw.write = function(data, ...rest) {
+          writes && writes.push(types(data))
+          return write.call(this, data, ...rest)
+        }
+        return raw
+      }
+    })
+    await sql`select 1`
+    writes = []
+    await Promise.all([
+      sql.unsafe('select $1::text as x', ['a']),
+      sql.unsafe('select $1::int as x', [1])
+    ])
+    result.push(writes.join('|'))
+    await sql.end()
+  }
+  return ['PDH|BESPDBES PDH|BES|PDBES', result.join(' ')]
+
+  function types(data) {
+    let x = ''
+    for (let i = 0; i < data.length; i += 1 + data.readInt32BE(i + 1))
+      x += String.fromCharCode(data[i])
+    return x
+  }
+})
+
 t('Custom socket', {}, async() => {
   let result
   const sql = postgres({

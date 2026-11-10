@@ -114,6 +114,7 @@ export function Connection(ready, options, events) {
 
   function holds(x) {
     return x.describing
+      || (x.described && socket.serial && !x.nosync && !x.done)
       || (x.gate && x.learn && !x.error)
       || (!!x.error && !x.done)
       || (x.flushing && !x.synced)
@@ -581,6 +582,7 @@ export function Connection(ready, options, events) {
 
   function described(x) {
     x.describing = false
+    x.described = true
     const { built } = x.query.wire
         , name = x.statement.name
         , params = x.params || []
