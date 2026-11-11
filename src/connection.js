@@ -1135,7 +1135,6 @@ export function Connection(ready, options, events) {
   function settle(x) {
     answered(x)
     settling(x)
-    // a batch query settles inside settling(), after the first answered()
     x.batch && answered(x)
   }
 
