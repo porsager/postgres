@@ -10,6 +10,8 @@
 - **`.cursor()` yields the rows of `SHOW`, `EXPLAIN` and other commands without a row count.** Their last batch was only passed on when the command tag had a count, so a cursor over them yielded nothing.
 - **`PGSSLMODE` is kept when a url has `sslrootcert`, `sslcert` or `sslkey`.** Such a url without an `sslmode` used `require` even if `PGSSLMODE` was set, so `PGSSLMODE=verify-full` dropped the host name check and `PGSSLMODE=disable` used TLS.
 - **A connection error without a `stack` rejects the waiting queries** (#1312). Adding the calling line to such an error threw, so the queries waiting for a connection never settled and the pool stopped retrying. On Bun a DNS error such as `EAI_AGAIN` has no `stack`, so a query to a host that doesn't resolve hung forever.
+- **A canceled `sql.batch` no longer keeps the process alive for `cancel_timeout`** (#1317, #1318). The timer that waits for the cancel to be answered was left running after the batch rejected, so the process stayed up for 5 seconds after `sql.end()`.
+- **A JSON key ending with `_` no longer makes `toCamel` and `toPascal` throw** (#1313). With `transform: postgres.camel`, such a key made the whole query throw. The trailing `_` is now kept, so `a_` stays `a_`, and an empty key stays empty instead of becoming `undefined`.
 
 ## v4.1.0 - 5 November 2026
 
