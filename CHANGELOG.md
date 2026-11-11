@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **A command after a select in a multi-statement simple query has no columns** (#1321). In `sql.unsafe('select …; rollback')` the `ROLLBACK` result had the columns of the `SELECT` before it.
 - **A query queued behind one with an untyped string or boolean parameter resolves on Cloudflare Hyperdrive** (#1319). Such a query is described first, and 4.1.0 sent its Bind, Execute and Sync together with the next query, which never resolved through Hyperdrive. On Cloudflare Workers the next query now waits until the described one is done, as in 3.4.9. Other runtimes still pipeline it.
 - **`.cursor()` yields the rows of `SHOW`, `EXPLAIN` and other commands without a row count.** Their last batch was only passed on when the command tag had a count, so a cursor over them yielded nothing.
 - **`PGSSLMODE` is kept when a url has `sslrootcert`, `sslcert` or `sslkey`.** Such a url without an `sslmode` used `require` even if `PGSSLMODE` was set, so `PGSSLMODE=verify-full` dropped the host name check and `PGSSLMODE=disable` used TLS.

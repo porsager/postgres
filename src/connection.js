@@ -1031,7 +1031,7 @@ export function Connection(ready, options, events) {
     result.state = connection.backend
     result.statement = item
     item.query && (item.query.source = item)
-    result.columns = result.columns || item.columns
+    item.kind === 'simple' || (result.columns = result.columns || item.columns)
 
     item.final && (item.stream && Object.assign(item.stream, { count, command }), item.final(), item.final = null)
     item.kind !== 'simple' && (item.completed = true)

@@ -155,6 +155,14 @@ t('Multiple statements give one result each', async() => {
   return ['3:UPDATE,DELETE,SELECT', xs.length + ':' + xs.map(x => x.command).join(), await sql`drop table test`]
 })
 
+t('A command after a select in a simple query has no columns (#1321)', async() => {
+  const xs = await sql.unsafe('begin read only; select 1 as a where false; rollback')
+  return [
+    'BEGIN:,SELECT:a,ROLLBACK:',
+    xs.map(x => x.command + ':' + (x.columns ? x.columns.map(c => c.name).join() : '')).join()
+  ]
+})
+
 t('Error mid-result does not offset rows of next query', async() => {
   const sql = postgres({ ...options, max: 1 })
   await sql`select 1 / (g - 3) from generate_series(1, 5) g`.catch(x => x)
