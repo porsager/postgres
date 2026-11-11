@@ -237,19 +237,23 @@ function Postgres(a, b) {
       lease.release()
     }
 
-    async function scope(fn, name, inside, above = () => false) {
+    async function scope(fn, name, inside, above = () => false, outer = () => false) {
       let uncaught
         , result
         , rolled = null
         , after = null
+        , ending = false
 
       if (above())
         throw rolledBack()
 
       const stopped = () => !!rolled || above()
+          , over = () => ending || outer()
           , scoped = Sql(Object.assign(q => {
             if (stopped())
               return q.reject(after || (after = rolledBack()))
+            if (over())
+              return q.reject(Errors.generic('UNSAFE_TRANSACTION', 'The transaction has ended'))
             q.catch(e => uncaught || (uncaught = e))
             lease.send(q)
           }, { cancel: pool.cancel }))
@@ -274,6 +278,7 @@ function Postgres(a, b) {
         if (lease.connection.closed)
           throw lease.error || lease.connection.closed
       } catch (error) {
+        ending = true
         context && !name && (context.outcome = 'rollback')
         stopped()
           ? rolled && await rolled.catch(() => {})
@@ -292,6 +297,7 @@ function Postgres(a, b) {
       }
 
       if (!name) {
+        ending = true
         const done = await control(lease, prepare ? 'prepare transaction \'' + prepare.replace(/'/g, '\'\'') + '\'' : 'commit')
         context && (context.outcome = prepare ? 'prepare' : done.command === 'COMMIT' ? 'commit' : 'rollback')
 
@@ -306,7 +312,7 @@ function Postgres(a, b) {
           return savepoint(sql => sql.apply(sql, arguments))
 
         arguments.length === 1 && (fn = name, name = null)
-        return scope(fn, 's' + savepoints++ + (name ? '_' + name : ''), false, stopped)
+        return scope(fn, 's' + savepoints++ + (name ? '_' + name : ''), false, stopped, over)
       }
 
       async function nested(inner, fn) {
@@ -315,7 +321,7 @@ function Postgres(a, b) {
         if (normal(inner) && normal(inner) !== normal(mode))
           throw Errors.generic('NESTED_TRANSACTION_MODE', 'A nested transaction runs in a savepoint, which can not change the transaction mode')
 
-        return scope(fn, 's' + savepoints++, true, stopped)
+        return scope(fn, 's' + savepoints++, true, stopped, over)
       }
     }
   }

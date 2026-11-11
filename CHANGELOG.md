@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **A statement `sql.begin` sends after its own `COMMIT` or `ROLLBACK` is rejected** (#1320). A statement the callback did not await, sent between the transaction's `COMMIT` or `ROLLBACK` and the release of its connection, ran outside the transaction, and after a rollback its write was kept. It now rejects with `UNSAFE_TRANSACTION`, as a statement after the transaction has ended does.
 - **A command after a select in a multi-statement simple query has no columns** (#1321). In `sql.unsafe('select …; rollback')` the `ROLLBACK` result had the columns of the `SELECT` before it.
 - **A query queued behind one with an untyped string or boolean parameter resolves on Cloudflare Hyperdrive** (#1319). Such a query is described first, and 4.1.0 sent its Bind, Execute and Sync together with the next query, which never resolved through Hyperdrive. On Cloudflare Workers the next query now waits until the described one is done, as in 3.4.9. Other runtimes still pipeline it.
 - **`.cursor()` yields the rows of `SHOW`, `EXPLAIN` and other commands without a row count.** Their last batch was only passed on when the command tag had a count, so a cursor over them yielded nothing.

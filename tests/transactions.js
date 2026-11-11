@@ -11,6 +11,24 @@ t('Throws on illegal transactions', async() => {
   ]
 })
 
+t('A statement sent after the transaction commits or rolls back is rejected (#1320)', async() => {
+  const sql = postgres({ ...options, max: 1 })
+  await sql`create table test (x text)`
+  const late = []
+  for (const mode of ['commit', 'rollback']) {
+    await sql.begin(async sql => {
+      sql`select 1`.then(() => sql`insert into test values (${ mode })`).then(() => late.push(mode), e => late.push(e.code))
+      if (mode === 'rollback')
+        throw new Error('fail')
+    }).catch(() => {})
+    await delay(100)
+  }
+  const rows = await sql`select x from test`
+  await sql`drop table test`
+  await sql.end()
+  return ['UNSAFE_TRANSACTION,UNSAFE_TRANSACTION 0', late.join() + ' ' + rows.length]
+})
+
 t('Transaction throws', async() => {
   await sql`create table test (a int)`
   return ['22P02', await sql.begin(async sql => {
