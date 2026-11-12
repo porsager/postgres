@@ -677,23 +677,41 @@ export function Pool(options, types) {
     options.parameters[k] !== v && (options.parameters[k] = v, options.onparameter && options.onparameter(k, v))
   }
 
-  async function lease(kind) {
+  function lease(kind) {
     used = true
-    await 1
-    if (ending)
-      throw Errors.connection('CONNECTION_ENDED', options, options.host[0], options.port[0])
+    let job
+      , cancelled = false
 
-    if (failingFast())
-      throw copy(failure.error)
+    const p = Promise.resolve().then(() => {
+      if (cancelled)
+        throw Errors.generic('57014', 'canceling statement due to user request')
 
-    const missing = retype()
-    if (missing)
-      throw missing
+      if (ending)
+        throw Errors.connection('CONNECTION_ENDED', options, options.host[0], options.port[0])
 
-    return new Promise((resolve, reject) => {
-      waiting.push(wait({ lease: true, kind, resolve, reject, queued: listened(channels.pool) ? now() : 0 }))
-      drain()
+      if (failingFast())
+        throw copy(failure.error)
+
+      const missing = retype()
+      if (missing)
+        throw missing
+
+      return new Promise((resolve, reject) => {
+        if (cancelled)
+          return reject(Errors.generic('57014', 'canceling statement due to user request'))
+
+        job = wait({ lease: true, kind, resolve, reject, queued: listened(channels.pool) ? now() : 0 })
+        waiting.push(job)
+        drain()
+      })
     })
+    p.cancel = () => {
+      cancelled = true
+      if (job && waiting.remove(x => x === job && (started(x), true)))
+        job.reject(Errors.generic('57014', 'canceling statement due to user request'))
+      return Promise.resolve()
+    }
+    return p
   }
 
   function grant(c, job) {

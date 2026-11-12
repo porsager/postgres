@@ -21,3 +21,35 @@ t('A canceled sql.batch leaves no cancel_timeout timer behind', async() => {
   await clock.run(300)
   return ['57014,0', code + ',' + clock.pending]
 })
+
+
+t('A queued reserve() can be cancelled while waiting for a pool lease', async() => {
+  const sql = postgres({ max: 0, fetch_types: false, host: '127.0.0.1', port: 1 })
+  const pending = sql.reserve()
+  let code
+  pending.then(() => code = 'resolved', e => code = e.code)
+  await Promise.resolve()
+  await Promise.resolve()
+  await Promise.resolve()
+  const waiting = sql.stats.waiting
+  await pending.cancel()
+  await Promise.resolve()
+  await sql.end({ timeout: 0 })
+  return ['57014,1,0', [code, waiting, sql.stats.waiting].join(',')]
+})
+
+t('A queued begin() can be cancelled while waiting for a pool lease', async() => {
+  const sql = postgres({ max: 0, fetch_types: false, host: '127.0.0.1', port: 1 })
+  let entered = false
+  const pending = sql.begin(async() => { entered = true })
+  let code
+  pending.then(() => code = 'resolved', e => code = e.code)
+  await Promise.resolve()
+  await Promise.resolve()
+  await Promise.resolve()
+  const waiting = sql.stats.waiting
+  await pending.cancel()
+  await Promise.resolve()
+  await sql.end({ timeout: 0 })
+  return ['57014,1,0,false', [code, waiting, sql.stats.waiting, entered].join(',')]
+})
