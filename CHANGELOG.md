@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Performance
+
+- **The scheduler weighs a connection's queue without walking it.** With a query of more than 5 ms in flight, the pool picks a connection for each query by its queued work, and summed the estimated cost of every query queued on every connection to do it. Each connection now keeps that sum, and a count of its slow queries, as queries are queued and finish. With 200 fast queries in flight beside 20 slow ones, the client uses about a tenth less CPU per query.
+
 ## v4.1.1 - 11 November 2026
 
 ### Fixed

@@ -51,6 +51,8 @@ export function Connection(ready, options, events) {
     , epoch = 0
     , headSince = 0
     , notables = 0
+    , total = 0
+    , heavies = 0
 
   const connection = {
     id: ids++,
@@ -191,7 +193,7 @@ export function Connection(ready, options, events) {
         abort(x)
       } else if (!x.own || x.kind === 'step' || !connection.lease) {
         x.kind = 'local'
-        x.cost >= notable && notables--
+        uncost(x)
         x.cost = undefined
         return sent.length === 0 ? queueMicrotask(() => settle(x)) : sent.push(x)
       } else {
@@ -363,7 +365,7 @@ export function Connection(ready, options, events) {
       y.entry && y.entry.owner === y && y.entry.state === 'parsing' && (y.entry.state = 'stale')
       y.done = true
       y.trace && traced--
-      y.cost >= notable && notables--
+      uncost(y)
       settleError(y, skipped(error, b.parts.indexOf(y.query)))
     }
   }
@@ -371,14 +373,28 @@ export function Connection(ready, options, events) {
   function cost(x) {
     const { query } = x
     query.cost && !query.cursorFn && !query.streaming && (x.cost = query.cost.est === undefined ? unknown : query.cost.est)
+    if (x.cost === undefined)
+      return
+
+    total += x.cost
+    x.cost >= slow && heavies++
     x.cost >= notable && notables++
+  }
+
+  function uncost(x) {
+    if (x.cost === undefined)
+      return
+
+    total -= x.cost
+    x.cost >= slow && heavies--
+    x.cost >= notable && notables--
   }
 
   function timed(x) {
     const t = timers.now()
 
     if (x.cost !== undefined) {
-      x.cost >= notable && notables--
+      uncost(x)
       const sample = t - headSince
           , c = x.query.cost
       c.est = c.est === undefined || sample > c.est ? sample : c.est + (sample - c.est) * 0.1
@@ -389,35 +405,16 @@ export function Connection(ready, options, events) {
   }
 
   function backlog(t) {
-    let w = 0
-    for (let i = 0; i < sent.length; i++) {
-      const e = sent[i].cost || 0
-      if (i === 0) {
-        const elapsed = t - headSince
-        w += elapsed < e ? e - elapsed : elapsed
-      } else {
-        w += e
-      }
-    }
+    if (sent.length === 0 && pending.length === 0)
+      return (total = 0, heavies = 0, 0)
 
-    for (let i = 0; i < pending.length; i++)
-      w += pending[i].cost || 0
-
-    return w
+    const e = sent.length ? sent[0].cost || 0 : 0
+        , elapsed = t - headSince
+    return total - e + (sent.length ? elapsed < e ? e - elapsed : elapsed : 0)
   }
 
   function heavy() {
-    for (let i = 0; i < sent.length; i++) {
-      if (sent[i].cost >= slow)
-        return true
-    }
-
-    for (let i = 0; i < pending.length; i++) {
-      if (pending[i].cost >= slow)
-        return true
-    }
-
-    return false
+    return heavies > 0
   }
 
   function extended(x) {
@@ -671,7 +668,7 @@ export function Connection(ready, options, events) {
     if (i !== -1) {
       const [x] = pending.splice(i, 1)
       x === fence && (fence = null)
-      x.cost >= notable && notables--
+      uncost(x)
       settleError(x, Errors.generic('57014', 'canceling statement due to user request'))
       release()
       return Promise.resolve()
@@ -802,6 +799,8 @@ export function Connection(ready, options, events) {
     blocker = null
     fence = null
     notables = 0
+    total = 0
+    heavies = 0
     const head = sent[0]
         , failed = head && head.error && head.error.severity === 'FATAL' ? head.error : null
         , fatal = connection.fatal || failed
