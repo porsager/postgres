@@ -2,6 +2,7 @@ import v8 from 'v8'
 import vm from 'vm'
 import { t } from '../test.js'
 import { Queue } from '../../src/pool.js'
+import { Connection } from '../../src/connection.js'
 
 const gc = globalThis.Bun ? () => globalThis.Bun.gc(true) : (v8.setFlagsFromString('--expose-gc'), vm.runInNewContext('gc'))
 
@@ -56,4 +57,22 @@ t('Queue stays small when items cycle through it without it ever draining (#747)
     q.push(q.shift())
   gc()
   return ['3 true', q.length + ' ' + (process.memoryUsage().heapUsed - before < 1024 * 1024)]
+})
+
+t('A connection has fast properties, and every connection the same shape', async() => {
+  if (globalThis.Bun || globalThis.Deno)
+    return [true, true]
+
+  v8.setFlagsFromString('--allow-natives-syntax')
+  const fast = new Function('x', 'return %HasFastProperties(x)') // eslint-disable-line
+      , same = new Function('a', 'b', 'return %HaveSameMap(a, b)') // eslint-disable-line
+  v8.setFlagsFromString('--no-allow-natives-syntax')
+
+  const socket = () => ({ shared: false, resume() {}, pause() {}, ref() {}, unref() {}, write: () => true, destroy() {}, end() {} })
+      , ready = () => ({ socket: socket(), host: 'localhost', port: 5432, backend: { pid: 1, secret: 1 }, parameters: {}, status: 'I' })
+      , options = { timers: { now: () => 0, nextTick: process.nextTick, setTimeout, clearTimeout }, transform: {}, parameters: {} }
+      , a = Connection(ready(), options, {})
+      , b = Connection(ready(), options, {})
+
+  return ['true true true', [fast(a), fast(b), same(a, b)].join(' ')]
 })
