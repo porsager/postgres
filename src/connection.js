@@ -23,6 +23,16 @@ const text = p.text
 let ids = 1
   , compiles = true
 
+class Handle {
+  get status() { return this.$status() }
+  get inflight() { return this.$sent.length + this.$pending.length }
+  get exclusive() { return this.$exclusive() }
+  get copying() { return this.$copying() }
+  get closed() { return this.$closed() }
+  get closing() { return this.$closing() }
+  get notable() { return this.$notable() }
+}
+
 export function Connection(ready, options, events) {
   const { socket } = ready
       , timers = options.timers
@@ -53,6 +63,7 @@ export function Connection(ready, options, events) {
     , notables = 0
 
   const connection = {
+    __proto__: Handle.prototype,
     id: ids++,
     host: ready.host,
     port: ready.port,
@@ -60,12 +71,14 @@ export function Connection(ready, options, events) {
     parameters: ready.parameters,
     prepared,
     lease: null,
-    get status() { return status },
-    get inflight() { return sent.length + pending.length },
-    get exclusive() { return !!blocker && exclusive(blocker) },
-    get copying() { return !!blocker && blocker.streaming && blocker.open },
-    get closed() { return closed },
-    get closing() { return !!closing },
+    $status: () => status,
+    $sent: sent,
+    $pending: pending,
+    $exclusive: () => !!blocker && exclusive(blocker),
+    $copying: () => !!blocker && blocker.streaming && blocker.open,
+    $closed: () => closed,
+    $closing: () => !!closing,
+    $notable: () => notables > 0,
     send,
     batch,
     simple,
@@ -78,8 +91,7 @@ export function Connection(ready, options, events) {
     ref: () => socket.ref(),
     unref: () => socket.unref(),
     backlog,
-    heavy,
-    get notable() { return notables > 0 }
+    heavy
   }
 
   socket.ondata = x => (heard = timers.now(), frames.push(x))
