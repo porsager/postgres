@@ -916,11 +916,11 @@ declare namespace postgres {
 
     largeObject(oid?: number, /** @default 0x00020000 | 0x00040000 */ mode?: number): Promise<LargeObject>
 
-    begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>
-    begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>
+    begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): PendingLease<UnwrapPromiseArray<T>>
+    begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): PendingLease<UnwrapPromiseArray<T>>
 
     /** A connection of your own until `release()` */
-    reserve(): Promise<ReservedSql<TTypes>>
+    reserve(): PendingLease<ReservedSql<TTypes>>
 
     /** `await using sql = postgres()` ends the pool when it goes out of scope */
     [Symbol.asyncDispose](): Promise<void>
@@ -945,6 +945,12 @@ declare namespace postgres {
     [Symbol.dispose](): void
     [Symbol.asyncDispose](): Promise<void>
   }
+
+  /** A `begin()` or `reserve()` that is still waiting for a pool connection */
+  type PendingLease<T> = Promise<T> & {
+    /** Drops a queued lease and rejects; a lease already granted is left alone */
+    cancel(): Promise<void>
+  }
 }
 
 export default postgres
@@ -955,6 +961,7 @@ export type ReservedSql<TTypes extends Record<string, unknown> = {}> = postgres.
 export type Options<T extends Record<string, postgres.PostgresType> = {}> = postgres.Options<T>
 export type ParsedOptions<T extends Record<string, unknown> = {}> = postgres.ParsedOptions<T>
 export type PendingQuery<T extends readonly postgres.MaybeRow[]> = postgres.PendingQuery<T>
+export type PendingLease<T> = postgres.PendingLease<T>
 export type RowList<T extends readonly any[]> = postgres.RowList<T>
 export type Row = postgres.Row
 export type Fragment = postgres.Fragment

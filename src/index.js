@@ -180,14 +180,17 @@ function Postgres(a, b) {
     throw Errors.generic('ARRAY_REMOVED', 'sql.array() is removed in v4, pass the array as it is')
   }
 
-  async function reserve() {
-    const lease = await pool.lease('reserve')
-        , reserved = Sql(Object.assign(q => lease.send(q), { cancel: pool.cancel }))
-
-    reserved.release = () => lease.release()
-    Symbol.dispose && (reserved[Symbol.dispose] = reserved.release)
-    Symbol.asyncDispose && (reserved[Symbol.asyncDispose] = async() => reserved.release())
-    return reserved
+  function reserve() {
+    const pending = pool.lease('reserve')
+    const result = pending.then(lease => {
+      const reserved = Sql(Object.assign(q => lease.send(q), { cancel: pool.cancel }))
+      reserved.release = () => lease.release()
+      Symbol.dispose && (reserved[Symbol.dispose] = reserved.release)
+      Symbol.asyncDispose && (reserved[Symbol.asyncDispose] = async() => reserved.release())
+      return reserved
+    })
+    result.cancel = () => pending.cancel()
+    return result
   }
 
   function begin(mode, fn) {
@@ -207,17 +210,20 @@ function Postgres(a, b) {
     let promise
     start(channels.transaction, context, () => promise = transaction(mode, fn, context))
 
-    return promise.then(
+    const result = promise.then(
       result => (finish(channels.transaction, context, null, result), result),
       error => {
         finish(channels.transaction, context, error)
         throw error
       }
     )
+    result.cancel = () => promise.cancel()
+    return result
   }
 
-  async function transaction(mode, fn, context) {
-    const lease = await pool.lease('transaction')
+  function transaction(mode, fn, context) {
+    const pending = pool.lease('transaction')
+    const result = pending.then(async lease => {
 
     let savepoints = 0
       , prepare = null
@@ -324,6 +330,9 @@ function Postgres(a, b) {
         return scope(fn, 's' + savepoints++, true, stopped, over)
       }
     }
+    })
+    result.cancel = () => pending.cancel()
+    return result
   }
 
   function rolledBack() {
