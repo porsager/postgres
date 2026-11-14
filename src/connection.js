@@ -38,6 +38,7 @@ export function Connection(ready, options, events) {
 
   let stash = null
     , heard = timers.now()
+    , at = heard
     , rolling = false
     , fence = null
     , drained = null
@@ -92,7 +93,7 @@ export function Connection(ready, options, events) {
     unref: () => socket.unref()
   }
 
-  socket.ondata = x => (heard = timers.now(), frames.push(x))
+  socket.ondata = x => (heard = at = timers.now(), frames.push(x))
   socket.ondrain = ondrain
   socket.onclose = onclose
   ready.rest && ready.rest.length && frames.push(ready.rest)
@@ -395,7 +396,7 @@ export function Connection(ready, options, events) {
   }
 
   function timed(x) {
-    const t = timers.now()
+    const t = at
 
     if (x.cost !== undefined) {
       uncost(x)
@@ -861,8 +862,14 @@ export function Connection(ready, options, events) {
       return
 
     const { type, x } = stash
+    at = timers.now()
     dispatch(type, x, 0, x.length)
     stash = null
+    wake()
+  }
+
+  function wake() {
+    at = timers.now()
     frames.resume()
   }
 
@@ -1369,11 +1376,11 @@ export function Connection(ready, options, events) {
     return () => {
       item.wanted = true
 
-      if (!frames.paused)
+      if (!frames.paused())
         return
 
-      frames.resume()
-      frames.paused || socket.resume()
+      wake()
+      frames.paused() || socket.resume()
     }
   }
 
@@ -1384,9 +1391,9 @@ export function Connection(ready, options, events) {
         return
 
       item.stream = null
-      if (frames.paused) {
-        frames.resume()
-        frames.paused || socket.resume()
+      if (frames.paused()) {
+        wake()
+        frames.paused() || socket.resume()
       }
     }
   }

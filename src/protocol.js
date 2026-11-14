@@ -1,102 +1,118 @@
-export function Writer(size = 16384) {
-  let b = Buffer.allocUnsafe(size)
-    , i = 0
-    , at = 0
-
-  const w = {
-    get length() { return i },
-    type(x) {
-      fit(5)
-      at = i
-      b[i] = x
-      i += 5
-      return w
-    },
-    untyped() {
-      fit(4)
-      at = i
-      i += 4
-      return w
-    },
-    end() {
-      b.writeInt32BE(i - at - 1, at + 1)
-      return w
-    },
-    endUntyped() {
-      b.writeInt32BE(i - at, at)
-      return w
-    },
-    str(x) {
-      fit(x.length * 3 + 1)
-      i += b.write(x, i)
-      b[i++] = 0
-      return w
-    },
-    bytes(x) {
-      if (typeof x === 'string') {
-        fit(x.length * 3)
-        i += b.write(x, i)
-      } else {
-        fit(x.length)
-        b.set(x, i)
-        i += x.length
-      }
-      return w
-    },
-    value(x) {
-      if (x === null || x === undefined)
-        return w.i32(-1)
-      const n = i
-      i += 4
-      w.bytes(x)
-      b.writeInt32BE(i - n - 4, n)
-      return w
-    },
-    u8(x) {
-      fit(1)
-      b[i++] = x
-      return w
-    },
-    i16(x) {
-      fit(2)
-      b.writeInt16BE(x, i)
-      i += 2
-      return w
-    },
-    u16(x) {
-      fit(2)
-      b.writeUInt16BE(x, i)
-      i += 2
-      return w
-    },
-    i32(x) {
-      fit(4)
-      b.writeInt32BE(x, i)
-      i += 4
-      return w
-    },
-    truncate(n) {
-      i = n
-      return w
-    },
-    take() {
-      const out = i < 4096 ? Buffer.from(b.subarray(0, i)) : b.subarray(0, i)
-      i >= 4096 && (b = Buffer.allocUnsafe(size))
-      i = at = 0
-      return out
-    }
+class Out {
+  constructor(size) {
+    this.size = size
+    this.b = Buffer.allocUnsafe(size)
+    this.length = 0
+    this.at = 0
   }
 
-  return w
+  type(x) {
+    this.fit(5)
+    const i = this.at = this.length
+    this.b[i] = x
+    this.length = i + 5
+    return this
+  }
 
-  function fit(n) {
-    if (b.length - i >= n)
+  untyped() {
+    this.fit(4)
+    this.at = this.length
+    this.length += 4
+    return this
+  }
+
+  end() {
+    this.b.writeInt32BE(this.length - this.at - 1, this.at + 1)
+    return this
+  }
+
+  endUntyped() {
+    this.b.writeInt32BE(this.length - this.at, this.at)
+    return this
+  }
+
+  str(x) {
+    this.fit(x.length * 3 + 1)
+    const i = this.length + this.b.write(x, this.length)
+    this.b[i] = 0
+    this.length = i + 1
+    return this
+  }
+
+  bytes(x) {
+    if (typeof x === 'string') {
+      this.fit(x.length * 3)
+      this.length += this.b.write(x, this.length)
+    } else {
+      this.fit(x.length)
+      this.b.set(x, this.length)
+      this.length += x.length
+    }
+    return this
+  }
+
+  value(x) {
+    if (x === null || x === undefined)
+      return this.i32(-1)
+    const n = this.length
+    this.length = n + 4
+    this.bytes(x)
+    this.b.writeInt32BE(this.length - n - 4, n)
+    return this
+  }
+
+  u8(x) {
+    this.fit(1)
+    this.b[this.length++] = x
+    return this
+  }
+
+  i16(x) {
+    this.fit(2)
+    this.b.writeInt16BE(x, this.length)
+    this.length += 2
+    return this
+  }
+
+  u16(x) {
+    this.fit(2)
+    this.b.writeUInt16BE(x, this.length)
+    this.length += 2
+    return this
+  }
+
+  i32(x) {
+    this.fit(4)
+    this.b.writeInt32BE(x, this.length)
+    this.length += 4
+    return this
+  }
+
+  truncate(n) {
+    this.length = n
+    return this
+  }
+
+  take() {
+    const i = this.length
+        , out = i < 4096 ? Buffer.from(this.b.subarray(0, i)) : this.b.subarray(0, i)
+    i >= 4096 && (this.b = Buffer.allocUnsafe(this.size))
+    this.length = this.at = 0
+    return out
+  }
+
+  fit(n) {
+    if (this.b.length - this.length >= n)
       return
 
-    const prev = b
-    b = Buffer.allocUnsafe(Math.max(size, prev.length * 2, i + n))
-    prev.copy(b, 0, 0, i)
+    const prev = this.b
+    this.b = Buffer.allocUnsafe(Math.max(this.size, prev.length * 2, this.length + n))
+    prev.copy(this.b, 0, 0, this.length)
   }
+}
+
+export function Writer(size = 16384) {
+  return new Out(size)
 }
 
 const own = Writer(1024)
@@ -234,7 +250,7 @@ export function Frames(onframe, shared = false, onerror = null) {
       chunks.push(shared && (paused || owning) ? own(x) : x)
       run()
     },
-    get paused() {
+    paused() {
       return paused
     },
     owns(x) {
@@ -418,6 +434,30 @@ export function parameterDescription(x, start) {
   return oids
 }
 
+function digits(x, start, end) {
+  let n = 0
+  for (let i = start; i < end; i++)
+    n = n * 10 + x[i] - 48
+  return n
+}
+
+function word(x, start, end) {
+  if (end - start !== 6 || x[start + 2] !== 76 && x[start + 2] !== 83 && x[start + 2] !== 68)
+    return text(x, start, end)
+
+  const a = x[start]
+      , b = x[start + 1]
+      , c = x[start + 2]
+      , d = x[start + 3]
+      , e = x[start + 4]
+      , f = x[start + 5]
+  return a === 83 && b === 69 && c === 76 && d === 69 && e === 67 && f === 84 ? 'SELECT'
+    : a === 73 && b === 78 && c === 83 && d === 69 && e === 82 && f === 84 ? 'INSERT'
+    : a === 85 && b === 80 && c === 68 && d === 65 && e === 84 && f === 69 ? 'UPDATE'
+    : a === 68 && b === 69 && c === 76 && d === 69 && e === 84 && f === 69 ? 'DELETE'
+    : text(x, start, end)
+}
+
 export function commandComplete(x, start, end) {
   const first = start + 5
 
@@ -430,11 +470,11 @@ export function commandComplete(x, start, end) {
       s--
     if (s === e - 1 || s < first || x[s] !== 32)
       break
-    count === null && (count = +text(x, s + 1, e))
+    count === null && (count = e - s > 16 ? +text(x, s + 1, e) : digits(x, s + 1, e))
     e = s
   }
 
-  return { command: text(x, first, e), count }
+  return { command: word(x, first, e), count }
 }
 
 export function readyForQuery(x, start) {

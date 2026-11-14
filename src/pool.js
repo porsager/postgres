@@ -60,7 +60,7 @@ export function Pool(options, types) {
     cancel,
     end,
     close,
-    get stats() {
+    stats() {
       return {
         connections: connections.size,
         opening,
@@ -585,7 +585,7 @@ export function Pool(options, types) {
       host: c ? c.host : null,
       port: c ? c.port : null,
       database: options.database,
-      stats: pool.stats,
+      stats: pool.stats(),
       ...extra
     })
   }
@@ -706,7 +706,7 @@ export function Pool(options, types) {
       error: null,
       connection: c,
       closed,
-      get released() { return released },
+      released: false,
       send(q) {
         if (c.closed)
           return q.reject(queryError(c.closed, q, options.debug))
@@ -723,7 +723,7 @@ export function Pool(options, types) {
       release() {
         if (released)
           return
-        released = true
+        x.released = released = true
         c.lease === x && (c.lease = null)
         listened(channels.pool) && event('release', c, { kind: job.kind })
         if (c.closed)
@@ -817,34 +817,52 @@ export function Pool(options, types) {
   }
 }
 
-export function Queue() {
-  let xs = []
-    , head = 0
-
-  return {
-    get length() { return xs.length - head },
-    push: x => xs.push(x),
-    peek: () => xs[head],
-    shift() {
-      const x = xs[head]
-      xs[head++] = undefined
-      head === xs.length ? (xs = [], head = 0) : head > 1024 && head * 2 > xs.length && (xs = xs.slice(head), head = 0)
-      return x
-    },
-    take() {
-      const all = xs.slice(head)
-      xs = []
-      head = 0
-      return all
-    },
-    remove(fn) {
-      for (let i = head; i < xs.length; i++) {
-        if (fn(xs[i]))
-          return (xs.splice(i, 1), true)
-      }
-      return false
-    }
+class Waiting {
+  constructor() {
+    this.xs = []
+    this.head = 0
   }
+
+  get length() {
+    return this.xs.length - this.head
+  }
+
+  push(x) {
+    return this.xs.push(x)
+  }
+
+  peek() {
+    return this.xs[this.head]
+  }
+
+  shift() {
+    const xs = this.xs
+        , x = xs[this.head]
+    xs[this.head++] = undefined
+    this.head === xs.length
+      ? (this.xs = [], this.head = 0)
+      : this.head > 1024 && this.head * 2 > xs.length && (this.xs = xs.slice(this.head), this.head = 0)
+    return x
+  }
+
+  take() {
+    const all = this.xs.slice(this.head)
+    this.xs = []
+    this.head = 0
+    return all
+  }
+
+  remove(fn) {
+    for (let i = this.head; i < this.xs.length; i++) {
+      if (fn(this.xs[i]))
+        return (this.xs.splice(i, 1), true)
+    }
+    return false
+  }
+}
+
+export function Queue() {
+  return new Waiting()
 }
 
 const limit = 2000
@@ -914,16 +932,34 @@ function Statements(scheduler) {
       return unnamed(built.text)
 
     const tagged = !built.dynamic && (templates.get(built.strings) || set(built.strings))
-        , cached = tagged && tagged.get(built.types)
+        , oids = built.oids
+
+    if (tagged && tagged.last && tagged.last.live && same(tagged.oids, oids))
+      return (tagged.last.used = clock++, tagged.last)
+
+    const types = oids.join()
+        , cached = tagged && tagged.map.get(types)
 
     if (cached && cached.live)
-      return (cached.used = clock++, cached)
+      return (cached.used = clock++, tagged.oids = oids, tagged.last = cached)
 
-    const key = built.types + '\0' + built.text
+    const key = types + '\0' + built.text
     let statement = map.get(key)
     statement ? statement.used = clock++ : statement = add(key, built.text)
-    tagged && tagged.set(built.types, statement)
+    tagged && (tagged.map.set(types, statement), tagged.oids = oids, tagged.last = statement)
     return statement
+  }
+
+  function same(a, b) {
+    if (a.length !== b.length)
+      return false
+
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i])
+        return false
+    }
+
+    return true
   }
 
   function unnamed(text) {
@@ -952,7 +988,7 @@ function Statements(scheduler) {
   }
 
   function set(strings) {
-    const x = new Map()
+    const x = { map: new Map(), oids: null, last: null }
     templates.set(strings, x)
     return x
   }

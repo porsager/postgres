@@ -39,6 +39,21 @@ export class Query extends Promise {
     this.aborts = null
     this.timer = null
     this.timedOut = false
+    this.alone = undefined
+    this.cost = undefined
+    this.wire = undefined
+    this.connection = undefined
+    this.onwrite = undefined
+    this.parts = undefined
+    this.isRaw = undefined
+    this.cursorFn = undefined
+    this.cursorRows = undefined
+    this.forEachFn = undefined
+    this.streaming = undefined
+    this.onlyDescribe = undefined
+    this.ownParsers = undefined
+    this.cancelled = undefined
+    this.aborted = undefined
 
     this.originError = handler.debug ? new Error() : null
     this.tagged && !handler.debug && !origins.has(strings) && origins.set(strings, located())

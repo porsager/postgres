@@ -45,8 +45,7 @@ export function build(query, options) {
   if (values.length >= 65534)
     throw Errors.generic('MAX_PARAMETERS_EXCEEDED', 'Max number of parameters (65534) exceeded')
 
-  const types = oids.join()
-  return { strings: query.strings, dynamic: o.dynamic, types, text, values, oids }
+  return { strings: query.strings, dynamic: o.dynamic, text, values, oids }
 }
 
 function stringify(q, o) {

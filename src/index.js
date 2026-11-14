@@ -63,7 +63,7 @@ function Postgres(a, b) {
 
   Object.defineProperties(sql, {
     parameters: { get: () => options.parameters, enumerable: true },
-    stats: { get: () => pool.stats, enumerable: true }
+    stats: { get: () => pool.stats(), enumerable: true }
   })
 
   Object.assign(sql, {
