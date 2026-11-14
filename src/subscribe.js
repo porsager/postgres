@@ -399,7 +399,7 @@ function tuples(x, columns, xi, transform) {
 function parseEvent(x) {
   const [, command, path, key] = x.match(/^(\*|insert|update|delete|truncate)?:?([^.]+?\.?[^=]+)?=?(.+)?/i)
 
-  return (command || '*')
+  return (command ? command.toLowerCase() : '*')
        + (path ? ':' + (path.indexOf('.') === -1 ? 'public.' + path : path) : '')
        + (key ? '=' + key : '')
 }

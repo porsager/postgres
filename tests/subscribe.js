@@ -164,6 +164,18 @@ async function replicating(name) {
   }
 }
 
+t('subscribe with an uppercase command', { timeout: 10 }, async() => {
+  const { sql, done } = await replicating()
+      , seen = []
+
+  const { unsubscribe } = await sql.subscribe('INSERT:test', row => seen.push(row.name))
+  await sql`insert into test (name) values ('a')`
+  await until(() => seen.length === 1)
+  await unsubscribe()
+
+  return ['a', seen.join(), await done()]
+})
+
 t('subscribe with a persistent slot resumes where it left off', { timeout: 10 }, async() => {
   const { sql, done, replica } = await replicating('postgresjs_resume')
       , seen = []
