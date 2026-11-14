@@ -36,8 +36,7 @@ export function Connection(ready, options, events) {
       , out = p.Writer()
       , frames = p.Frames(frame, socket.shared, error => (connection.fatal = error, socket.destroy()))
 
-  let blocker = null
-    , stash = null
+  let stash = null
     , heard = timers.now()
     , rolling = false
     , fence = null
@@ -49,10 +48,6 @@ export function Connection(ready, options, events) {
     , portals = 0
     , traced = 0
     , epoch = 0
-    , headSince = 0
-    , notables = 0
-    , total = 0
-    , heavies = 0
 
   const connection = {
     id: ids++,
@@ -61,13 +56,29 @@ export function Connection(ready, options, events) {
     backend: ready.backend,
     parameters: ready.parameters,
     prepared,
+    sent,
+    pending,
+    status,
+    closed: null,
+    closing: false,
+    blocker: null,
+    headSince: 0,
+    weight: 0,
+    heavies: 0,
+    notables: 0,
     lease: null,
-    get status() { return status },
-    get inflight() { return sent.length + pending.length },
-    get exclusive() { return !!blocker && exclusive(blocker) },
-    get copying() { return !!blocker && blocker.streaming && blocker.open },
-    get closed() { return closed },
-    get closing() { return !!closing },
+    loading: false,
+    typing: null,
+    releasing: false,
+    retiring: false,
+    retired: null,
+    index: 0,
+    idleSince: 0,
+    idleTimer: null,
+    lifeTimer: null,
+    fatal: null,
+    uncertain: false,
+    onended: null,
     send,
     batch,
     simple,
@@ -78,10 +89,7 @@ export function Connection(ready, options, events) {
     destroy,
     go,
     ref: () => socket.ref(),
-    unref: () => socket.unref(),
-    backlog,
-    heavy,
-    get notable() { return notables > 0 }
+    unref: () => socket.unref()
   }
 
   socket.ondata = x => (heard = timers.now(), frames.push(x))
@@ -124,12 +132,8 @@ export function Connection(ready, options, events) {
       || (x.alone && !x.done)
   }
 
-  function exclusive(x) {
-    return x.flushing || x.streaming || x.alone
-  }
-
   function refresh() {
-    blocker && !holds(blocker) && (blocker = null)
+    connection.blocker && !holds(connection.blocker) && (connection.blocker = null)
     release()
   }
 
@@ -137,7 +141,7 @@ export function Connection(ready, options, events) {
     if (closed)
       return settleError(x, copy(closed))
 
-    if (blocker && blocker.streaming && blocker.open)
+    if (connection.blocker && connection.blocker.streaming && connection.blocker.open)
       return settleError(x, Errors.generic('COPY_IN_PROGRESS', 'You cannot execute queries during copy'))
 
     x.query && (x.query.state = connection.backend)
@@ -145,7 +149,7 @@ export function Connection(ready, options, events) {
       pending.splice(pending.indexOf(fence), 0, x)
     else if (x.ends && open.size)
       pending.push(fence = x)
-    else if (blocker || pending.length)
+    else if (connection.blocker || pending.length)
       pending.push(x)
     else
       return (write(x), schedule())
@@ -154,7 +158,7 @@ export function Connection(ready, options, events) {
   }
 
   function release() {
-    while (!blocker && pending.length && pending[0] !== fence)
+    while (!connection.blocker && pending.length && pending[0] !== fence)
       write(pending.shift())
 
     schedule()
@@ -175,8 +179,8 @@ export function Connection(ready, options, events) {
     if (result === held) {
       out.truncate(mark)
       x.loose = false
-      blocker = sent.find(y => y.gate && holds(y)) || null
-      blocker && blocker.nosync && !blocker.flushed && (blocker.flushed = true, p.flush(out), schedule())
+      connection.blocker = sent.find(y => y.gate && holds(y)) || null
+      connection.blocker && connection.blocker.nosync && !connection.blocker.flushed && (connection.blocker.flushed = true, p.flush(out), schedule())
       return pending.unshift(x)
     }
 
@@ -209,9 +213,9 @@ export function Connection(ready, options, events) {
     x.query && (x.query.active = sent.length === 0)
     x.ends && epoch++
     x.epoch = epoch
-    options.scheduler && sent.length === 0 && (headSince = timers.now())
+    options.scheduler && sent.length === 0 && (connection.headSince = timers.now())
     sent.push(x)
-    holds(x) && (blocker = x)
+    holds(x) && (connection.blocker = x)
     x.trace && wrote(x)
   }
 
@@ -318,7 +322,7 @@ export function Connection(ready, options, events) {
     x.done = true
     x.open = false
     x.trace && traced--
-    blocker === x && (blocker = null)
+    connection.blocker === x && (connection.blocker = null)
     settle(x)
     const next = sent[0]
     if (next && next.query) {
@@ -345,7 +349,7 @@ export function Connection(ready, options, events) {
         sent.splice(i, 1)
         synced = synced || (!y.nosync && y.synced)
         drop(y)
-        blocker === y && (blocker = null)
+        connection.blocker === y && (connection.blocker = null)
       } else {
         i++
       }
@@ -376,18 +380,18 @@ export function Connection(ready, options, events) {
     if (x.cost === undefined)
       return
 
-    total += x.cost
-    x.cost >= slow && heavies++
-    x.cost >= notable && notables++
+    connection.weight += x.cost
+    x.cost >= slow && connection.heavies++
+    x.cost >= notable && connection.notables++
   }
 
   function uncost(x) {
     if (x.cost === undefined)
       return
 
-    total -= x.cost
-    x.cost >= slow && heavies--
-    x.cost >= notable && notables--
+    connection.weight -= x.cost
+    x.cost >= slow && connection.heavies--
+    x.cost >= notable && connection.notables--
   }
 
   function timed(x) {
@@ -395,26 +399,13 @@ export function Connection(ready, options, events) {
 
     if (x.cost !== undefined) {
       uncost(x)
-      const sample = t - headSince
+      const sample = t - connection.headSince
           , c = x.query.cost
       c.est = c.est === undefined || sample > c.est ? sample : c.est + (sample - c.est) * 0.1
       events.ontimed && events.ontimed(sample, t)
     }
 
-    headSince = t
-  }
-
-  function backlog(t) {
-    if (sent.length === 0 && pending.length === 0)
-      return (total = 0, heavies = 0, 0)
-
-    const e = sent.length ? sent[0].cost || 0 : 0
-        , elapsed = t - headSince
-    return total - e + (sent.length ? elapsed < e ? e - elapsed : elapsed : 0)
-  }
-
-  function heavy() {
-    return heavies > 0
+    connection.headSince = t
   }
 
   function extended(x) {
@@ -767,7 +758,7 @@ export function Connection(ready, options, events) {
   }
 
   function close() {
-    closing || (closing = new Promise(r => {
+    closing || (connection.closing = true, closing = new Promise(r => {
       connection.onended = r
       idle() && terminate()
     }))
@@ -787,7 +778,7 @@ export function Connection(ready, options, events) {
   }
 
   function destroy(error) {
-    closing || (closing = Promise.resolve())
+    closing || (connection.closing = true, closing = Promise.resolve())
     socket.destroy(error)
   }
 
@@ -796,16 +787,16 @@ export function Connection(ready, options, events) {
       return
 
     out.take()
-    blocker = null
+    connection.blocker = null
     fence = null
-    notables = 0
-    total = 0
-    heavies = 0
+    connection.notables = 0
+    connection.weight = 0
+    connection.heavies = 0
     const head = sent[0]
         , failed = head && head.error && head.error.severity === 'FATAL' ? head.error : null
         , fatal = connection.fatal || failed
     connection.uncertain = !!(fatal && head && head.ends)
-    closed = Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
+    connection.closed = closed = Errors.connection(closing ? 'CONNECTION_DESTROYED' : 'CONNECTION_CLOSED', options, ready.host, ready.port)
     closed.cause = fatal || error || undefined
     sent.concat(pending).forEach(x => x.cancel && x.cancel.resolve())
     sent.splice(0).forEach(x => {
@@ -905,7 +896,7 @@ export function Connection(ready, options, events) {
       const x = sent[0]
       x ? fail(x, error) : destroy(error)
     }
-    blocker && !holds(blocker) && (blocker = null, release())
+    connection.blocker && !holds(connection.blocker) && (connection.blocker = null, release())
     out.length && schedule()
   }
 
@@ -1105,7 +1096,7 @@ export function Connection(ready, options, events) {
   }
 
   function ReadyForQuery(x, start) {
-    status = p.readyForQuery(x, start)
+    connection.status = status = p.readyForQuery(x, start)
     frames.own(false)
     const item = sent.shift()
     options.scheduler && timed(item)
@@ -1114,7 +1105,7 @@ export function Connection(ready, options, events) {
     item.trace && traced--
     item.kind === 'internal' && (rolling = false)
     status !== 'I' && !rolling && !item.lease && !connection.lease && options.max !== 1 && unsafe(item)
-    blocker === item && (blocker = null)
+    connection.blocker === item && (connection.blocker = null)
     settle(item)
     item.entry && item.entry.owner === item && (item.entry.owner = null)
     while (sent.length && sent[0].kind === 'local')

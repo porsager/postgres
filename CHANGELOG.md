@@ -4,6 +4,7 @@
 
 ### Performance
 
+- **Placing a query reads plain fields in one pass.** The pool read each connection's state through getters on every query, in up to four passes over all connections, so the cost of placing a query grew with the pool. A connection now keeps the state the pool reads as plain fields declared once, and the pool reads them from an array in one pass, with a second only when the scheduler is needed. Placement is unchanged. With 20 queries in flight per connection, the client uses about a quarter less CPU per query at `max: 10` and about a third of it at `max: 90`.
 - **The scheduler weighs a connection's queue without walking it.** With a query of more than 5 ms in flight, the pool picks a connection for each query by its queued work, and summed the estimated cost of every query queued on every connection to do it. Each connection now keeps that sum, and a count of its slow queries, as queries are queued and finish. With 200 fast queries in flight beside 20 slow ones, the client uses about a tenth less CPU per query.
 
 ## v4.1.1 - 11 November 2026

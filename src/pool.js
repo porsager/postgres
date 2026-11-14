@@ -13,6 +13,7 @@ export function Pool(options, types) {
   const { setTimeout, clearTimeout, now } = options.timers
       , statements = Statements(options.scheduler)
       , connections = new Set()
+      , list = []
       , waiting = Queue()
       , events = {
         parser: types.parser,
@@ -63,7 +64,7 @@ export function Pool(options, types) {
       return {
         connections: connections.size,
         opening,
-        idle: [...connections].filter(x => x.inflight === 0 && !x.lease).length,
+        idle: [...connections].filter(x => inflight(x) === 0 && !x.lease).length,
         leased: [...connections].filter(x => x.lease).length,
         waiting: waiting.length
       }
@@ -251,66 +252,57 @@ export function Pool(options, types) {
     if (!job.q || connections.size + opening < options.max || connections.size === 0)
       return false
 
-    for (const c of connections) {
-      if (!c.copying)
+    for (let i = 0; i < list.length; i++) {
+      const x = list[i].blocker
+      if (!(x && x.streaming && x.open))
         return false
     }
     return true
   }
 
-  function quiet(c) {
-    return c.inflight === 0 || (!!c.typing && !c.typing.settled && c.inflight === 1)
-  }
-
-  function usable(c) {
-    return !c.closed && !c.closing && !c.lease && !c.releasing && !c.retiring && !c.exclusive && !c.loading
-  }
-
   function pick(job) {
     const statement = job.statement
         , any = !statement || !statement.name
+        , pipelined = !job.lease && !job.exclusive
 
     if (!typesLoaded && (eager ? job.lease || job.typed : job.typed))
       return (eager || need(), null)
 
     let best = null
+      , load = 0
+      , free = false
       , soon = false
+      , notables = false
 
-    for (const c of connections) {
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i]
       c.loading && !c.closed && (soon = true)
-      const free = usable(c)
-      if (free && quiet(c)) {
+      c.notables > 0 && (notables = true)
+      const n = usable(c) ? inflight(c) : -1
+      if (n === 0 || (n === 1 && typing(c))) {
         if (any || c.prepared.has(statement.name))
           return c
-        best = best && quiet(best) ? best : c
-      } else if (free && !job.lease && !job.exclusive
-        && c.inflight < options.max_pipeline && (!best || c.inflight < best.inflight)) {
+        free || (best = c, load = n, free = true)
+      } else if (n > 0 && pipelined && n < options.max_pipeline && (!best || n < load)) {
         best = c
+        load = n
       }
     }
 
-    if (best && quiet(best))
+    if (free)
       return best
 
     if (soon || (connections.size + opening < options.max && !failingSince))
       return null
 
-    best && options.scheduler && job.q && needed(job) && (best = scheduled(job) || best)
-    return best && opening && best.inflight >= Math.ceil(waiting.length / (opening + 1))
+    best && options.scheduler && job.q && (notables || needed(job)) && (best = scheduled(job) || best)
+    return best && opening && inflight(best) >= Math.ceil(waiting.length / (opening + 1))
       ? null
       : best
   }
 
   function needed(job) {
-    if (!job.q.cost || job.q.cost.est === undefined || job.q.cost.est >= notable)
-      return true
-
-    for (const c of connections) {
-      if (c.notable)
-        return true
-    }
-
-    return false
+    return !job.q.cost || job.q.cost.est === undefined || job.q.cost.est >= notable
   }
 
   function scheduled(job) {
@@ -321,8 +313,8 @@ export function Pool(options, types) {
       return soonest(t, Infinity, false)
 
     let heavy = 0
-    for (const c of connections)
-      c.inflight && c.heavy() && heavy++
+    for (let i = 0; i < list.length; i++)
+      list[i].heavies > 0 && inflight(list[i]) && heavy++
 
     decay(t)
     const reserve = Math.max(1, Math.min(Math.ceil(work.fast / 2000 * 1.5) + 1, connections.size - Math.ceil(work.slow / 2000)))
@@ -336,8 +328,9 @@ export function Pool(options, types) {
       , value = Infinity
       , ties = 0
 
-    for (const c of connections) {
-      const v = usable(c) && c.inflight < options.max_pipeline && (!heavy || c.heavy()) ? c.backlog(t) : Infinity
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i]
+          , v = usable(c) && inflight(c) < options.max_pipeline && (!heavy || c.heavies > 0) ? backlog(c, t) : Infinity
       if (v <= most && v < value)
         (best = c, value = v, ties = 1)
       else if (v <= most && v === value && v !== Infinity && Math.random() * ++ties < 1)
@@ -425,6 +418,7 @@ export function Pool(options, types) {
     const c = Connection(ready, options, events)
     c.index = ready.index || 0
     connections.add(c)
+    list.push(c)
     lifetime(c)
     listened(channels.pool) && event('open', c)
     typesLoaded || !eager || (typesLoading ? (c.loading = true) : loadTypes(c))
@@ -447,7 +441,7 @@ export function Pool(options, types) {
       return
 
     typesLoading = true
-    const idle = [...connections].find(x => !paused.has(x) && usable(x) && x.inflight === 0)
+    const idle = [...connections].find(x => !paused.has(x) && usable(x) && inflight(x) === 0)
     idle
       ? fetched(types.load(runner(idle)))
       : (options.open || startup)(options, signal, 0).then(ready => {
@@ -579,7 +573,7 @@ export function Pool(options, types) {
     const life = typeof options.max_lifetime === 'function' ? options.max_lifetime() : options.max_lifetime
     life && (c.lifeTimer = unref(setTimeout(() => {
       c.retiring = true
-      c.inflight === 0 && !c.lease && c.close()
+      inflight(c) === 0 && !c.lease && c.close()
     }, life * 1000)))
     idle(c)
   }
@@ -598,7 +592,7 @@ export function Pool(options, types) {
 
   function idle(c) {
     listened(channels.pool) && event('idle', c)
-    if (c.inflight || c.lease)
+    if (inflight(c) || c.lease)
       return
 
     options.unref_sockets && !c.loading && waiting.length === 0 && c.unref()
@@ -620,7 +614,7 @@ export function Pool(options, types) {
 
   function idled(c) {
     c.idleTimer = null
-    if (c.inflight || c.lease || c.closed)
+    if (inflight(c) || c.lease || c.closed)
       return
 
     if (connections.size <= options.min)
@@ -634,26 +628,26 @@ export function Pool(options, types) {
 
   function onready(c) {
     if (c.releasing) {
-      if (c.inflight)
+      if (inflight(c))
         return
 
       c.releasing = false
       if (c.status !== 'I')
         return c.close()
     }
-    if (c.inflight === 0 && !c.lease && (c.retiring || (ending && waiting.length === 0)))
+    if (inflight(c) === 0 && !c.lease && (c.retiring || (ending && waiting.length === 0)))
       return c.close()
 
     idle(c)
-    while (waiting.length > connections.size + opening && usable(c) && c.inflight < options.max_pipeline && plain(waiting.peek()))
+    while (waiting.length > connections.size + opening && usable(c) && inflight(c) < options.max_pipeline && plain(waiting.peek()))
       run(c, waiting.shift())
 
-    waiting.length && !c.lease && c.inflight < options.max_pipeline && drain()
+    waiting.length && !c.lease && inflight(c) < options.max_pipeline && drain()
     ending && waiting.length === 0 && finishing()
   }
 
   function onclose(c, error) {
-    connections.delete(c)
+    connections.delete(c) && list.splice(list.indexOf(c), 1)
     ;(c.loading || c.typing) && !signal.aborted && attempted(copy(error))
     paused.delete(c)
     ending || replacing.push((c.index + 1) % (options.path ? 1 : options.host.length))
@@ -735,7 +729,7 @@ export function Pool(options, types) {
         if (c.closed)
           return
 
-        if (c.inflight)
+        if (inflight(c))
           return (c.releasing = true)
 
         c.status === 'I' ? onready(c) : c.close()
@@ -787,7 +781,7 @@ export function Pool(options, types) {
       return
 
     if (waiting.length === 0)
-      connections.forEach(c => c.inflight === 0 && !c.lease && c.close())
+      connections.forEach(c => inflight(c) === 0 && !c.lease && c.close())
 
     if (connections.size === 0 && opening === 0 && waiting.length) {
       const error = Errors.connection('CONNECTION_ENDED', options, options.host[0], options.port[0])
@@ -967,4 +961,31 @@ function Statements(scheduler) {
     map.forEach(x => x.live = false)
     map.clear()
   }
+}
+
+function inflight(c) {
+  return c.sent.length + c.pending.length
+}
+
+function typing(c) {
+  return !!c.typing && !c.typing.settled
+}
+
+function exclusive(c) {
+  const x = c.blocker
+  return x !== null && !!(x.flushing || x.streaming || x.alone)
+}
+
+function usable(c) {
+  return !c.closed && !c.closing && !c.lease && !c.releasing && !c.retiring && !c.loading && !exclusive(c)
+}
+
+function backlog(c, t) {
+  const sent = c.sent
+  if (sent.length === 0)
+    return c.pending.length === 0 ? (c.weight = 0, c.heavies = 0, 0) : c.weight
+
+  const e = sent[0].cost || 0
+      , elapsed = t - c.headSince
+  return c.weight - e + (elapsed < e ? e - elapsed : elapsed)
 }
