@@ -384,6 +384,7 @@ t('A query after a described one waits for it on a serial socket (#1319)', async
       }
     })
     await sql`select 1`
+    await sql.unsafe('select $1::int as x', [1])
     writes = []
     await Promise.all([
       sql.unsafe('select $1::text as x', ['a']),

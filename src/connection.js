@@ -463,7 +463,7 @@ export function Connection(ready, options, events) {
     }
 
     x.learn = true
-    x.values = typed ? serialize(built.oids, built, x.fresh || {}) : untyped(built)
+    x.values = typed ? serialize(built.oids, built, x.fresh || {}) : untyped(x, built)
     run(x, name)
   }
 
@@ -490,19 +490,25 @@ export function Connection(ready, options, events) {
       return false
 
     const { oids, values } = built
+        , seen = x.statement.seen.params
     for (let i = 0; i < oids.length; i++) {
-      if (!oids[i] && values[i] !== null && !(typeof values[i] === 'number' && isFinite(values[i])))
+      if (!oids[i] && values[i] !== null && !(seen && typeof values[i] === 'number' && isFinite(values[i])))
         return false
     }
     return x.loose = true
   }
 
-  function untyped(built) {
+  function untyped(x, built) {
     const { oids, values } = built
+        , seen = x.statement.seen.params
         , out = new Array(values.length)
 
-    for (let i = 0; i < values.length; i++)
-      out[i] = values[i] === null ? null : oids[i] ? events.serializer(oids[i])(values[i]) : '' + values[i]
+    for (let i = 0; i < values.length; i++) {
+      out[i] = values[i] === null ? null
+        : oids[i] ? events.serializer(oids[i])(values[i])
+        : seen && dated(seen[i]) ? events.serializer(seen[i])(values[i])
+        : '' + values[i]
+    }
 
     return out
   }
@@ -937,6 +943,7 @@ export function Connection(ready, options, events) {
   function ParameterDescription(x, start) {
     const item = sent[0]
     item.params = p.parameterDescription(x, start)
+    item.statement && item.statement.seen && (item.statement.seen.params = item.params)
     item.loose && item.entry && item.entry.owner === item && item.entry.oids === null && (item.entry.oids = item.params)
     logged(item, item.params)
   }
@@ -1518,6 +1525,10 @@ function Exchange(kind, query, lease, write) {
     reject: null,
     cost: undefined
   }
+}
+
+function dated(oid) {
+  return oid === 1184 || oid === 1114 || oid === 1082
 }
 
 function Entry(name, owner, oids) {

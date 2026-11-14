@@ -922,7 +922,7 @@ function Statements(scheduler) {
     if (x)
       return x
 
-    texts.set(text, x = { text, est: undefined, alone: undefined })
+    texts.set(text, x = { text, est: undefined, alone: undefined, params: undefined })
     texts.size > limit && texts.delete(texts.keys().next().value)
     return x
   }
@@ -965,14 +965,14 @@ function Statements(scheduler) {
   function unnamed(text) {
     return {
       key: null, live: false, name: '', text, ends: undefined, shape: undefined, version: 0, used: 0,
-      cost: scheduler ? known(text) : null
+      cost: scheduler ? known(text) : null, seen: known(text)
     }
   }
 
   function add(key, text) {
     const statement = {
       key, live: true, name: prefix + counter++, text, ends: undefined, shape: undefined, version: 0, used: clock++,
-      cost: { est: undefined }, alone: undefined
+      cost: { est: undefined }, alone: undefined, seen: known(text)
     }
     map.set(key, statement)
     map.size > limit && evict()

@@ -1,6 +1,21 @@
 import { t } from './test.js'
 import { postgres, sql, options, delay } from './setup.js'
 
+t('A number for a timestamptz, timestamp or date parameter is epoch milliseconds (#1324)', async() => {
+  const n = 1794569323252
+      , xs = []
+
+  for (let i = 0; i < 2; i++)
+    xs.push((await sql`select ${ n } = '2026-11-13T11:28:43.252Z'::timestamptz as x`)[0].x)
+
+  xs.push((await sql`select ${ n } = '2026-11-13T11:28:43.252Z'::timestamptz and ${ 'x' }::text = 'x' as x`)[0].x)
+  xs.push((await sql`select ${ n }::timestamp = '2026-11-13 11:28:43.252'::timestamp as x`)[0].x)
+  xs.push((await sql`select ${ n } = '2026-11-13'::date as x`)[0].x)
+  xs.push((await sql`select ${ n } = 1794569323252::int8 as x`)[0].x)
+
+  return ['true,true,true,true,true,true', xs.join()]
+})
+
 t('null', async() =>
   [null, (await sql`select ${ null } as x`)[0].x]
 )

@@ -580,7 +580,7 @@ async function counted(fn) {
   await sql`select 1`
   try {
     writes = 0
-    const result = await fn(sql)
+    const result = await fn(sql, () => writes)
     return [writes, result]
   } finally {
     await sql.end()
@@ -588,9 +588,14 @@ async function counted(fn) {
   }
 }
 
-t('A new query with only numbers and nulls as untyped values is sent in one write', async() => {
-  const [writes, rows] = await counted(sql => sql`select ${ 1 }::int + ${ 2.5 }::float8 as x, ${ null }::text as y`)
-  return ['1 3.5 null', writes + ' ' + rows[0].x + ' ' + rows[0].y]
+t('A query with only numbers and nulls as untyped values learns the parameter types once, then is sent in one write', async() => {
+  const [, [first, second, rows]] = await counted(async(sql, writes) => {
+    await sql`select ${ 1 }::int + ${ 2.5 }::float8 as x, ${ null }::text as y`
+    const first = writes()
+        , rows = await sql.unsafe('select $1::int + $2::float8 as x, $3::text as y', [1, 2.5, null], { prepare: false })
+    return [first, writes() - first, rows]
+  })
+  return ['2 1 3.5 null', first + ' ' + second + ' ' + rows[0].x + ' ' + rows[0].y]
 })
 
 t('A new query with a string value still learns the parameter types before writing values', async() => {
@@ -650,5 +655,5 @@ async function first(sql, refs) {
 t('The same new query with numbers fired many times at once on one connection is prepared once', async() => {
   const batch = sql => Promise.all(Array.from({ length: 10 }, (_, i) => sql`select ${ i }::int as x`))
   const [writes, rows] = await counted(async sql => (await batch(sql), batch(sql)))
-  return [(options.prepare === false ? 2 : 3) + ' 9', writes + ' ' + rows[9][0].x]
+  return ['3 9', writes + ' ' + rows[9][0].x]
 })

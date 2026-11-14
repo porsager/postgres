@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **A number for a `timestamptz`, `timestamp` or `date` parameter is written as epoch milliseconds again** (#1324). 4.0 sent a number as its digits before the server had named the parameter's type, so `${ Date.now() }` for a timestamp failed with `22008`, where v3 wrote it as that instant. The first time a statement with a number parameter runs, the pool now waits for the server's parameter types, at the cost of one round trip, and remembers them for that statement.
+
 ### Performance
 
 - **Less work for each query in the client.** The protocol writer and the pool's queue had a getter that put them in V8's slow dictionary mode, so every call on them was a hash lookup. They now keep plain fields with shared methods. A tagged query finds its prepared statement by comparing parameter types, without joining them into a string. A query declares all its fields when it is created, the command tag is read without making strings, and one timestamp serves all results in a chunk. With these and the two entries below, a client against an in-process server uses 2.7 µs of CPU per query where 4.1.1 used 5.0 µs.

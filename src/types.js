@@ -173,7 +173,7 @@ const shaped = (is, serialize) => x => is(x) ? serialize(x) : string(x)
 const shapedTypes = {
   ...types,
   boolean: { ...types.boolean, serialize: shaped(x => typeof x === 'boolean', types.boolean.serialize) },
-  date: { ...types.date, serialize: shaped(x => x instanceof Date, types.date.serialize) },
+  date: { ...types.date, serialize: shaped(x => x instanceof Date || typeof x === 'number', types.date.serialize) },
   bytea: { ...types.bytea, serialize: shaped(x => x instanceof Uint8Array, types.bytea.serialize) }
 }
 
