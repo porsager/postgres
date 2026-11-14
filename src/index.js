@@ -511,8 +511,8 @@ function parseOptions(a, b) {
 
   const options = {
     host            : targets.map(x => x[0]),
-    port            : Array.isArray(port) ? port : targets.map(x => o.port || query.port ? +port : x[1] || +port),
-    path            : o.path || targets[0][0].indexOf('/') > -1 && targets[0][0] + '/.s.PGSQL.' + (targets[0][1] || port),
+    port            : ports(port, targets, o.port || query.port),
+    path            : o.path || targets[0][0].indexOf('/') > -1 && targets[0][0] + '/.s.PGSQL.' + (targets[0][1] || String(port).split(',')[0]),
     database        : o.database || o.db || (url.url.pathname || '').slice(1) || env.PGDATABASE || (typeof user === 'function' ? null : user),
     user            : user,
     pass            : o.pass || o.password || url.url.password || env.PGPASSWORD || '',
@@ -664,6 +664,21 @@ function decode(x) {
   } catch (_) {
     return x
   }
+}
+
+// A comma separated port list, as libpq takes in port and PGPORT, gives one port per host
+function ports(port, targets, given) {
+  if (Array.isArray(port))
+    return port
+
+  const list = String(port).split(',').map(x => +x)
+  if (list.length > 1 && list.length !== targets.length)
+    throw new Error('could not match ' + list.length + ' port numbers to ' + targets.length + ' hosts')
+
+  return targets.map((x, i) => {
+    const p = list.length > 1 ? list[i] : list[0]
+    return given ? p : x[1] || p
+  })
 }
 
 function hosts(o, query, url, env) {

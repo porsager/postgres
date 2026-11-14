@@ -93,6 +93,37 @@ t('A port option applies to every host', async() => [
   parsed('postgres://u@a:1,b:2/db', { port: 7 })
 ])
 
+t('A port list in the query of a url gives one port per host', async() => [
+  JSON.stringify([['a', 'b'], [5433, 5434], 'u', '', 'db', null]),
+  parsed('postgres://u@/db?host=a,b&port=5433,5434')
+])
+
+t('A port list in PGPORT gives one port per host', async() => {
+  const before = process.env.PGPORT
+  process.env.PGPORT = '5433,5434'
+  try {
+    return [
+      JSON.stringify([['a', 'b'], [5433, 5434], 'u', '', 'db', null]),
+      parsed('postgres://u@a,b/db')
+    ]
+  } finally {
+    if (before === undefined)
+      delete process.env.PGPORT
+    else
+      process.env.PGPORT = before
+  }
+})
+
+t('A port list that does not match the hosts throws', async() => {
+  let error
+  try {
+    postgres('postgres://u@/db?host=a,b,c&port=5433,5434', { max: 1 })
+  } catch (e) {
+    error = e.message
+  }
+  return ['could not match 2 port numbers to 3 hosts', error]
+})
+
 t('disable and false in the query of a url turn an option off', async() => {
   const x = postgres('postgres://u@h/db?prepare=false&ssl=disable&fetch_types=false', { max: 1 }).options
   return ['false false false', [x.prepare, x.ssl, x.fetch_types].join(' ')]
