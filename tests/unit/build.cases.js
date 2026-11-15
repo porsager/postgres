@@ -160,5 +160,31 @@ export default [
   ['Join values as parameters', sql => sql`select x where y in (${ sql`,`.join([1, 2, 3]) })`, 'select x where y in ( $1 , $2 , $3 )', [1, 2, 3]],
   ['Join adds no space where there is one', sql => sql`select ${ sql`, `.join([sql`a `, sql`b`]) }from t`, 'select a , b from t', []],
   ['Join of nothing is empty', sql => sql`select 1 ${ sql`and`.join([false]) }`, 'select 1 ', []],
+  [
+    'Insert helper after a line comment with a keyword in it',
+    sql => sql`insert into x -- rows from the import
+      ${ sql({ a: 1 }) }`,
+    'insert into x -- rows from the import\n      ("a")values($1)',
+    [1]
+  ],
+  [
+    'Update helper after a line comment with an apostrophe in it',
+    sql => sql`update x set -- the user's name
+      ${ sql({ a: 1 }) } where id = 1`,
+    'update x set -- the user\'s name\n      "a"=$1 where id = 1',
+    [1]
+  ],
+  [
+    'Update helper after a nested block comment with a keyword in it',
+    sql => sql`update x set /* where /* from */ is added below */ ${ sql({ a: 1 }) }`,
+    'update x set /* where /* from */ is added below */ "a"=$1',
+    [1]
+  ],
+  [
+    'Comment markers inside literals and dollar quotes are not comments',
+    sql => sql`select '--', $$ /* $$, E'\\' -- ', ${ sql(['a']) } from t`,
+    'select \'--\', $$ /* $$, E\'\\\' -- \', "a" from t',
+    []
+  ],
   ['Join with helpers among the items', sql => sql`select ${ sql`,`.join([sql(['a', 'b']), sql`c`]) } from t`, 'select "a","b" , c from t', []]
 ]

@@ -142,6 +142,8 @@ function helper(before, x, o) {
 }
 
 function context(sql) {
+  (sql.includes('--') || sql.includes('/*')) && (sql = uncomment(sql))
+
   const words = []
 
   let i = sql.length - 1
@@ -190,6 +192,50 @@ function context(sql) {
     }
   }
   return null
+}
+
+function uncomment(sql) {
+  let text = ''
+    , start = 0
+    , i = 0
+
+  while (i < sql.length) {
+    const c = sql[i]
+    if (c === '\'' || c === '"') {
+      const escapes = c === '\'' && (sql[i - 1] === 'e' || sql[i - 1] === 'E') && !/[a-z_0-9$]/i.test(sql[i - 2] || '')
+      for (i++; i < sql.length; i++) {
+        if (escapes && sql[i] === '\\')
+          i++
+        else if (sql[i] === c && sql[++i] !== c)
+          break
+      }
+    } else if (c === '$' && !/[a-z_0-9$]/i.test(sql[i - 1] || '')) {
+      const tag = sql.slice(i).match(/^\$([a-z_][a-z_0-9]*)?\$/i)
+      if (tag) {
+        const end = sql.indexOf(tag[0], i + tag[0].length)
+        i = end === -1 ? sql.length : end + tag[0].length
+      } else {
+        i++
+      }
+    } else if (c === '-' && sql[i + 1] === '-') {
+      const end = sql.indexOf('\n', i)
+      text += sql.slice(start, i) + ' '
+      i = start = end === -1 ? sql.length : end
+    } else if (c === '/' && sql[i + 1] === '*') {
+      text += sql.slice(start, i) + ' '
+      let depth = 1
+      for (i += 2; i < sql.length && depth > 0; i++) {
+        sql[i] === '/' && sql[i + 1] === '*' ? (depth++, i++)
+          : sql[i] === '*' && sql[i + 1] === '/' ? (depth--, i++)
+          : null
+      }
+      start = i
+    } else {
+      i++
+    }
+  }
+
+  return text + sql.slice(start)
 }
 
 function previous(sql, i) {
