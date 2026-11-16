@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### New
+
+- **``sql`…`.transform(false)`` gives a query's results without the instance's `transform`.** Its columns keep the server's names, and its values and rows are what the server and its parsers give, so a query with `.parsers()` gets exactly what its parsers return. Code given an app's `sql`, a transaction or a reserved connection can't see the app's `transform`, and with `postgres.camel` the keys of its JSON values were renamed.
+- **The function form of `.parsers()` gets the column's position.** `.parsers((column, i) => …)` can pick a parser for each of several columns with the same name.
+
 ### Fixed
 
 - **A number for a `timestamptz`, `timestamp` or `date` parameter is written as epoch milliseconds again** (#1324). 4.0 sent a number as its digits before the server had named the parameter's type, so `${ Date.now() }` for a timestamp failed with `22008`, where v3 wrote it as that instant. The first time a statement with a number parameter runs, the pool now waits for the server's parameter types, at the cost of one round trip, and remembers them for that statement.

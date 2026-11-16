@@ -575,7 +575,7 @@ This can be useful for specific performance/transformation reasons. The column d
 ### Parsers for One Query
 #### ```sql``.parsers(parsers)```
 
-Using `.parsers` will parse this query's values with parsers of its own, while every other query keeps the instance's [`types`](#custom-types). Give them by type, keyed by oid, on top of the instance's, or as a function that gets each column and returns the parser for it. A column given `null` keeps the server's text.
+Using `.parsers` will parse this query's values with parsers of its own, while every other query keeps the instance's [`types`](#custom-types). Give them by type, keyed by oid, on top of the instance's, or as a function that gets each column and its position and returns the parser for it. A column given `null` keeps the server's text.
 
 ```js
 const [row] = await sql`select 1.5::numeric as price, now() as at`.parsers({ 1700: Number })
@@ -586,6 +586,22 @@ const rows = await sql`select id, body from posts`.parsers(column => column.name
 ```
 
 The parsers are picked once for each result, and a query that reuses the same ones reuses the same compiled row reader. Pass the same functions each time: an inline one like `x => +x` is a new function on every call, so each query using it compiles a reader of its own.
+
+The instance's [`transform`](#data-transformation) still applies to what the parsers return. Add [`.transform(false)`](#results-without-the-transform) to leave it out.
+
+### Results Without the Transform
+#### ```sql``.transform(false)```
+
+Using `.transform(false)` gives this query's results as the server and its parsers do: the instance's [`transform`](#data-transformation) doesn't rename its columns or change its values and rows. Values sent and names given to helpers are still transformed.
+
+```js
+const sql = postgres({ transform: postgres.camel })
+
+const [row] = await sql`select user_id, settings from users`.transform(false)
+// row = { user_id: 1, settings: { dark_mode: true } }
+```
+
+This suits code that reads its own queries' results on an instance it didn't create, such as a library given an app's `sql`, a transaction or a reserved connection.
 
 ### Queries in Files
 #### `await sql.file(path, [args], [options]) -> Result[]`

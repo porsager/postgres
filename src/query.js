@@ -52,6 +52,7 @@ export class Query extends Promise {
     this.streaming = undefined
     this.onlyDescribe = undefined
     this.ownParsers = undefined
+    this.untransformed = undefined
     this.cancelled = undefined
     this.aborted = undefined
 
@@ -227,6 +228,11 @@ export class Query extends Promise {
 
   parsers(parsers) {
     this.ownParsers = parsers || null
+    return this
+  }
+
+  transform(transform) {
+    this.untransformed = transform === false
     return this
   }
 

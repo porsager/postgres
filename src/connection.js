@@ -17,6 +17,8 @@ const text = p.text
     , held = Symbol('held')
     , unknown = 100
     , states = new WeakMap()
+    , names = new WeakMap()
+    , plains = new WeakMap()
     , after = 16
     , variety = 16
 
@@ -936,7 +938,7 @@ export function Connection(ready, options, events) {
     x.bound = true
     if (!x.columns && x.entry) {
       x.columns = x.entry.columns
-      x.result.columns = x.columns
+      x.result.columns = shown(x, x.columns)
     }
   }
 
@@ -962,7 +964,7 @@ export function Connection(ready, options, events) {
       x.result = new Result()
     }
     x.columns = columns
-    x.result.columns = columns
+    x.result.columns = shown(x, columns)
     if (x.learn) {
       x.learn = false
       x.entry && x.entry.owner === x && (x.entry.columns = columns, learned(x.entry, x.statement))
@@ -972,22 +974,39 @@ export function Connection(ready, options, events) {
 
   function column(name, table, number, type) {
     const parser = events.parser(type)
-    return {
-      name: transform.column.from ? transform.column.from(name) : name,
-      parser: parser.identity ? null : parser,
-      decode: events.decoder(type, parser),
-      table,
-      number,
-      type
-    }
+        , x = {
+          name: transform.column.from ? transform.column.from(name) : name,
+          parser: parser.identity ? null : parser,
+          decode: events.decoder(type, parser),
+          table,
+          number,
+          type
+        }
+
+    transform.column.from && names.set(x, name)
+    return x
+  }
+
+  function shown(x, columns) {
+    return columns && x.query && x.query.untransformed === true ? plain(columns) : columns
+  }
+
+  function plain(columns) {
+    if (!transform.column.from && !transform.value.from)
+      return columns
+
+    let x = plains.get(columns)
+    x === undefined && plains.set(columns, x = columns.map(c => names.has(c) ? { ...c, name: names.get(c) } : { ...c }))
+    return x
   }
 
   function DataRow(x, start) {
     const item = sent[0]
         , { query } = item
         , raw = query.isRaw
-        , from = raw !== true ? transform.value.from : null
-        , shape = item.shaped === item.columns ? item.reader : (item.shaped = item.columns, item.reader = query.ownParsers && raw !== true ? Parsed(item.columns, query.ownParsers) : Rows(item.columns))
+        , untransformed = query.untransformed === true
+        , from = raw !== true && !untransformed ? transform.value.from : null
+        , shape = item.shaped === item.columns ? item.reader : (item.shaped = item.columns, item.reader = reader(item.columns, query, raw))
         , columns = shape.columns
         , fast = raw !== true && read(shape, !!raw, text, from)
         , n = columns.length
@@ -1019,10 +1038,15 @@ export function Connection(ready, options, events) {
       }
     }
 
-    const out = transform.row.from ? transform.row.from(row) : row
+    const out = transform.row.from && !untransformed ? transform.row.from(row) : row
     query.forEachFn
       ? query.forEachFn(out, result)
       : result[result.length] = out
+  }
+
+  function reader(columns, query, raw) {
+    const own = query.untransformed === true ? plain(columns) : columns
+    return query.ownParsers && raw !== true ? Parsed(own, query.ownParsers) : Rows(own)
   }
 
   function CommandComplete(x, start, end) {
@@ -1035,7 +1059,7 @@ export function Connection(ready, options, events) {
     result.state = connection.backend
     result.statement = item
     item.query && (item.query.source = item)
-    item.kind === 'simple' || (result.columns = result.columns || item.columns)
+    item.kind === 'simple' || (result.columns = result.columns || shown(item, item.columns))
 
     item.final && (item.stream && Object.assign(item.stream, { count, command }), item.final(), item.final = null)
     item.kind !== 'simple' && (item.completed = true)
@@ -1554,7 +1578,7 @@ function Rows(columns) {
 function Parsed(columns, parsers) {
   const state = Rows(columns)
       , list = columns.map(typeof parsers === 'function'
-        ? c => parsers(c) || null
+        ? (c, i) => parsers(c, i) || null
         : c => c.type in parsers ? parsers[c.type] || null : c.parser
       )
 

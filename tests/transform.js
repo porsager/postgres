@@ -291,3 +291,41 @@ t('json: false keeps a value transform of your own', async() => {
   return ['2 {"a_b":1}', id + ' ' + JSON.stringify(home_address), await done()]
 })
 
+
+t('transform(false) gives a query\'s columns, values and rows as the server and its parsers do', async() => {
+  const sql = postgres({ ...options, transform: { ...postgres.camel, row: x => ({ row: x }) } })
+      , query = () => sql`select 1 as hello_world, '{"snake_key":1}'::jsonb as json_value from generate_series(1, 40)`
+      , [before, own, after] = await Promise.all([query(), query().transform(false), query()])
+      , show = xs => [Object.keys(xs[39]).join('+'), JSON.stringify(xs[39].row || xs[39]), xs.columns.map(x => x.name).join('+')].join(' ')
+  return [
+    'row {"helloWorld":1,"jsonValue":{"snakeKey":1}} helloWorld+jsonValue|hello_world+json_value {"hello_world":1,"json_value":{"snake_key":1}} hello_world+json_value|row {"helloWorld":1,"jsonValue":{"snakeKey":1}} helloWorld+jsonValue',
+    [before, own, after].map(show).join('|'),
+    await sql.end()
+  ]
+})
+
+t('transform(false) leaves the values a query\'s own parsers give it, in .values() too', async() => {
+  const sql = postgres({ ...options, transform: { value: { from: x => 'app:' + x } } })
+      , query = () => sql`select 1.5::numeric as n, 'x' as s from generate_series(1, 40)`
+      , [own, values, kept, plain] = await Promise.all([
+        query().parsers({ 1700: Number }).transform(false),
+        query().values().parsers({ 1700: Number }).transform(false),
+        query().parsers({ 1700: Number }),
+        query()
+      ])
+  return [
+    'number x|number x|app:1.5 app:x|app:1.5 app:x',
+    [[typeof own[39].n, own[39].s], [typeof values[39][0], values[39][1]], [kept[39].n, kept[39].s], [plain[39].n, plain[39].s]].map(x => x.join(' ')).join('|'),
+    await sql.end()
+  ]
+})
+
+t('transform(false) works in a transaction and on a reserved connection', async() => {
+  const sql = postgres({ ...options, transform: postgres.camel })
+      , query = sql => sql`select '{"snake_key":1}'::jsonb as json_value`.transform(false)
+      , [begun] = await sql.begin(query)
+      , reserved = await sql.reserve()
+      , [own] = await query(reserved)
+  reserved.release()
+  return ['{"json_value":{"snake_key":1}} {"json_value":{"snake_key":1}}', JSON.stringify(begun) + ' ' + JSON.stringify(own), await sql.end()]
+})
