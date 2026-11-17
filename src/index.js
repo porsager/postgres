@@ -481,7 +481,7 @@ function parseOptions(a, b) {
   const files = certificates(query)
 
   const ints = [
-    'idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive', 'min',
+    'idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive', 'max', 'min',
     'queue_timeout', 'query_timeout', 'cancel_timeout'
   ]
   const defaults = {
