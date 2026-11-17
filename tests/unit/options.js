@@ -156,3 +156,21 @@ t('The scheduler is on by default, and off with scheduler: false, scheduler=fals
     postgres({ max: 1 }).options.scheduler
   ].join(' ')
 ])
+
+t('max from the url or PGMAX is numeric and disables the scheduler at one', async() => {
+  const before = process.env.PGMAX
+  try {
+    process.env.PGMAX = '3'
+    const env = postgres().options
+        , url = postgres('postgres://u@h/db?max=1').options
+        , option = postgres('postgres://u@h/db?max=1', { max: 2 }).options
+    process.env.PGMAX = '1'
+    const single = postgres().options
+    return [
+      '[[3,true],[1,false],[2,true],[1,false]]',
+      JSON.stringify([env, url, option, single].map(x => [x.max, x.scheduler]))
+    ]
+  } finally {
+    before === undefined ? delete process.env.PGMAX : process.env.PGMAX = before
+  }
+})
