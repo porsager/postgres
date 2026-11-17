@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **Canceling a `sql.batch` queued behind another query honors `cancel_timeout`.** `cancelBatch` did not start the silence timer that `cancel()` starts for a queued query, so the batch and its `cancel()` stayed pending when the earlier query never finished.
 - **A number for a `timestamptz`, `timestamp` or `date` parameter is written as epoch milliseconds again** (#1324). 4.0 sent a number as its digits before the server had named the parameter's type, so `${ Date.now() }` for a timestamp failed with `22008`, where v3 wrote it as that instant. The first time a statement with a number parameter runs, the pool now waits for the server's parameter types, at the cost of one round trip, and remembers them for that statement.
 
 ### Performance
