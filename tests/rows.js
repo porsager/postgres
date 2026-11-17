@@ -145,3 +145,20 @@ t('A query\'s own parser that throws fails that query only', async() => {
       , [{ x }] = await sql`select 1 as x`
   return ['nope 1', error + ' ' + x]
 })
+
+t('A query\'s own parsers keep the decode of the custom type a parser belongs to', async() => {
+  const parse = x => 'parse ' + x
+      , decode = (x, start, end) => 'decode ' + x.toString('latin1', start, end)
+      , sql = postgres({ ...options, max: 1, types: { numeric: { from: [1700], parse, decode } } })
+      , query = () => sql`select 1.5::numeric as n, 2 as i from generate_series(1, 40)`
+      , xs = await Promise.all([
+        query().parsers(column => column.name === 'n' ? column.parser : null),
+        query().parsers({ 23: parse }),
+        query().parsers({ 1700: x => 'own ' + x })
+      ])
+  return [
+    'decode 1.5 2|decode 1.5 decode 2|own 1.5 2',
+    xs.map(x => x[39].n + ' ' + x[39].i).join('|'),
+    await sql.end()
+  ]
+})
