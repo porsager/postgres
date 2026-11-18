@@ -36,7 +36,8 @@ t('Canceling a sql.batch queued behind another query honors cancel_timeout', asy
   sql`select ${ 2 }::int as id, ${ 0 }::int as scope sleep(${ 100000 }::int)`.catch(() => {})
   await clock.run(110)
   const q = sql.batch([sql`select ${ 3 }::int as id, ${ 0 }::int as scope`])
-  let done = false, canceled = false
+  let done = false
+  let canceled = false
   q.then(() => done = true, () => done = true)
   await clock.run(120)
   q.cancel().then(() => canceled = true, () => canceled = true)
