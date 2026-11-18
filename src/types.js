@@ -181,7 +181,7 @@ export function Types(options = {}) {
   const parsers = {}
       , serializers = {}
       , elements = {}
-      , decoders = new Map()
+      , decoders = {}
       , undefinedValue = options.transform && options.transform.undefined
 
   Object.entries(arrays).forEach(([oid, array]) => elements[array] = [+oid, +oid === 603 ? ';' : ','])
@@ -241,14 +241,14 @@ export function Types(options = {}) {
       : parse === bool && oid === 16 ? boolean
       : parse === parseTimestamptz && oid === 1184 ? timestamptz
       : parse === parseDate && (oid === 1114 || oid === 1082) ? utcStamp
-      : decoders.get(parse) || null
+      : oid in decoders && decoders[oid].parse === parse ? decoders[oid].decode : null
   }
 
   function register(xs) {
     Object.values(xs).forEach(x => {
       const from = [].concat(x.from || [])
       x.parse && from.forEach(oid => parsers[oid] = x.parse)
-      x.parse && x.decode && decoders.set(x.parse, x.decode)
+      x.parse && x.decode && from.forEach(oid => decoders[oid] = x)
       if (x.serialize) {
         serializers[x.to] = x.serialize
         from.forEach(oid => serializers[oid] = x.serialize)

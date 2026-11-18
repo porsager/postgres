@@ -618,12 +618,13 @@ t('A pool reads array types and domains only once a query meets a type it does n
 t('A custom type with decode reads its values from their bytes, and its arrays with parse', async() => {
   const parse = x => 'parse ' + x
       , decode = (x, start, end) => 'decode ' + x.toString('latin1', start, end)
-      , sql = postgres({ ...options, max: 1, types: { int8: { from: [20], parse, decode }, numeric: { from: ['numeric'], parse, decode } } })
+      , numeric = (x, start, end) => 'numeric ' + x.toString('latin1', start, end)
+      , sql = postgres({ ...options, max: 1, types: { int8: { from: [20], parse, decode }, numeric: { from: ['numeric'], parse, decode: numeric } } })
       , query = () => sql`select 1::int8 as a, 1.5::numeric as b, null::int8 as c, array[2]::int8[] as d from generate_series(1, 40)`
       , rows = await query()
       , values = await query().values()
   return [
-    'decode 1,decode 1.5,,parse 2|decode 1,decode 1.5,,parse 2|decode 1,decode 1.5,,parse 2',
+    'decode 1,numeric 1.5,,parse 2|decode 1,numeric 1.5,,parse 2|decode 1,numeric 1.5,,parse 2',
     [rows[0], rows[39]].map(Object.values).concat([values[39]]).map(x => x.join()).join('|'),
     await sql.end()
   ]
