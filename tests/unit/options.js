@@ -205,3 +205,21 @@ t('max from the url or PGMAX is numeric and disables the scheduler at one', asyn
     before === undefined ? delete process.env.PGMAX : process.env.PGMAX = before
   }
 })
+
+t('disable and false in PG environment variables turn an option off', async() => {
+  const keys = ['PGPREPARE', 'PGFETCH_TYPES', 'PGSCHEDULER', 'PGSSLMODE']
+      , before = Object.fromEntries(keys.map(k => [k, process.env[k]]))
+  try {
+    process.env.PGPREPARE = 'false'
+    process.env.PGFETCH_TYPES = 'false'
+    process.env.PGSCHEDULER = 'false'
+    process.env.PGSSLMODE = 'disable'
+    const x = postgres({ max: 2 }).options
+    return [
+      '[false,false,false,false]',
+      JSON.stringify([x.prepare, x.fetch_types, x.scheduler, x.ssl])
+    ]
+  } finally {
+    keys.forEach(k => before[k] === undefined ? delete process.env[k] : process.env[k] = before[k])
+  }
+})
