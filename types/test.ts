@@ -28,6 +28,7 @@ const sql = postgres({
 postgres('postgres://user@host/db', { ssl: { rejectUnauthorized: false } })
 postgres()
 postgres({ types: { numeric: { from: [1700], parse: Number } } })
+postgres({ types: { int8: { from: [20], parse: BigInt, decode: (x: Buffer, start: number, end: number) => BigInt(x.toString('latin1', start, end)) } } })
 const toOnly = postgres({ types: { int4: { to: 23 } } })
 toOnly.typed.int4(1)
 // @ts-expect-error a symbol is not a value

@@ -987,7 +987,7 @@ export function Connection(ready, options, events) {
         , { query } = item
         , raw = query.isRaw
         , from = raw !== true ? transform.value.from : null
-        , shape = item.shaped === item.columns ? item.reader : (item.shaped = item.columns, item.reader = query.ownParsers && raw !== true ? Parsed(item.columns, query.ownParsers) : Rows(item.columns))
+        , shape = item.shaped === item.columns ? item.reader : (item.shaped = item.columns, item.reader = query.ownParsers && raw !== true ? Parsed(item.columns, query.ownParsers, events.decoder) : Rows(item.columns))
         , columns = shape.columns
         , fast = raw !== true && read(shape, !!raw, text, from)
         , n = columns.length
@@ -1551,7 +1551,7 @@ function Rows(columns) {
   return state
 }
 
-function Parsed(columns, parsers) {
+function Parsed(columns, parsers, decoder) {
   const state = Rows(columns)
       , list = columns.map(typeof parsers === 'function'
         ? c => parsers(c) || null
@@ -1567,7 +1567,7 @@ function Parsed(columns, parsers) {
   if (found)
     return found.state
 
-  const variant = { list, state: Rows(columns.map((c, i) => list[i] === c.parser ? c : { ...c, parser: list[i], decode: null })) }
+  const variant = { list, state: Rows(columns.map((c, i) => list[i] === c.parser ? c : { ...c, parser: list[i], decode: list[i] && decoder(c.type, list[i]) })) }
   variants.length === variety && variants.shift()
   variants.push(variant)
   return variant.state

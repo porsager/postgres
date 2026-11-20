@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### New
+
+- **`decode` on a custom type.** A custom type can read its values from the bytes of their text with `decode(x, start, end)`, so no string is made for `parse`. It returns what `parse` would, and reads the type's columns in query results, `.parsers()` included. Arrays of the type still go through `parse`, and a type without `decode` is read as before. Reading `timestamptz` as an ISO string with microseconds and `int8` as a `BigInt` this way, 25,000 rows of 12 columns took about half the CPU and less than half the memory allocated.
+
 ### Fixed
 
 - **A number for a `timestamptz`, `timestamp` or `date` parameter is written as epoch milliseconds again** (#1324). 4.0 sent a number as its digits before the server had named the parameter's type, so `${ Date.now() }` for a timestamp failed with `22008`, where v3 wrote it as that instant. The first time a statement with a number parameter runs, the pool now waits for the server's parameter types, at the cost of one round trip, and remembers them for that statement.

@@ -1579,6 +1579,31 @@ const sql = postgres({
 await sql`insert into items ${ sql({ embedding: sql.typed.vector([1, 2, 3]) }) }`
 ```
 
+A type can also read its values straight from the bytes the server sent, so no string is made for `parse`. Its `decode(x, start, end)` gets the row's buffer and the bounds of the value's text, and returns what `parse` would for that text. It reads the type's columns in query results, `.parsers()` included, and arrays of the type still go through `parse`. The buffer can be reused once `decode` returns, so a value that keeps bytes from it needs a copy.
+
+```js
+const sql = postgres({
+  types: {
+    bigint: {
+      to: 20,
+      from: [20],
+      serialize: x => x.toString(),
+      parse: x => BigInt(x),
+      decode: (x, start, end) => {
+        // up to 15 characters fit a number exactly
+        if (end - start > 15)
+          return BigInt(x.toString('latin1', start, end))
+        const negative = x[start] === 45 // -
+        let n = 0
+        for (let i = negative ? start + 1 : start; i < end; i++)
+          n = n * 10 + x[i] - 48
+        return BigInt(negative ? -n : n)
+      }
+    }
+  }
+})
+```
+
 ### Custom socket
 
 Easily do in-process ssh tunneling to your database by providing a custom socket for Postgres.js to use. The function (optionally async) is called with the options and the host and port to connect to, and must return a socket-like duplex stream. If the socket has done TLS itself, set `negotiated: true` on it so Postgres.js does not ask the server for TLS again.
