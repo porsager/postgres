@@ -100,6 +100,11 @@ t('A query\'s own parsers can be picked by column, null keeping the server\'s te
   return ['string 2 X|string 2 X', [rows[0], rows[39]].map(x => typeof x.a + ' ' + x.b + ' ' + x.c).join('|')]
 })
 
+t('A query\'s own parsers picked by column get its position, for names a result repeats', async() => {
+  const rows = await sql`select 1 as a, 2 as a from generate_series(1, 40)`.values().parsers((column, i) => i === 0 ? x => 'first:' + x : null)
+  return ['first:1 2', rows[39].join(' ')]
+})
+
 t('Queries of one statement with different parsers each get their own', async() => {
   const query = () => sql`select 1.5::numeric as n from generate_series(1, 40)`
       , xs = await Promise.all([
