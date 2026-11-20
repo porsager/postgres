@@ -173,20 +173,30 @@ export class Query extends Promise {
       return (this.cursorFn = fn, this)
 
     let prev
+      , error = null
+
     return {
       [Symbol.asyncIterator]: () => ({
         next: () => {
+          if (error) {
+            const x = error
+            error = null
+            return Promise.reject(x)
+          }
+
           if (this.executed && !this.active)
             return { done: true }
 
           prev && prev()
+          let waiting = true
           const promise = new Promise((resolve, reject) => {
             this.cursorFn = value => {
+              waiting = false
               resolve({ value, done: false })
               return new Promise(r => prev = r)
             }
             this.resolve = x => (this.active = false, this.settled = true, this.trace && traced(this, null, x), resolve({ done: true }))
-            this.reject = x => (this.active = false, this.settled = true, this.trace && traced(this, x), reject(x))
+            this.reject = x => (this.active = false, this.settled = true, this.trace && traced(this, x), waiting ? reject(x) : error = x)
           })
           this.execute()
           return promise
