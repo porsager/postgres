@@ -133,6 +133,8 @@ export class Query extends Promise {
     if (!signal || this.settled)
       return this
 
+    this.aborts && this.aborts()
+
     if (signal.aborted)
       return (this.cancel().catch(noop), this)
 
@@ -185,8 +187,8 @@ export class Query extends Promise {
               resolve({ value, done: false })
               return new Promise(r => prev = r)
             }
-            this.resolve = x => (this.active = false, this.settled = true, this.trace && traced(this, null, x), resolve({ done: true }))
-            this.reject = x => (this.active = false, this.settled = true, this.trace && traced(this, x), reject(x))
+            this.resolve = x => (this.timer && untime(this), this.aborts && this.aborts(), this.active = false, this.settled = true, this.trace && traced(this, null, x), resolve({ done: true }))
+            this.reject = x => (this.timer && untime(this), this.timedOut && x && timedOut(x) && (x = late(this, x)), this.aborts && this.aborts(), this.active = false, this.settled = true, this.trace && traced(this, x), reject(x))
           })
           this.execute()
           return promise
