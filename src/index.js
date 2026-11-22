@@ -180,20 +180,40 @@ function Postgres(a, b) {
     throw Errors.generic('ARRAY_REMOVED', 'sql.array() is removed in v4, pass the array as it is')
   }
 
-  async function reserve() {
-    const lease = await pool.lease('reserve')
-        , reserved = Sql(Object.assign(q => lease.send(q), { cancel: pool.cancel }))
+  function reserve() {
+    const handle = {}
+    return cancellable(pool.lease('reserve', handle).then(lease => {
+      const reserved = Sql(Object.assign(q => lease.send(q), { cancel: pool.cancel }))
+      reserved.release = () => lease.release()
+      Symbol.dispose && (reserved[Symbol.dispose] = reserved.release)
+      Symbol.asyncDispose && (reserved[Symbol.asyncDispose] = async() => reserved.release())
+      return reserved
+    }), handle)
+  }
 
-    reserved.release = () => lease.release()
-    Symbol.dispose && (reserved[Symbol.dispose] = reserved.release)
-    Symbol.asyncDispose && (reserved[Symbol.asyncDispose] = async() => reserved.release())
-    return reserved
+  function cancellable(promise, handle) {
+    promise.cancel = () => pool.withdraw(handle)
+    promise.signal = signal => {
+      if (!signal)
+        return promise
+
+      if (signal.aborted)
+        return (promise.cancel(), promise)
+
+      const abort = () => promise.cancel()
+          , remove = () => signal.removeEventListener('abort', abort)
+      signal.addEventListener('abort', abort, { once: true })
+      promise.then(remove, remove)
+      return promise
+    }
+    return promise
   }
 
   function begin(mode, fn) {
     !fn && (fn = mode, mode = '')
+    const handle = {}
     if (!active(channels.transaction))
-      return transaction(mode, fn, null)
+      return cancellable(transaction(mode, fn, null, handle), handle)
 
     const context = {
       mode,
@@ -205,19 +225,19 @@ function Postgres(a, b) {
       outcome: null
     }
     let promise
-    start(channels.transaction, context, () => promise = transaction(mode, fn, context))
+    start(channels.transaction, context, () => promise = transaction(mode, fn, context, handle))
 
-    return promise.then(
+    return cancellable(promise.then(
       result => (finish(channels.transaction, context, null, result), result),
       error => {
         finish(channels.transaction, context, error)
         throw error
       }
-    )
+    ), handle)
   }
 
-  async function transaction(mode, fn, context) {
-    const lease = await pool.lease('transaction')
+  async function transaction(mode, fn, context, handle) {
+    const lease = await pool.lease('transaction', handle)
 
     let savepoints = 0
       , prepare = null

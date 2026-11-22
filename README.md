@@ -672,6 +672,16 @@ await sql`select * from report()`.signal(AbortSignal.timeout(5000))
 
 A query waits for a connection when every connection is reserved, in a transaction or has `max_pipeline` queries in flight. `queue_timeout` (in seconds) rejects it with `QUEUE_TIMEOUT` if it waits longer, without ever sending it, and the same goes for `sql.begin` and `sql.reserve`. Once a query is sent, PostgreSQL's own `statement_timeout` is the limit.
 
+A `sql.begin` or `sql.reserve` still waiting for a connection can be given up on the same way as a query: `.cancel()`, or `.signal()` with an `AbortSignal`, takes it out of the queue and rejects it with `57014`, so the transaction callback never runs and no connection is handed over. Once it has its connection, both do nothing.
+
+```js
+const tx = sql.begin(sql => sql`update account set seen = now()`)
+setTimeout(() => tx.cancel(), 100)
+await tx.catch(error => error.code === '57014' ? null : Promise.reject(error))
+
+const reserved = await sql.reserve().signal(AbortSignal.timeout(5000))
+```
+
 `query_timeout` (in seconds) limits each query, waiting for a connection and running together; inside `sql.begin` or a reserved connection the clock starts when the query is sent on it. A query that runs out of time is canceled as `.cancel()` would, and rejects with `QUERY_TIMEOUT`, with the `57014` it was canceled with as its `cause`. The `begin`, `commit` and savepoint queries of a transaction and `forEach` are limited too; cursors, streams and `sql.listen` are not.
 
 `statement_timeout` is the better limit while the server answers, since the server enforces it and the outcome is known. `query_timeout` is the backstop for when it does not: a server or network that goes silent leaves a query waiting for as long as TCP takes to notice, which is many minutes with default keepalive settings. When a cancel request, from `.cancel()`, `.signal()` or `query_timeout`, gets no answer within `cancel_timeout` (5 seconds by default), the connection is closed and the pool connects again for the next query. As nobody knows whether the queries on that connection ran, they reject with `CONNECTION_DESTROYED`, or a timed out one with `QUERY_TIMEOUT`, whose `cause` is `CANCEL_UNANSWERED`. `cancel_timeout: 0` waits for the answer as long as it takes.

@@ -1323,6 +1323,65 @@ t('queue_timeout applies to transactions and reserves waiting for a connection',
   return ['QUEUE_TIMEOUT QUEUE_TIMEOUT', codes.join(' '), await sql.end()]
 })
 
+t('A transaction or reserve waiting for a connection can be cancelled, and leaves the queue (#1322)', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const held = await sql.reserve()
+  let entered = false
+  const begin = sql.begin(() => { entered = true })
+  const reserve = sql.reserve()
+  while (sql.stats.waiting < 2)
+    await delay(5)
+  await Promise.all([begin.cancel(), reserve.cancel()])
+  const waiting = sql.stats.waiting
+  const codes = [await begin.then(() => 'ran', e => e.code), await reserve.then(() => 'reserved', e => e.code)]
+  held.release()
+  const [{ x }] = await sql`select 1 as x`
+  return ['57014 57014 0 false 1', codes.join(' ') + ' ' + waiting + ' ' + entered + ' ' + x, await sql.end()]
+})
+
+t('A transaction or reserve cancelled before it reaches the queue never waits (#1322)', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const held = await sql.reserve()
+  const begin = sql.begin(sql => sql`select 1`)
+  const reserve = sql.reserve()
+  begin.cancel()
+  reserve.cancel()
+  const codes = await Promise.all([begin, reserve].map(x => x.then(() => 'ran', e => e.code)))
+  const waiting = sql.stats.waiting
+  held.release()
+  return ['57014 57014 0', codes.join(' ') + ' ' + waiting, await sql.end()]
+})
+
+t('.signal() cancels a transaction or reserve waiting for a connection (#1322)', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const held = await sql.reserve()
+  const controller = new AbortController()
+  const begin = sql.begin(sql => sql`select 1`).signal(controller.signal)
+  const reserve = sql.reserve().signal(controller.signal)
+  const early = sql.reserve().signal(AbortSignal.abort())
+  const settled = [begin, reserve, early].map(x => x.then(() => 'ran', e => e.code))
+  while (sql.stats.waiting < 2)
+    await delay(5)
+  controller.abort()
+  const codes = await Promise.all(settled)
+  const waiting = sql.stats.waiting
+  held.release()
+  return ['57014 57014 57014 0', codes.join(' ') + ' ' + waiting, await sql.end()]
+})
+
+t('Cancelling a transaction or reserve that has its connection changes nothing (#1322)', { timeout: 10 }, async() => {
+  const sql = postgres({ ...options, max: 1 })
+  const reserve = sql.reserve()
+  const reserved = await reserve
+  await reserve.cancel()
+  const [{ a }] = await reserved`select 1 as a`
+  reserved.release()
+  const begin = sql.begin(sql => sql`select 2 as b`)
+  const [{ b }] = await begin
+  await begin.cancel()
+  return ['1 2', a + ' ' + b, await sql.end()]
+})
+
 t('A query that waits less than queue_timeout runs', { timeout: 10 }, async() => {
   const sql = postgres({ ...options, max: 1, queue_timeout: 1 })
   const reserved = await sql.reserve()
