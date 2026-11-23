@@ -918,11 +918,11 @@ declare namespace postgres {
 
     largeObject(oid?: number, /** @default 0x00020000 | 0x00040000 */ mode?: number): Promise<LargeObject>
 
-    begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>
-    begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Promise<UnwrapPromiseArray<T>>
+    begin<T>(cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Leasing<UnwrapPromiseArray<T>>
+    begin<T>(options: string, cb: (sql: TransactionSql<TTypes>) => T | Promise<T>): Leasing<UnwrapPromiseArray<T>>
 
     /** A connection of your own until `release()` */
-    reserve(): Promise<ReservedSql<TTypes>>
+    reserve(): Leasing<ReservedSql<TTypes>>
 
     /** `await using sql = postgres()` ends the pool when it goes out of scope */
     [Symbol.asyncDispose](): Promise<void>
@@ -939,6 +939,13 @@ declare namespace postgres {
     prepare(name: string): string
     /** Rolls back the transaction, or the savepoint it is called in, at once; later queries are not sent and reject with TRANSACTION_ROLLED_BACK */
     rollback(): Promise<void>
+  }
+
+  interface Leasing<T> extends Promise<T> {
+    /** Takes it out of the queue if it is still waiting for a connection, and rejects it with `57014`; once it has its connection, does nothing */
+    cancel(): Promise<void>
+    /** Cancels it when the signal aborts while it is still waiting for a connection */
+    signal(signal: AbortSignal | null | undefined): this
   }
 
   interface ReservedSql<TTypes extends Record<string, unknown> = {}> extends ISql<TTypes> {

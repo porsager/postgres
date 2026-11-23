@@ -57,6 +57,7 @@ export function Pool(options, types) {
   const pool = {
     query,
     lease,
+    withdraw,
     cancel,
     end,
     close,
@@ -671,9 +672,12 @@ export function Pool(options, types) {
     options.parameters[k] !== v && (options.parameters[k] = v, options.onparameter && options.onparameter(k, v))
   }
 
-  async function lease(kind) {
+  async function lease(kind, handle) {
     used = true
     await 1
+    if (handle && handle.cancelled)
+      throw withdrawn(kind)
+
     if (ending)
       throw Errors.connection('CONNECTION_ENDED', options, options.host[0], options.port[0])
 
@@ -685,7 +689,9 @@ export function Pool(options, types) {
       throw missing
 
     return new Promise((resolve, reject) => {
-      waiting.push(wait({ lease: true, kind, resolve, reject, queued: listened(channels.pool) ? now() : 0 }))
+      const job = wait({ lease: true, kind, resolve, reject, queued: listened(channels.pool) ? now() : 0 })
+      handle && (handle.job = job)
+      waiting.push(job)
       drain()
     })
   }
@@ -747,6 +753,17 @@ export function Pool(options, types) {
 
   function ended(lease) {
     return Errors.generic('UNSAFE_TRANSACTION', 'The ' + lease.kind + ' has ended')
+  }
+
+  function withdraw(handle) {
+    handle.cancelled = true
+    const job = handle.job
+    job && waiting.remove(x => x === job) && reject(job, withdrawn(job.kind))
+    return Promise.resolve()
+  }
+
+  function withdrawn(kind) {
+    return Errors.generic('57014', 'canceling the ' + kind + ' waiting for a connection due to user request')
   }
 
   function cancel(q) {

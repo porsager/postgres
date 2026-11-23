@@ -28,7 +28,8 @@
   },
   "files": [
     "/src/*.js",
-    "/types/index.d.ts"
+    "/types/index.d.ts",
+    "/UNLICENSE"
   ],
   "author": "Rasmus Porsager <rasmus@porsager.com> (https://www.porsager.com)",
   "keywords": [

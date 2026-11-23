@@ -217,8 +217,14 @@ function valuesBuilder(first, columns, o) {
   ).join(',')
 }
 
+// A Date, a Buffer or a typed parameter is a single value, not a row
+function isRow(x) {
+  return x !== null && typeof x === 'object' && !isFragment(x)
+    && !(x instanceof Date || x instanceof Uint8Array || x instanceof Parameter)
+}
+
 function values(first, rest, o) {
-  const rows = Array.isArray(first) && first.length > 0 && first[0] !== null && typeof first[0] === 'object' && !isFragment(first[0])
+  const rows = Array.isArray(first) && first.length > 0 && isRow(first[0])
       , picked = columns(rows ? first[0] : first, rest)
 
   return valuesBuilder(rows ? first : [first], picked, o)
