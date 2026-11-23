@@ -559,7 +559,7 @@ export function Connection(ready, options, events) {
   }
 
   function serialize(oids, built, cache) {
-    const serializers = cache.serializers || (cache.serializers = oids.map(events.serializer))
+    const serializers = cache.serializers || (cache.serializers = oids.map((x, i) => events.serializer(built.oids[i] || x)))
         , values = built.values
         , out = new Array(values.length)
 

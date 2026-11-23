@@ -1,3 +1,6 @@
+const d1 = new Date('2020-01-01T00:00:00Z')
+const d2 = new Date('2021-01-01T00:00:00Z')
+
 export default [
   ['Parameters are numbered', sql => sql`select ${ 1 }, ${ 'a' }`, 'select $1, $2', [1, 'a']],
   ['No parameters', sql => sql`select 1`, 'select 1', []],
@@ -22,6 +25,10 @@ export default [
   ['Update picked columns', sql => sql`update x set ${ sql({ a: 1, b: 2 }, ['a']) }`, 'update x set "a"=$1', [1]],
   ['In list', sql => sql`select 1 where x in ${ sql([1, 2]) }`, 'select 1 where x in ($1,$2)', [1, 2]],
   ['In empty list', sql => sql`select 1 where x in ${ sql([]) }`, 'select 1 where x in (null)', []],
+  ['In list of dates', sql => sql`select 1 where x in ${ sql([d1, d2]) }`, 'select 1 where x in ($1,$2)', [d1, d2]],
+  ['In list of one date', sql => sql`select 1 where x in ${ sql([d1]) }`, 'select 1 where x in ($1)', [d1]],
+  ['In list of buffers', sql => sql`select 1 where x in ${ sql([Buffer.from('ab')]) }`, 'select 1 where x in ($1)', [Buffer.from('ab')]],
+  ['In list of typed parameters', sql => sql`select 1 where x in ${ sql([sql.typed(5, 23)]) }`, 'select 1 where x in ($1)', [5]],
   ['In list of rows', sql => sql`select 1 where (x, y) in ${ sql([[1, 2], [3, 4]]) }`, 'select 1 where (x, y) in ($1,$2),($3,$4)', [1, 2, 3, 4]],
   ['Values rows', sql => sql`select * from (values ${ sql([[1, 'a'], [2, 'b']]) }) v`, 'select * from (values ($1,$2),($3,$4)) v', [1, 'a', 2, 'b']],
   ['Identifiers outside a clause', sql => sql`select * from x order by ${ sql('a', 'b') }`, 'select * from x order by "a","b"', []],

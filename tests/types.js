@@ -559,6 +559,21 @@ t('A value typed as a domain on a new pool is written for the domain base type',
   return ['"text"', JSON.stringify(x), await fresh.end(), await sql`drop domain test_doc`]
 })
 
+t('A typed parameter keeps its own type when the server describes the others', async() => {
+  const json = (sql, x) => sql`select (${ sql.typed('"x"', 705) }::jsonb)::text as a, ${ x }::text as b`.then(([x]) => x.a)
+      , xs = []
+
+  for (const prepare of [true, false]) {
+    for (const x of [null, 'b']) {
+      const sql = postgres({ ...options, prepare })
+      xs.push(await json(sql, x), await json(sql, x), await sql.begin(sql => json(sql, x)))
+      await sql.end()
+    }
+  }
+
+  return [Array(12).fill('"x"').join(), xs.join()]
+})
+
 const binaries = sql => sql`select ${ 1 }::int as k, '\\x00ff10'::bytea as b, array[1, -2, null, 2147483647, -2147483648]::int4[] as i4,
   array[[1, 2], [3, -32768]]::int2[] as i2, array['9223372036854775807', null]::int8[] as i8, array[true, false, null]::bool[] as bo,
   '{}'::int[] as e, '[0:1]={5,6}'::int[] as lb, null::int[] as n`

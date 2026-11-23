@@ -180,20 +180,40 @@ function Postgres(a, b) {
     throw Errors.generic('ARRAY_REMOVED', 'sql.array() is removed in v4, pass the array as it is')
   }
 
-  async function reserve() {
-    const lease = await pool.lease('reserve')
-        , reserved = Sql(Object.assign(q => lease.send(q), { cancel: pool.cancel }))
+  function reserve() {
+    const handle = {}
+    return cancellable(pool.lease('reserve', handle).then(lease => {
+      const reserved = Sql(Object.assign(q => lease.send(q), { cancel: pool.cancel }))
+      reserved.release = () => lease.release()
+      Symbol.dispose && (reserved[Symbol.dispose] = reserved.release)
+      Symbol.asyncDispose && (reserved[Symbol.asyncDispose] = async() => reserved.release())
+      return reserved
+    }), handle)
+  }
 
-    reserved.release = () => lease.release()
-    Symbol.dispose && (reserved[Symbol.dispose] = reserved.release)
-    Symbol.asyncDispose && (reserved[Symbol.asyncDispose] = async() => reserved.release())
-    return reserved
+  function cancellable(promise, handle) {
+    promise.cancel = () => pool.withdraw(handle)
+    promise.signal = signal => {
+      if (!signal)
+        return promise
+
+      if (signal.aborted)
+        return (promise.cancel(), promise)
+
+      const abort = () => promise.cancel()
+          , remove = () => signal.removeEventListener('abort', abort)
+      signal.addEventListener('abort', abort, { once: true })
+      promise.then(remove, remove)
+      return promise
+    }
+    return promise
   }
 
   function begin(mode, fn) {
     !fn && (fn = mode, mode = '')
+    const handle = {}
     if (!active(channels.transaction))
-      return transaction(mode, fn, null)
+      return cancellable(transaction(mode, fn, null, handle), handle)
 
     const context = {
       mode,
@@ -205,19 +225,19 @@ function Postgres(a, b) {
       outcome: null
     }
     let promise
-    start(channels.transaction, context, () => promise = transaction(mode, fn, context))
+    start(channels.transaction, context, () => promise = transaction(mode, fn, context, handle))
 
-    return promise.then(
+    return cancellable(promise.then(
       result => (finish(channels.transaction, context, null, result), result),
       error => {
         finish(channels.transaction, context, error)
         throw error
       }
-    )
+    ), handle)
   }
 
-  async function transaction(mode, fn, context) {
-    const lease = await pool.lease('transaction')
+  async function transaction(mode, fn, context, handle) {
+    const lease = await pool.lease('transaction', handle)
 
     let savepoints = 0
       , prepare = null
@@ -481,7 +501,7 @@ function parseOptions(a, b) {
   const files = certificates(query)
 
   const ints = [
-    'idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive', 'min',
+    'idle_timeout', 'connect_timeout', 'max_lifetime', 'max_pipeline', 'backoff', 'keep_alive', 'max', 'min',
     'queue_timeout', 'query_timeout', 'cancel_timeout'
   ]
   const defaults = {
@@ -511,8 +531,8 @@ function parseOptions(a, b) {
 
   const options = {
     host            : targets.map(x => x[0]),
-    port            : Array.isArray(port) ? port : targets.map(x => o.port || query.port ? +port : x[1] || +port),
-    path            : o.path || targets[0][0].indexOf('/') > -1 && targets[0][0] + '/.s.PGSQL.' + (targets[0][1] || port),
+    port            : ports(port, targets, o.port || query.port),
+    path            : o.path || targets[0][0].indexOf('/') > -1 && targets[0][0] + '/.s.PGSQL.' + (targets[0][1] || String(port).split(',')[0]),
     database        : o.database || o.db || (url.url.pathname || '').slice(1) || env.PGDATABASE || (typeof user === 'function' ? null : user),
     user            : user,
     pass            : o.pass || o.password || url.url.password || env.PGPASSWORD || '',
@@ -664,6 +684,21 @@ function decode(x) {
   } catch (_) {
     return x
   }
+}
+
+// A comma separated port list, as libpq takes in port and PGPORT, gives one port per host
+function ports(port, targets, given) {
+  if (Array.isArray(port))
+    return port
+
+  const list = String(port).split(',').map(x => +x)
+  if (list.length > 1 && list.length !== targets.length)
+    throw new Error('could not match ' + list.length + ' port numbers to ' + targets.length + ' hosts')
+
+  return targets.map((x, i) => {
+    const p = list.length > 1 ? list[i] : list[0]
+    return given ? p : x[1] || p
+  })
 }
 
 function hosts(o, query, url, env) {

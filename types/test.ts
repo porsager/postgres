@@ -169,6 +169,10 @@ async function transactions() {
   const reserved = await sql.reserve()
   await reserved`select 1`
   reserved.release()
+  const waiting = sql.reserve().signal(AbortSignal.timeout(1000))
+  await waiting.cancel()
+  const queued = sql.begin(sql => sql`select 1`)
+  await queued.cancel()
   // @ts-expect-error a reserved connection cannot end the pool
   reserved.end()
 }
