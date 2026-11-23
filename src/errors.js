@@ -49,12 +49,25 @@ function notSupported(x) {
 
 const places = locations()
 
-export const ours = line => places.some(here => line.includes(here) && !line.slice(line.indexOf(here) + here.length).split(':')[0].includes('/'))
+export const ours = line => places.some(here => {
+  const index = line.indexOf(here)
+  if (index === -1)
+    return false
+  const rest = line.slice(index + here.length).split(':')[0]
+  return !rest.includes('/') && !rest.includes('\\')
+})
 
 function locations() {
   try {
     const url = new URL('.', import.meta.url)
-    return url.protocol === 'file:' ? [url.href, decodeURIComponent(url.pathname)] : [url.href]
+    if (url.protocol !== 'file:')
+      return [url.href]
+
+    const pathname = decodeURIComponent(url.pathname)
+    const list = [url.href, pathname]
+    if (/^\/[A-Za-z]:\//.test(pathname))
+      list.push(pathname.slice(1).replace(/\//g, '\\'))
+    return list
   } catch (error) {
     return []
   }

@@ -1,4 +1,5 @@
 import { t } from './test.js'
+import { ours } from '../src/errors.js'
 import { postgres, sql, options, login_md5, rel, idle_timeout, delay } from './setup.js'
 
 t('Undefined values throws', async() => {
@@ -308,3 +309,18 @@ function holding(refs) {
     return sql`select ${ big.data.length } as n`
   }())
 }
+
+t('ours recognizes internal stack frames and ignores subdirectories', () => {
+  const srcUrl = new URL('../src/', import.meta.url)
+  const pathname = decodeURIComponent(srcUrl.pathname)
+  const winPath = /^\/[A-Za-z]:\//.test(pathname) ? pathname.slice(1).replace(/\//g, '\\') : null
+  return [
+    true,
+    ours(`    at Query.handle (${ srcUrl.href }query.js:12:3)`) &&
+    !ours(`    at User.run (${ srcUrl.href }sub/user.js:12:3)`) &&
+    (!winPath || (
+      ours(`    at Query.handle (${ winPath }query.js:12:3)`) &&
+      !ours(`    at User.run (${ winPath }sub\\user.js:12:3)`)
+    ))
+  ]
+})
