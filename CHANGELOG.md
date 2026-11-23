@@ -5,6 +5,8 @@
 ### Added
 
 - **A `sql.begin` or `sql.reserve` waiting for a connection can be cancelled** (#1322). Their promise has `.cancel()` and `.signal()`, as a query does. While it waits, either takes it out of the queue and rejects it with `57014`, so the transaction callback never runs and no connection is handed over. Before, a caller with a deadline could not give up its place, and the callback ran once a connection freed up. Once it has its connection, both do nothing.
+- **``sql`…`.transform(false)`` gives a query's results without the instance's `transform`.** Its columns keep the server's names, and its values and rows are what the server and its parsers give, so a query with `.parsers()` gets exactly what its parsers return. Code given an app's `sql`, a transaction or a reserved connection can't see the app's `transform`, and with `postgres.camel` the keys of its JSON values were renamed.
+- **The function form of `.parsers()` gets the column's position.** `.parsers((column, i) => …)` can pick a parser for each of several columns with the same name.
 
 ### Fixed
 

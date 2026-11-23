@@ -601,7 +601,7 @@ declare namespace postgres {
   /** A query's own parsers: by type, keyed by oid, or a function picking one for each column; null keeps the server's text */
   type QueryParsers =
     | { readonly [oid: number]: ((raw: string) => unknown) | null }
-    | ((column: Column<string>) => ((raw: string) => unknown) | null | undefined)
+    | ((column: Column<string>, index: number) => ((raw: string) => unknown) | null | undefined)
 
   interface State {
     status: string
@@ -654,6 +654,8 @@ declare namespace postgres {
     signal(signal: AbortSignal | null | undefined): this
     /** Parses its values with parsers of its own instead of the instance's: `.parsers({ 1700: Number })` */
     parsers(parsers: QueryParsers | null | undefined): this
+    /** Gives its columns, values and rows as the server and its parsers do, without the instance's `transform`: `.transform(false)` */
+    transform(transform: false): this
 
     /** @deprecated renamed to `.forEach` */
     stream(cb: (row: NonNullable<TRow[number]>, result: ExecutionResult<TRow[number]>) => void): never
