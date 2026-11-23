@@ -1,3 +1,4 @@
+import net from 'net'
 import { t } from './test.js'
 import { postgres, sql, options, delay } from './setup.js'
 
@@ -424,4 +425,89 @@ t('A reserved cursor whose callback throws at once rejects and leaves the connec
   const [{ x }] = await reserved`select 1 as x`
   reserved.release()
   return ['at once 1', error + ' ' + x, await sql.end()]
+})
+
+t('Async iterator cursor rejects when its connection closes between batches', async() => {
+  let closed
+  const onclose = new Promise(r => closed = r)
+      , s = postgres({ ...options, max: 1, onclose: () => closed() })
+      , [{ pid }] = await s`select pg_backend_pid() as pid`
+
+  let rows = 0
+    , code = 'no error'
+  try {
+    for await (const batch of s`select generate_series(1, 100) as x`.cursor(10)) {
+      rows += batch.length
+      if (rows === 20) {
+        await sql`select pg_terminate_backend(${ pid })`
+        await onclose
+      }
+    }
+  } catch (e) {
+    code = e.code
+  }
+  await s.end()
+  return ['57P01 20', code + ' ' + rows]
+})
+
+t('Async iterator cursor on a reserved connection in a transaction rejects when the connection closes between batches', async() => {
+  let closed
+  const onclose = new Promise(r => closed = r)
+      , s = postgres({ ...options, max: 1, onclose: () => closed() })
+      , reserved = await s.reserve()
+      , [{ pid }] = await reserved`select pg_backend_pid() as pid`
+
+  let rows = 0
+    , code = 'no error'
+  try {
+    await reserved`begin`
+    for await (const batch of reserved`select generate_series(1, 100) as x`.cursor(10)) {
+      rows += batch.length
+      if (rows === 20) {
+        await sql`select pg_terminate_backend(${ pid })`
+        await onclose
+      }
+    }
+  } catch (e) {
+    code = e.code
+  }
+  reserved.release()
+  await s.end()
+  return ['57P01 20', code + ' ' + rows]
+})
+
+t('Async iterator cursor rejects when its socket closes between batches without an ErrorResponse', async() => {
+  const sockets = []
+  const proxy = net.createServer(client => {
+    const upstream = net.connect(options.port || 5432, options.host || 'localhost')
+    sockets.push(client, upstream)
+    client.on('data', x => upstream.write(x))
+    upstream.on('data', x => client.write(x))
+    client.on('error', () => upstream.destroy())
+    upstream.on('error', () => client.destroy())
+    client.on('close', () => upstream.destroy())
+    upstream.on('close', () => client.destroy())
+  })
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+
+  let closed
+  const onclose = new Promise(r => closed = r)
+      , s = postgres({ ...options, host: 'localhost', port: proxy.address().port, max: 1, onclose: () => closed() })
+
+  let rows = 0
+    , code = 'no error'
+  try {
+    for await (const batch of s`select generate_series(1, 100) as x`.cursor(10)) {
+      rows += batch.length
+      if (rows === 20) {
+        sockets.forEach(x => x.destroy())
+        await onclose
+      }
+    }
+  } catch (e) {
+    code = e.code
+  }
+  await s.end()
+  proxy.close()
+  return ['CONNECTION_CLOSED 20', code + ' ' + rows]
 })

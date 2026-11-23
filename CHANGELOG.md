@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **A cursor used as an async iterator rejects when its connection closes between batches** (#1330, #1166). Each `next()` gave the query a `reject` tied to its own promise, which had already resolved with the last batch while the loop body ran. An error from the connection closing then was lost, and the next `next()` ended the loop as if all rows had been read, so `for await … of query.cursor(n)` returned a partial result without an error. The error is now kept and thrown from the next `next()`, as `cursor(n, fn)` rejects with it.
 - **A number for a `timestamptz`, `timestamp` or `date` parameter is written as epoch milliseconds again** (#1324). 4.0 sent a number as its digits before the server had named the parameter's type, so `${ Date.now() }` for a timestamp failed with `22008`, where v3 wrote it as that instant. The first time a statement with a number parameter runs, the pool now waits for the server's parameter types, at the cost of one round trip, and remembers them for that statement.
 - **A value typed with `sql.typed()` is written as its own type when the server types the other parameters.** A statement with an untyped parameter learns its parameter types from the server, and once it had them it wrote every value with the serializer of the server's type, a typed value included. JSON text typed as `unknown` (705) for a `jsonb` parameter went through `JSON.stringify` again and was stored as a JSON string, from the statement's second run on, or from its first when the untyped value was not `null`.
 
