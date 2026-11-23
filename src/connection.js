@@ -753,8 +753,13 @@ export function Connection(ready, options, events) {
 
   function cancelBatch(query) {
     const x = sent.find(x => x.batch && x.batch.query === query)
-    if (x)
-      return x === sent[0] ? cancelling(x) : new Promise((resolve, reject) => x.cancel = { resolve, reject })
+    if (x) {
+      if (x === sent[0])
+        return cancelling(x)
+
+      quiet(x)
+      return new Promise((resolve, reject) => x.cancel = { resolve, reject })
+    }
 
     const first = pending.find(x => x.batch && x.batch.query === query)
     if (first) {
