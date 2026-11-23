@@ -1,3 +1,4 @@
+import net from 'net'
 import { t } from './test.js'
 import { postgres, sql, options, delay } from './setup.js'
 
@@ -473,4 +474,40 @@ t('Async iterator cursor on a reserved connection in a transaction rejects when 
   reserved.release()
   await s.end()
   return ['57P01 20', code + ' ' + rows]
+})
+
+t('Async iterator cursor rejects when its socket closes between batches without an ErrorResponse', async() => {
+  const sockets = []
+  const proxy = net.createServer(client => {
+    const upstream = net.connect(options.port || 5432, options.host || 'localhost')
+    sockets.push(client, upstream)
+    client.on('data', x => upstream.write(x))
+    upstream.on('data', x => client.write(x))
+    client.on('error', () => upstream.destroy())
+    upstream.on('error', () => client.destroy())
+    client.on('close', () => upstream.destroy())
+    upstream.on('close', () => client.destroy())
+  })
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+
+  let closed
+  const onclose = new Promise(r => closed = r)
+      , s = postgres({ ...options, host: 'localhost', port: proxy.address().port, max: 1, onclose: () => closed() })
+
+  let rows = 0
+    , code = 'no error'
+  try {
+    for await (const batch of s`select generate_series(1, 100) as x`.cursor(10)) {
+      rows += batch.length
+      if (rows === 20) {
+        sockets.forEach(x => x.destroy())
+        await onclose
+      }
+    }
+  } catch (e) {
+    code = e.code
+  }
+  await s.end()
+  proxy.close()
+  return ['CONNECTION_CLOSED 20', code + ' ' + rows]
 })
