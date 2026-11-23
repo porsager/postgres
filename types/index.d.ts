@@ -180,6 +180,8 @@ declare namespace postgres {
     from?: number | string | (number | string)[]
     serialize?: (value: T) => unknown
     parse?: (raw: any) => T
+    /** Reads a value from the bytes of its text, `x[start]` to `x[end - 1]`, giving what `parse` would; reads the type's columns in query results. `x` can be reused once it returns */
+    decode?: (x: Buffer, start: number, end: number) => T
   }
 
   interface ConnectionParameters {
