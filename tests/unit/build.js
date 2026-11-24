@@ -19,6 +19,14 @@ t('Insert and update helpers with no columns throw (#644)', async() => [
   ].map(fn => { try { fn().text } catch (e) { return e.code } }).join(' ')
 ])
 
+t('Insert helper with an empty array throws NO_COLUMNS', async() => [
+  'NO_COLUMNS NO_COLUMNS',
+  [
+    () => sql`insert into x ${ sql([]) }`,
+    () => sql`insert into x ${ sql([], 'a') }`
+  ].map(fn => { try { return fn().text } catch (e) { return e.code } }).join(' ')
+])
+
 t('Undefined values in any row of a multi row insert throw, whatever the order (#889)', async() => [
   'UNDEFINED_VALUE UNDEFINED_VALUE',
   [

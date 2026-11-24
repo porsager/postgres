@@ -240,10 +240,13 @@ function update(first, rest, o) {
 }
 
 function insert(first, rest, o) {
+  if (Array.isArray(first) && !first.length)
+    empty('insert')
+
   if (Array.isArray(first) && first.every(x => typeof x === 'string'))
     return '(' + escapeIdentifiers(first.concat(rest.flat()), o) + ')'
 
-  const picked = columns(Array.isArray(first) ? first[0] || {} : first, rest)
+  const picked = columns(Array.isArray(first) ? first[0] : first, rest)
   picked.length || empty('insert')
 
   return '(' + escapeIdentifiers(picked, o) + ')values' + valuesBuilder(Array.isArray(first) ? first : [first], picked, o)
