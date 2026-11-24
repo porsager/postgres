@@ -538,9 +538,13 @@ function parseOptions(a, b) {
     pass            : o.pass || o.password || url.url.password || env.PGPASSWORD || '',
     ...Object.entries(defaults).reduce(
       (acc, [k, d]) => {
-        const value = k in o && o[k] !== undefined ? o[k] : k in query
-          ? (query[k] === 'disable' || query[k] === 'false' ? false : query[k])
-          : k === 'ssl' && env.PGSSLMODE || env['PG' + k.toUpperCase()] || d
+        const fromEnv = k === 'ssl' && env.PGSSLMODE || env['PG' + k.toUpperCase()]
+        const raw = k in query ? query[k] : fromEnv
+        const value = k in o && o[k] !== undefined
+          ? o[k]
+          : k in query || fromEnv
+            ? (raw === 'disable' || raw === 'false' ? false : raw)
+            : d
         acc[k] = typeof value === 'string' && ints.includes(k)
           ? +value
           : value
