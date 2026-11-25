@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **A helper after an SQL comment builds the right clause.** A `--` or `/* */` comment before `${ sql(...) }` was read as SQL when the helper looked back for its clause, so a comment with a word like `from` or `where` in it, or an apostrophe, made `insert into x -- rows from the import ${ sql(row) }` or `update x set -- the user's name ${ sql(row) }` fail with `TypeError: x.replace is not a function`. Comments are now skipped, while `--` and `/*` inside quoted strings, quoted identifiers and dollar quotes are left alone.
 - **A number for a `timestamptz`, `timestamp` or `date` parameter is written as epoch milliseconds again** (#1324). 4.0 sent a number as its digits before the server had named the parameter's type, so `${ Date.now() }` for a timestamp failed with `22008`, where v3 wrote it as that instant. The first time a statement with a number parameter runs, the pool now waits for the server's parameter types, at the cost of one round trip, and remembers them for that statement.
 - **A value typed with `sql.typed()` is written as its own type when the server types the other parameters.** A statement with an untyped parameter learns its parameter types from the server, and once it had them it wrote every value with the serializer of the server's type, a typed value included. JSON text typed as `unknown` (705) for a `jsonb` parameter went through `JSON.stringify` again and was stored as a JSON string, from the statement's second run on, or from its first when the untyped value was not `null`.
 
