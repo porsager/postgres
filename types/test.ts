@@ -134,7 +134,7 @@ async function queries() {
   // @ts-expect-error a helper is not a query
   await sql('users')
   // @ts-expect-error removed in v4
-  sql.array([1, 2]).value
+  sql`select ${ sql.array([1, 2]) }`
   // @ts-expect-error a symbol is not a value
   const insertSymbol = <T extends { name: symbol }>(row: T) => sql`insert into users ${ sql(row) }`
   // @ts-expect-error a symbol is not a value
