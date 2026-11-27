@@ -128,7 +128,7 @@ function attempt(options, host, port, signal) {
             , auth = Auth({ user, pass: options.pass || stored, binding: options.channel_binding, socket })
             , parameters = {}
             , backend = { pid: null, secret: null }
-            , frames = p.Frames(frame, false, error => (reject(error), socket.destroy()))
+            , frames = p.Frames(frame, false, reject)
             , rows = []
 
         let probing = false
@@ -162,7 +162,7 @@ function attempt(options, host, port, signal) {
 
         function authenticate(x) {
           authing = authing.then(() => auth(x)).then(reply => reply && socket.write(reply))
-          authing.catch(error => (reject(error), socket.destroy()))
+          authing.catch(reject)
         }
 
         function settled(x, rest) {
