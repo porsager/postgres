@@ -869,7 +869,7 @@ declare namespace postgres {
     notify(channel: string, payload: string): PendingRequest
 
     /** @deprecated removed in v4: pass the array as it is, and cast it if needed (`${ xs }::int[]`) */
-    array(value: any, type?: number): never
+    array: never
 
     /** A query from a file */
     file<T extends readonly any[] = Row[]>(path: string | Buffer | URL | number, options?: { cache?: boolean | undefined }): PendingQuery<T>
