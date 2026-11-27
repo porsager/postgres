@@ -685,6 +685,28 @@ t('A lazy read of array types that keeps failing rejects the query once connect_
   ]
 })
 
+t('A lazy read of array types whose backend is terminated is retried after backoff', { timeout: 10 }, async() => {
+  await sql`create type test_mood as enum ('ok', 'sad')`
+  let killed = 0
+  const proxy = net.createServer(client => {
+    const server = net.connect(options.port || 5432, options.host || 'localhost')
+    client.on('data', x => !killed && x.includes('pg_catalog.pg_type')
+      ? (killed++, server.destroy(), client.end(errorResponse('FATAL', '57P01')))
+      : server.write(x)
+    )
+    server.on('data', x => client.writable && client.write(x))
+    client.on('error', () => server.destroy())
+    server.on('error', () => client.destroy())
+    client.on('close', () => server.destroy())
+  })
+  await new Promise(r => proxy.listen(0, 'localhost', r))
+  const lazy = postgres({ ...options, host: 'localhost', port: proxy.address().port, max: 1, backoff: () => 0.1 })
+  const [{ m }] = await lazy`select '{ok,sad}'::test_mood[] as m`
+  await lazy.end()
+  proxy.close()
+  return ['ok|sad 1', [].concat(m).join('|') + ' ' + killed, await sql`drop type test_mood`]
+})
+
 t('A query refused with a FATAL error rejects with the peer error instead of reconnecting forever', async() => {
   let attempts = 0
     , unhandled = 0

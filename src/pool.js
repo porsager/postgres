@@ -453,7 +453,7 @@ export function Pool(options, types) {
 
   function fetched(loading) {
     let failure = null
-    loading.then(() => typesLoaded = true, error => error instanceof PostgresError ? typesLoaded = true : failure = error).then(() => {
+    loading.then(() => typesLoaded = true, error => answered(error) ? typesLoaded = true : failure = error).then(() => {
       typesLoading = false
       events.typed = typesLoaded
       if (typesLoaded) {
@@ -476,6 +476,11 @@ export function Pool(options, types) {
       const wait = 1000 * (typeof options.backoff === 'function' ? options.backoff(typeRetries) : options.backoff)
       paused.size && (retryTypes = setTimeout(() => (retryTypes = null, need()), wait))
     })
+  }
+
+  // A connection exception (08) or a shutdown (57P) is a failed attempt, not the server's answer about types
+  function answered(error) {
+    return error instanceof PostgresError && !/^(08|57P)/.test(error.code)
   }
 
   function resume() {
@@ -528,7 +533,7 @@ export function Pool(options, types) {
       types.named || (c.typing = q)
       bound(c, q)
       c.simple(q, text)
-    })).then(() => typesLoaded = true, error => error instanceof PostgresError
+    })).then(() => typesLoaded = true, error => answered(error)
       ? typesLoaded = true
       : error && error.code === 'TYPE_NOT_FOUND' && (typesError = error, typesFailed = now())
     ).then(() => {
