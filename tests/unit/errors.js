@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 import { t } from '../test.js'
 import { PostgresError } from '../../src/errors.js'
 import postgres from '../../src/index.js'
@@ -64,3 +65,29 @@ t('Not tagged error has a code', async() => {
   await sql.end()
   return ['NOT_TAGGED_CALL', e.code]
 })
+
+// Like the Workers socket, destroy() emits close before it returns
+function closing(reply) {
+  const x = new EventEmitter()
+  x.write = () => (setImmediate(() => x.emit('data', reply)), true)
+  x.destroy = () => x.emit('close')
+  x.end = x.pause = x.resume = x.setKeepAlive = () => {}
+  return x
+}
+
+async function startupError(reply, options) {
+  const sql = postgres({ socket: () => closing(reply), ssl: false, max: 1, connect_timeout: 1, ...options })
+  const e = await sql`select 1`.catch(x => x)
+  await sql.end({ timeout: 0 })
+  return e.code
+}
+
+t('Authentication error survives a socket that closes on destroy (#1349)', async() => [
+  'CHANNEL_BINDING_REQUIRED',
+  await startupError(Buffer.from([82, 0, 0, 0, 8, 0, 0, 0, 3]), { channel_binding: 'require' })
+])
+
+t('Protocol error survives a socket that closes on destroy (#1349)', async() => [
+  'PROTOCOL_ERROR',
+  await startupError(Buffer.from([82, 0, 0, 0, 1]))
+])
